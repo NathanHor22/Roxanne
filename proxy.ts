@@ -55,6 +55,13 @@ function forbiddenResponse(
 }
 
 export async function proxy(request: NextRequest) {
+  if (process.env.DEMO_ACCESS_MODE === "public") {
+    if (request.nextUrl.pathname === "/login") {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next({ request });
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const mode = authEnforcementMode({

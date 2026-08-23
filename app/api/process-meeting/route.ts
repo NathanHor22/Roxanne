@@ -7,7 +7,7 @@ import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-sec
 import { MAX_AUDIO_BYTES, normalizeAudioContentType } from "@/lib/audio-upload";
 import { parseLocale } from "@/lib/i18n";
 import { persistProcessedMeeting } from "@/lib/persistence";
-import { transcribeAudio } from "@/lib/providers/elevenlabs";
+import { transcribeMeetingAudio } from "@/lib/providers/transcription";
 import { extractMeetingInsights } from "@/lib/providers/qwen";
 import { rememberPerson, rememberSession, setProcessingState } from "@/lib/redis";
 import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
     const clientReference = input.clientReference;
 
     await setProcessingState(input.processingId, { status: "processing", stage: "transcribing", fileName: input.fileName });
-    const transcription = await transcribeAudio(input.audio, { fileName: input.fileName });
+    const transcription = await transcribeMeetingAudio(input.audio, { fileName: input.fileName });
     await setProcessingState(input.processingId, { status: "processing", stage: "extracting", language: transcription.language });
     const extraction = await extractMeetingInsights(transcription.segments, {
       title: input.title,
@@ -308,7 +308,7 @@ export async function POST(request: Request) {
       meeting,
       persisted: persistence.persisted,
       persistence,
-      providerStatus: { transcription: transcription.provider === "elevenlabs" ? "live" : "fallback", extraction: extraction.provider === "qwen" ? "live" : "fallback", persistence: persistence.persisted ? "live" : "local" },
+      providerStatus: { transcription: transcription.provider === "fallback" ? "fallback" : "live", extraction: extraction.provider === "qwen" ? "live" : "fallback", persistence: persistence.persisted ? "live" : "local" },
       warnings: [transcription.warning, extraction.warning, persistence.warning].filter(Boolean),
     });
   } catch (error) {

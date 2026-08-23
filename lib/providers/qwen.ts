@@ -156,8 +156,11 @@ function buildMessages(
   ] as const;
 }
 
-function responseFormat(strictSchema: boolean) {
-  if (!strictSchema) return { type: "json_object" } as const;
+type ResponseMode = "schema" | "object" | "prompt";
+
+function responseFormat(mode: ResponseMode) {
+  if (mode === "prompt") return undefined;
+  if (mode === "object") return { type: "json_object" } as const;
   return {
     type: "json_schema",
     json_schema: {
@@ -171,14 +174,18 @@ function responseFormat(strictSchema: boolean) {
 function makeRequestBody(
   model: string,
   messages: ReturnType<typeof buildMessages>,
-  strictSchema: boolean,
+  responseMode: ResponseMode,
+  includeThinkingControl = true,
+  useGroqLimits = false,
 ) {
+  const format = responseFormat(responseMode);
   return {
     model,
     messages,
-    response_format: responseFormat(strictSchema),
+    ...(format ? { response_format: format } : {}),
     temperature: 0.1,
-    enable_thinking: false,
+    ...(includeThinkingControl ? { enable_thinking: false } : {}),
+    ...(useGroqLimits ? { max_completion_tokens: 4_096 } : {}),
   };
 }
 
@@ -206,7 +213,7 @@ function redactAndCompactDetail(body: string, apiKey: string): string | undefine
 function supportsCompatibilityRetry(status: number, body: string): boolean {
   return (
     (status === 400 || status === 422) &&
-    /json[_ -]?schema|response[_ -]?format|structured output|unknown format|not supported/iu.test(
+    /json[_ -]?schema|response[_ -]?format|structured output|unknown format|not supported|failed to validate json|failed_generation/iu.test(
       body,
     )
   );
@@ -293,6 +300,8 @@ export async function extractMeetingInsights(
     "",
   );
   const endpoint = `${baseUrl}/chat/completions`;
+  const includeThinkingControl = /(?:dashscope|aliyuncs)/iu.test(baseUrl);
+  const useGroqLimits = /api\.groq\.com/iu.test(baseUrl);
   const model = options.model?.trim() || runtime.QWEN_MODEL;
   const referenceDate = context.referenceDate ?? new Date().toISOString();
   const messages = buildMessages(normalized.text, context, referenceDate);
@@ -305,7 +314,7 @@ export async function extractMeetingInsights(
   try {
     result = await makeProviderRequest(
       endpoint,
-      makeRequestBody(model, messages, true),
+      makeRequestBody(model, messages, "schema", includeThinkingControl, useGroqLimits),
       apiKey,
       fetchImpl,
       abort.signal,
@@ -321,11 +330,23 @@ export async function extractMeetingInsights(
       usedJsonObjectCompatibility = true;
       result = await makeProviderRequest(
         endpoint,
-        makeRequestBody(model, messages, false),
+        makeRequestBody(model, messages, "object", includeThinkingControl, useGroqLimits),
         apiKey,
         fetchImpl,
         abort.signal,
       );
+      if (
+        !result.response.ok &&
+        supportsCompatibilityRetry(result.response.status, result.text)
+      ) {
+        result = await makeProviderRequest(
+          endpoint,
+          makeRequestBody(model, messages, "prompt", includeThinkingControl, useGroqLimits),
+          apiKey,
+          fetchImpl,
+          abort.signal,
+        );
+      }
     }
   } catch (error) {
     if (abort.timedOut()) {

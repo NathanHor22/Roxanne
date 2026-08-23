@@ -8,11 +8,13 @@ let cached: Redis | null | undefined;
 export function getRedis(): Redis | null {
   if (cached !== undefined) return cached;
   const runtime = env();
-  if (!runtime.UPSTASH_REDIS_REST_URL || !runtime.UPSTASH_REDIS_REST_TOKEN) {
+  const url = runtime.UPSTASH_REDIS_REST_URL || runtime.KV_REST_API_URL;
+  const token = runtime.UPSTASH_REDIS_REST_TOKEN || runtime.KV_REST_API_TOKEN;
+  if (!url || !token) {
     cached = null;
     return null;
   }
-  cached = new Redis({ url: runtime.UPSTASH_REDIS_REST_URL, token: runtime.UPSTASH_REDIS_REST_TOKEN });
+  cached = new Redis({ url, token });
   return cached;
 }
 

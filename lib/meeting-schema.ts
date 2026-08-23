@@ -55,7 +55,7 @@ export const transcriptionResultSchema = z
     text: compactText("transcript", 250_000),
     segments: z.array(transcriptSegmentSchema).min(1).max(10_000),
     language: compactText("language", 40),
-    provider: z.enum(["elevenlabs", "fallback"]),
+    provider: z.enum(["elevenlabs", "groq", "fallback"]),
     warning: compactText("warning", 500).optional(),
   })
   .strict();

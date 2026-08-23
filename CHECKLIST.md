@@ -9,16 +9,16 @@ until it has been exercised with real credentials.
 ## Phase 1 — Foundation and safety
 
 - [x] Next.js application and persistent Baileys worker are separate services.
-- [x] Production authentication fails closed when Supabase Auth is missing.
-- [x] Access is restricted to `nathanhor2001@gmail.com`.
+- [x] Hackathon production uses the explicitly requested public launch mode;
+  owner-only Google Auth remains available with `DEMO_ACCESS_MODE=owner`.
 - [x] WhatsApp pairing and sends are restricted to `601154444038`.
 - [x] Provider secrets stay server-side.
 - [x] External sends require an explicit approved action.
 
 Reviewer check:
 
-- Open `/login` while signed out; the calendar must not be visible.
-- Try any Google account other than the owner; access must be rejected.
+- Open `/`, click **Open dashboard**, and confirm `/dashboard` loads directly.
+- Restore `DEMO_ACCESS_MODE=owner` before using this workspace beyond the demo.
 
 ## Phase 2 — Product experience
 
@@ -40,10 +40,11 @@ Reviewer check:
 - [x] Browser uploads audio directly to the private Supabase bucket.
 - [x] Owner/path validation, 25 MB limit, MIME allowlist, and failed-state handling.
 - [x] ElevenLabs Scribe v2 transcription adapter with diarization.
+- [x] Groq Whisper production transcription when ElevenLabs is not configured.
 - [x] Qwen strict structured extraction for people, insights, and commitments.
 - [x] Devin produces proposals only; it cannot execute a send.
 - [x] Production rejects credential-free fixture fallbacks.
-- [ ] Run one real audio through ElevenLabs → Qwen → Supabase.
+- [ ] Run one real audio through Groq Whisper → Qwen → Supabase.
 - [ ] Prepare one real Devin follow-up proposal.
 
 Reviewer check:
@@ -71,7 +72,7 @@ Reviewer check:
 
 - [x] Application TypeScript check passes.
 - [x] Worker TypeScript check passes.
-- [x] 59/59 automated tests pass.
+- [x] 60/60 automated tests pass.
 - [x] 2/2 worker hardening tests pass.
 - [x] Next.js production build passes.
 - [x] Baileys worker build passes.
@@ -95,24 +96,25 @@ npm.cmd run check
   14 tables, 12 public RLS policies, and the private recording bucket verified.
 - [x] Supabase Google Auth is enabled and email/password signup is disabled.
 - [ ] Add the Supabase and Roxanne callback URLs to the Google Cloud OAuth client.
-- [ ] Provision Vercel Marketplace Upstash Redis after the owner accepts its terms.
+- [x] Provision and connect Vercel Marketplace Upstash Redis.
 - [x] Add Supabase, application Google OAuth, WhatsApp relay, owner, timezone,
   and action-approval variables to Vercel Production.
-- [ ] Add live ElevenLabs, Qwen, Devin, Agora, and Upstash variables to Vercel.
+- [x] Add and verify live Groq/Qwen, Agora, and Upstash variables in Vercel.
+- [ ] Add Devin credentials if the proposal step is required for judging.
 - [x] Deploy and health-check the one-replica Baileys worker on Railway; live
   state is `qr_ready` and awaits owner pairing.
 - [ ] Pair WhatsApp from Roxanne Settings.
 - [x] Initial Vercel production build deployed and assigned to
-  `https://roxanne-two.vercel.app`.
-- [x] Redeploy with production variables and verify `/login` plus the signed-out
-  home redirect both return HTTP 200.
+  `https://roxanne-assistant.vercel.app`.
+- [ ] Deploy and verify the public launch page, dashboard, Groq, Agora, Redis,
+  and hardware bootstrap routes.
 - [ ] Run the complete credential-backed golden path.
 - [ ] Record the Railway URL and final golden-path verification time below.
 
 Release record:
 
 - Git branch: `origin/main`
-- Vercel URL: `https://roxanne-two.vercel.app` (live)
+- Vercel URL: `https://roxanne-assistant.vercel.app` (live)
 - Railway worker URL: `https://roxanne-whatsapp-production.up.railway.app`
 - Supabase project ref: `cjogfunwcwytvooycjzv` (schema applied)
 - Infrastructure verified: 23 August 2026, 14:13 (Asia/Kuala_Lumpur)
@@ -123,11 +125,9 @@ Release record:
 These steps require an account decision, secret, or physical confirmation and
 cannot be completed by repository automation alone:
 
-- [ ] Accept the Vercel Marketplace / Upstash terms so Redis can be provisioned.
-- [ ] Supply or approve the production credentials for ElevenLabs, Qwen, Devin,
-  and Agora without committing them to Git.
+- [ ] Add Devin credentials if the proposal step will be demonstrated.
 - [ ] Add `https://cjogfunwcwytvooycjzv.supabase.co/auth/v1/callback` and
-  `https://roxanne-two.vercel.app/api/google/callback` to the existing Google
+  `https://roxanne-assistant.vercel.app/api/google/callback` to the existing Google
   Cloud OAuth client's authorized redirect URIs, then complete the one-time
   Google Calendar consent from Roxanne Settings.
 - [ ] Scan the WhatsApp QR or enter the pairing code on the phone for
@@ -139,8 +139,8 @@ cannot be completed by repository automation alone:
 
 - [x] Gmail/email sending is replaced by the user-requested WhatsApp preview and
   approved self-send flow.
-- [x] Hardware is simulated by browser upload/Agora recording, as allowed by
-  the V0.1 specification.
+- [x] Browser Agora recording plus device registration and short-lived hardware
+  Agora bootstrap endpoints are implemented.
 - [ ] Existing Google Calendar event import and automatic recording matching
   are deferred; V0.1 includes free/busy input and invitation output.
 - [ ] Daily cross-meeting aggregation, Redis vectors, Supabase Realtime, and
@@ -148,12 +148,12 @@ cannot be completed by repository automation alone:
 
 ## Live golden path — final gate
 
-- [ ] Sign in as `nathanhor2001@gmail.com`.
+- [ ] Click **Open dashboard**; no Google login is required in hackathon mode.
 - [ ] Record or upload real audio.
-- [ ] Confirm live ElevenLabs transcription and live Qwen extraction.
+- [ ] Confirm live Groq Whisper transcription and live Qwen extraction.
 - [ ] Reload and confirm the meeting, audio, transcript, and follow-ups persist.
 - [ ] Generate a Devin proposal, review it, then approve WhatsApp send.
 - [ ] Confirm the message arrives only at `01154444038`.
 - [ ] Check Google free/busy, approve a slot, and receive the calendar invite.
-- [ ] Verify Settings reports Supabase, ElevenLabs, Qwen, Devin, Google,
+- [ ] Verify Settings reports Supabase, Groq Whisper, Qwen, Devin, Google,
   WhatsApp, Agora, and Redis as connected.

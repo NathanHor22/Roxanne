@@ -9,6 +9,7 @@ import {
   ElevenLabsProviderError,
   transcribeAudio,
 } from "../lib/providers/elevenlabs";
+import { transcribeWithGroq } from "../lib/providers/groq-transcription";
 import {
   FALLBACK_EXTRACTION_WARNING,
   FALLBACK_TRANSCRIPTION_WARNING,
@@ -221,6 +222,42 @@ test("configured ElevenLabs failures throw and never become fixture data", async
       return true;
     },
   );
+});
+
+test("Groq Whisper sends multipart audio and maps verbose segments", async () => {
+  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    assert.equal(String(input), "https://api.groq.com/openai/v1/audio/transcriptions");
+    assert.equal((init?.headers as Record<string, string>).authorization, "Bearer groq-key");
+    assert.ok(init?.body instanceof FormData);
+    assert.equal(init.body.get("model"), "whisper-large-v3-turbo");
+    assert.equal(init.body.get("response_format"), "verbose_json");
+    return new Response(
+      JSON.stringify({
+        text: "James wants a pilot.",
+        language: "en",
+        segments: [{ start: 0, end: 1.4, text: " James wants a pilot. " }],
+      }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  const result = await transcribeWithGroq(new Blob(["audio"]), {
+    apiKey: "groq-key",
+    modelId: "whisper-large-v3-turbo",
+    fileName: "meeting.wav",
+    fetchImpl,
+  });
+
+  assert.equal(result.provider, "groq");
+  assert.equal(result.language, "en");
+  assert.deepEqual(result.segments, [
+    {
+      speaker: "Speaker 1",
+      text: "James wants a pilot.",
+      startSeconds: 0,
+      endSeconds: 1.4,
+    },
+  ]);
 });
 
 test("credential-free extraction uses deterministic transcript-derived rules", () => {

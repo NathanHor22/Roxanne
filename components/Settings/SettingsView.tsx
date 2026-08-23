@@ -16,7 +16,7 @@ import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 
 const integrations = [
   { id: "supabase", label: "Supabase", icon: Database },
-  { id: "elevenlabs", label: "ElevenLabs", icon: Headphones },
+  { id: "elevenlabs", label: "Groq Whisper", icon: Headphones },
   { id: "qwen", label: "Qwen", icon: Sparkles },
   { id: "devin", label: "Devin", icon: Activity },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
@@ -118,7 +118,7 @@ export function SettingsView({ status }: { status: Record<string, boolean> }) {
               <div key={id} className="integration-row">
                 <span className="integration-row__icon"><Icon /></span>
                 <span><strong>{label}</strong><small>{live ? dict.settings.connected : status[id] ? dict.settings.configured : dict.settings.needsSetup}</small></span>
-                {id === "google" && !live ? <a className="integration-action" href="/api/google/connect?returnTo=%2F%3Fview%3Dsettings">{dict.settings.connect}</a> : null}
+                {id === "google" && !live ? <a className="integration-action" href="/api/google/connect?returnTo=%2Fdashboard%3Fview%3Dsettings">{dict.settings.connect}</a> : null}
                 {id === "whatsapp" && status.whatsappRelay && !live ? <button type="button" className="integration-action" disabled={working} onClick={() => void pairWhatsApp()}>{dict.settings.connect}</button> : null}
                 <i className={live ? "is-live" : ""} />
               </div>

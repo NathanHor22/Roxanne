@@ -9,6 +9,8 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   ELEVENLABS_API_KEY: z.string().optional(),
   ELEVENLABS_SCRIBE_MODEL_ID: z.string().default("scribe_v2"),
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_TRANSCRIPTION_MODEL: z.string().default("whisper-large-v3-turbo"),
   QWEN_API_KEY: z.string().optional(),
   QWEN_BASE_URL: optionalUrl,
   QWEN_MODEL: z.string().default("qwen-plus"),
@@ -29,10 +31,13 @@ const serverEnvSchema = z.object({
   AGORA_APP_CERTIFICATE: z.string().optional(),
   UPSTASH_REDIS_REST_URL: optionalUrl,
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+  KV_REST_API_URL: optionalUrl,
+  KV_REST_API_TOKEN: z.string().optional(),
   APP_TIMEZONE: z.string().default("Asia/Kuala_Lumpur"),
   ACTION_APPROVAL_SECRET: z.string().optional(),
   DEMO_USER_EMAIL: z.string().email().default("nathanhor2001@gmail.com"),
   DEMO_USER_ID: z.string().uuid().optional(),
+  DEMO_ACCESS_MODE: z.enum(["owner", "public"]).default("owner"),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -53,12 +58,15 @@ export function integrationStatus() {
   const value = env();
   return {
     supabase: Boolean(value.NEXT_PUBLIC_SUPABASE_URL && value.SUPABASE_SERVICE_ROLE_KEY),
-    elevenlabs: Boolean(value.ELEVENLABS_API_KEY),
+    elevenlabs: Boolean(value.ELEVENLABS_API_KEY || value.GROQ_API_KEY),
     qwen: Boolean(value.QWEN_API_KEY),
     devin: Boolean(value.DEVIN_API_KEY),
     google: Boolean(value.GOOGLE_CLIENT_ID && value.GOOGLE_CLIENT_SECRET && value.GOOGLE_REFRESH_TOKEN),
     whatsapp: Boolean(value.WHATSAPP_RELAY_URL && value.WHATSAPP_RELAY_TOKEN),
     agora: Boolean(value.NEXT_PUBLIC_AGORA_APP_ID && value.AGORA_APP_CERTIFICATE),
-    redis: Boolean(value.UPSTASH_REDIS_REST_URL && value.UPSTASH_REDIS_REST_TOKEN),
+    redis: Boolean(
+      (value.UPSTASH_REDIS_REST_URL && value.UPSTASH_REDIS_REST_TOKEN) ||
+        (value.KV_REST_API_URL && value.KV_REST_API_TOKEN),
+    ),
   };
 }

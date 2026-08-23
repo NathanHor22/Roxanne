@@ -24,6 +24,8 @@ function noStoreError(message: string, status: number): NextResponse {
  * public Supabase values are absent in local development.
  */
 export async function requireOwnerSession(): Promise<NextResponse | null> {
+  if (process.env.DEMO_ACCESS_MODE === "public") return null;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
   const mode = authEnforcementMode({
