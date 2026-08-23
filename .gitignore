@@ -1,0 +1,28 @@
+# dependencies
+/node_modules
+/worker/node_modules
+
+# Next.js
+/.next
+/out
+/worker/dist
+/.vercel
+
+# local configuration and secrets
+.env
+.env.local
+.env.*.local
+
+# test and build output
+/coverage
+/test-results
+/playwright-report
+*.tsbuildinfo
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+
+.vercel

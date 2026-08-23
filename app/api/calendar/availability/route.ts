@@ -1,0 +1,75 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { env } from "@/lib/env";
+import {
+  GoogleCalendarProviderError,
+  createAuthorizedGoogleOAuthClient,
+  getGoogleCalendarAvailability,
+  getGoogleOAuthConfig,
+} from "@/lib/providers/google-calendar";
+import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+export async function GET(request: Request) {
+  const authError = await requireOwnerSession();
+  if (authError) return authError;
+  const readinessError = requireProductionPersistence(
+    Boolean(getServerSupabase()),
+    "Supabase persistence is required for production Calendar access.",
+  );
+  if (readinessError) return readinessError;
+  try {
+    const requestUrl = new URL(request.url);
+    const input = {
+      date: requestUrl.searchParams.get("date"),
+      period: requestUrl.searchParams.get("period") || "afternoon",
+    };
+    const config = getGoogleOAuthConfig();
+    const client = getServerSupabase();
+    let userId = env().DEMO_USER_ID ?? null;
+    if (!config.refreshToken) {
+      if (!client) {
+        throw new GoogleCalendarProviderError(
+          "Google Calendar is not connected.",
+          "not_connected",
+        );
+      }
+      userId = await resolveDemoUserId(client, { createIfMissing: false });
+    }
+    const oauthClient = await createAuthorizedGoogleOAuthClient({
+      config,
+      client,
+      userId,
+    });
+    const availability = await getGoogleCalendarAvailability(input, {
+      oauthClient,
+      calendarId: config.calendarId,
+    });
+    return NextResponse.json(
+      { availability },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Choose a valid availability date and period." },
+        { status: 400 },
+      );
+    }
+    if (error instanceof GoogleCalendarProviderError) {
+      const status =
+        error.code === "configuration" || error.code === "not_connected"
+          ? 503
+          : 502;
+      return NextResponse.json({ error: error.message }, { status });
+    }
+    return NextResponse.json(
+      { error: "Calendar availability could not be checked." },
+      { status: 500 },
+    );
+  }
+}

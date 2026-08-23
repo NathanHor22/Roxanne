@@ -1,0 +1,41 @@
+{
+  "name": "roxanne",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "worker:typecheck": "npm --prefix worker run typecheck",
+    "worker:test": "npm --prefix worker run test",
+    "worker:build": "npm --prefix worker run build",
+    "check": "npm run typecheck && npm run worker:typecheck && npm run test && npm run worker:test && npm run build && npm run worker:build"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.106.2",
+    "@upstash/redis": "^1.38.0",
+    "agora-rtc-sdk-ng": "^4.24.6",
+    "agora-token": "^2.0.5",
+    "date-fns": "^4.1.0",
+    "googleapis": "^176.0.0",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.42.2",
+    "next": "^16.3.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
