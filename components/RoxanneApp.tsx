@@ -104,15 +104,23 @@ export function RoxanneApp() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/meetings")
+    let cancelled = false;
+    const refreshMeetings = () => fetch("/api/meetings", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then((payload: { meetings?: Meeting[]; source?: string }) => {
+        if (cancelled) return;
         if (payload.source !== "supabase" || !Array.isArray(payload.meetings)) return;
         setMeetings(payload.meetings);
         setMeetingSource("supabase");
         setFollowUps(payload.meetings.flatMap((meeting) => meeting.followUps || []));
       })
       .catch(() => undefined);
+    void refreshMeetings();
+    const timer = window.setInterval(refreshMeetings, 5_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {

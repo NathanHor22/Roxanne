@@ -8,8 +8,9 @@ import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
 export interface PersistMeetingInput {
   clientReference: string;
   meeting: Meeting;
-  audio: Blob;
-  fileName: string;
+  /** Omitted for live Agora hardware sessions where no source file exists. */
+  audio?: Blob;
+  fileName?: string;
   transcription: TranscriptionResult;
   extraction: MeetingExtractionResult;
   /** Private object and metadata row created by /api/recordings/upload-url. */
@@ -83,8 +84,9 @@ export async function persistProcessedMeeting(
 
   const recordingId = input.preUploadedRecording?.recordingId ?? randomUUID();
   const date = new Date(input.meeting.startAt);
-  const path = input.preUploadedRecording?.storagePath ??
-    `${userId}/${date.getUTCFullYear()}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${recordingId}.${extensionOf(input.fileName, input.audio.type)}`;
+  const path = input.preUploadedRecording?.storagePath ?? (input.audio
+    ? `${userId}/${date.getUTCFullYear()}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${recordingId}.${extensionOf(input.fileName || "recording.wav", input.audio.type)}`
+    : undefined);
 
   if (input.preUploadedRecording) {
     // Re-check both owner and path at the persistence boundary. This prevents a
@@ -94,7 +96,7 @@ export async function persistProcessedMeeting(
       .select("id")
       .eq("id", recordingId)
       .eq("user_id", userId)
-      .eq("storage_path", path)
+      .eq("storage_path", path!)
       .maybeSingle();
     if (recordingLookupError || !recording) {
       throw new Error(`Could not verify the pre-uploaded recording: ${recordingLookupError?.message || "owner/path mismatch"}`);
@@ -109,9 +111,9 @@ export async function persistProcessedMeeting(
       })
       .eq("id", recordingId)
       .eq("user_id", userId)
-      .eq("storage_path", path);
+      .eq("storage_path", path!);
     if (recordingError) throw new Error(`Could not update recording metadata: ${recordingError.message}`);
-  } else {
+  } else if (input.audio && path) {
     const { error: uploadError } = await client.storage.from("recordings").upload(path, input.audio, {
       contentType: input.audio.type || "audio/mp4",
       upsert: false,
@@ -127,6 +129,17 @@ export async function persistProcessedMeeting(
       provider_status: { transcription: input.transcription.provider, extraction: input.extraction.provider },
     });
     if (recordingError) throw new Error(`Could not save recording metadata: ${recordingError.message}`);
+  } else {
+    const { error: recordingError } = await client.from("recordings").insert({
+      id: recordingId,
+      user_id: userId,
+      device_id: null,
+      storage_path: null,
+      language: input.transcription.language,
+      status: "ready",
+      provider_status: { transcription: input.transcription.provider, extraction: input.extraction.provider },
+    });
+    if (recordingError) throw new Error(`Could not save live recording metadata: ${recordingError.message}`);
   }
 
   const { data: meetingRow, error: meetingError } = await client.from("meetings").upsert({
@@ -221,6 +234,8 @@ export async function persistProcessedMeeting(
     status: "pending",
   }));
 
-  const { data: signed } = await client.storage.from("recordings").createSignedUrl(path, 3600);
+  const signed = path
+    ? (await client.storage.from("recordings").createSignedUrl(path, 3600)).data
+    : null;
   return { persisted: true, meetingId, recordingId, contactIds, followUpIds, signedRecordingUrl: signed?.signedUrl };
 }

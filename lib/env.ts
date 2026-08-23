@@ -29,6 +29,10 @@ const serverEnvSchema = z.object({
   WHATSAPP_WORKSPACE_KEY: z.string().min(1).max(80).default("roxanne"),
   NEXT_PUBLIC_AGORA_APP_ID: z.string().optional(),
   AGORA_APP_CERTIFICATE: z.string().optional(),
+  AGORA_CUSTOMER_ID: z.string().optional(),
+  AGORA_CUSTOMER_SECRET: z.string().optional(),
+  AGORA_CONVOAI_ASR_LANGUAGE: z.string().default("en-US"),
+  AGORA_CONVOAI_TTS: z.string().optional(),
   UPSTASH_REDIS_REST_URL: optionalUrl,
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   KV_REST_API_URL: optionalUrl,
@@ -63,7 +67,12 @@ export function integrationStatus() {
     devin: Boolean(value.DEVIN_API_KEY),
     google: Boolean(value.GOOGLE_CLIENT_ID && value.GOOGLE_CLIENT_SECRET && value.GOOGLE_REFRESH_TOKEN),
     whatsapp: Boolean(value.WHATSAPP_RELAY_URL && value.WHATSAPP_RELAY_TOKEN),
-    agora: Boolean(value.NEXT_PUBLIC_AGORA_APP_ID && value.AGORA_APP_CERTIFICATE),
+    agora: Boolean(
+      value.NEXT_PUBLIC_AGORA_APP_ID &&
+      value.AGORA_APP_CERTIFICATE &&
+      value.AGORA_CUSTOMER_ID &&
+      value.AGORA_CUSTOMER_SECRET,
+    ),
     redis: Boolean(
       (value.UPSTASH_REDIS_REST_URL && value.UPSTASH_REDIS_REST_TOKEN) ||
         (value.KV_REST_API_URL && value.KV_REST_API_TOKEN),
