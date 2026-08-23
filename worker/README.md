@@ -8,7 +8,9 @@ to Vercel: serverless instances cannot reliably retain a WhatsApp Web socket.
 
 1. Create a service from this repository and set its root directory to `worker`.
 2. Set `DATABASE_URL` to the Supabase Postgres connection string (prefer the
-   session pooler URL when IPv4 is required).
+   session pooler URL when IPv4 is required). The worker pins Supabase Root
+   2021 CA from `certs/prod-ca-2021.crt` and keeps TLS verification enabled;
+   never bypass certificate validation.
 3. Generate a high-entropy value (at least 24 bytes) for
    `WHATSAPP_RELAY_TOKEN`; set the identical value in Vercel.
 4. Generate a different high-entropy value of at least 32 bytes for

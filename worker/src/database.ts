@@ -6,10 +6,15 @@ import {
   randomBytes,
   randomUUID,
 } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { AuthenticationCreds, AuthenticationState, SignalDataTypeMap } from "@whiskeysockets/baileys";
 import { BufferJSON, initAuthCreds, proto } from "@whiskeysockets/baileys";
 
 const { Pool } = pg;
+const SUPABASE_ROOT_CA = readFileSync(
+  new URL("../certs/prod-ca-2021.crt", import.meta.url),
+  "utf8",
+);
 
 export type DatabasePool = InstanceType<typeof Pool>;
 
@@ -87,8 +92,21 @@ export class AuthValueCipher {
 }
 
 export function createDatabasePool(databaseUrl: string): DatabasePool {
+  const connectionUrl = new URL(databaseUrl);
+  // pg-connection-string turns sslmode=require into its own TLS object, which
+  // would discard the project CA supplied below. Remove URL-level TLS options
+  // and enforce verified TLS explicitly for every worker connection.
+  connectionUrl.searchParams.delete("sslmode");
+  connectionUrl.searchParams.delete("sslcert");
+  connectionUrl.searchParams.delete("sslkey");
+  connectionUrl.searchParams.delete("sslrootcert");
+
   const pool = new Pool({
-    connectionString: databaseUrl,
+    connectionString: connectionUrl.toString(),
+    ssl: {
+      ca: SUPABASE_ROOT_CA,
+      rejectUnauthorized: true,
+    },
     max: 4,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 8_000,

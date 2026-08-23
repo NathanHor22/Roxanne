@@ -99,22 +99,23 @@ npm.cmd run check
 - [x] Add Supabase, application Google OAuth, WhatsApp relay, owner, timezone,
   and action-approval variables to Vercel Production.
 - [ ] Add live ElevenLabs, Qwen, Devin, Agora, and Upstash variables to Vercel.
-- [ ] Finish and health-check the one-replica Baileys worker on Railway.
+- [x] Deploy and health-check the one-replica Baileys worker on Railway; live
+  state is `qr_ready` and awaits owner pairing.
 - [ ] Pair WhatsApp from Roxanne Settings.
 - [x] Initial Vercel production build deployed and assigned to
   `https://roxanne-two.vercel.app`.
-- [ ] Redeploy after the new environment variables are present. The current
-  production deployment still returns the fail-closed Auth configuration `503`
-  because it predates the Supabase public variables.
+- [x] Redeploy with production variables and verify `/login` plus the signed-out
+  home redirect both return HTTP 200.
 - [ ] Run the complete credential-backed golden path.
 - [ ] Record the Railway URL and final golden-path verification time below.
 
 Release record:
 
 - Git branch: `origin/main`
-- Vercel URL: `https://roxanne-two.vercel.app` (redeploy required)
+- Vercel URL: `https://roxanne-two.vercel.app` (live)
 - Railway worker URL: `https://roxanne-whatsapp-production.up.railway.app`
 - Supabase project ref: `cjogfunwcwytvooycjzv` (schema applied)
+- Infrastructure verified: 23 August 2026, 14:13 (Asia/Kuala_Lumpur)
 - Golden-path result: pending
 
 ### Owner-only actions
@@ -125,7 +126,9 @@ cannot be completed by repository automation alone:
 - [ ] Accept the Vercel Marketplace / Upstash terms so Redis can be provisioned.
 - [ ] Supply or approve the production credentials for ElevenLabs, Qwen, Devin,
   and Agora without committing them to Git.
-- [ ] Add both Google Cloud OAuth redirect URIs, then complete the one-time
+- [ ] Add `https://cjogfunwcwytvooycjzv.supabase.co/auth/v1/callback` and
+  `https://roxanne-two.vercel.app/api/google/callback` to the existing Google
+  Cloud OAuth client's authorized redirect URIs, then complete the one-time
   Google Calendar consent from Roxanne Settings.
 - [ ] Scan the WhatsApp QR or enter the pairing code on the phone for
   `01154444038`.
