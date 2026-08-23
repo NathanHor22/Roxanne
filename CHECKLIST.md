@@ -88,23 +88,49 @@ npm.cmd run check
 
 - [x] Vercel account authenticated and `nathans-projects-b0bfd21e/roxanne` linked.
 - [x] GitHub repository connected to the Vercel project.
-- [ ] Create the Roxanne Supabase project in the approved organization/region.
-- [ ] Apply `supabase/migrations/001_initial.sql`.
-- [ ] Enable Supabase Google Auth and add local/production redirect URLs.
-- [ ] Provision Vercel Marketplace Upstash Redis after owner accepts its terms.
-- [ ] Add ElevenLabs, Qwen, Devin, Agora, Google, and Supabase secrets.
-- [ ] Deploy the one-replica Baileys worker to Railway.
+- [x] Current application code committed and pushed to `origin/main`.
+- [x] Roxanne Supabase project created and linked as `cjogfunwcwytvooycjzv`.
+- [x] Local Supabase configuration records the production URL and Auth redirects.
+- [x] Remote migrations `001_initial.sql` and `002_worker_hardening.sql` applied;
+  14 tables, 12 public RLS policies, and the private recording bucket verified.
+- [x] Supabase Google Auth is enabled and email/password signup is disabled.
+- [ ] Add the Supabase and Roxanne callback URLs to the Google Cloud OAuth client.
+- [ ] Provision Vercel Marketplace Upstash Redis after the owner accepts its terms.
+- [x] Add Supabase, application Google OAuth, WhatsApp relay, owner, timezone,
+  and action-approval variables to Vercel Production.
+- [ ] Add live ElevenLabs, Qwen, Devin, Agora, and Upstash variables to Vercel.
+- [ ] Finish and health-check the one-replica Baileys worker on Railway.
 - [ ] Pair WhatsApp from Roxanne Settings.
-- [ ] Deploy the Vercel production build.
+- [x] Initial Vercel production build deployed and assigned to
+  `https://roxanne-two.vercel.app`.
+- [ ] Redeploy after the new environment variables are present. The current
+  production deployment still returns the fail-closed Auth configuration `503`
+  because it predates the Supabase public variables.
 - [ ] Run the complete credential-backed golden path.
-- [ ] Record final production URLs and verification time below.
+- [ ] Record the Railway URL and final golden-path verification time below.
 
 Release record:
 
-- Vercel URL: pending
-- Railway worker URL: pending
-- Supabase project ref: pending
+- Git branch: `origin/main`
+- Vercel URL: `https://roxanne-two.vercel.app` (redeploy required)
+- Railway worker URL: `https://roxanne-whatsapp-production.up.railway.app`
+- Supabase project ref: `cjogfunwcwytvooycjzv` (schema applied)
 - Golden-path result: pending
+
+### Owner-only actions
+
+These steps require an account decision, secret, or physical confirmation and
+cannot be completed by repository automation alone:
+
+- [ ] Accept the Vercel Marketplace / Upstash terms so Redis can be provisioned.
+- [ ] Supply or approve the production credentials for ElevenLabs, Qwen, Devin,
+  and Agora without committing them to Git.
+- [ ] Add both Google Cloud OAuth redirect URIs, then complete the one-time
+  Google Calendar consent from Roxanne Settings.
+- [ ] Scan the WhatsApp QR or enter the pairing code on the phone for
+  `01154444038`.
+- [ ] Approve the real WhatsApp self-send and Google Calendar invitation during
+  the final golden-path test.
 
 ## Explicit MVP scope decisions
 

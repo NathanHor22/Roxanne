@@ -1,5 +1,7 @@
 -- Atomic WhatsApp delivery claims. A crashed worker's claim becomes eligible
 -- for retry when its renewable lease expires; completed sends remain permanent.
+begin;
+
 alter table public.whatsapp_delivery_keys
   add column if not exists lease_token uuid,
   add column if not exists lease_expires_at timestamptz,
@@ -37,3 +39,5 @@ $$;
 create index if not exists whatsapp_delivery_expired_lease_idx
   on public.whatsapp_delivery_keys (lease_expires_at)
   where provider_message_id is null;
+
+commit;

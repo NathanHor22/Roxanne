@@ -1,4 +1,6 @@
 -- Roxanne V0.1 — permanent relationship memory.
+begin;
+
 create extension if not exists pgcrypto;
 
 create type public.meeting_status as enum ('upcoming', 'processing', 'ready', 'failed');
@@ -261,3 +263,5 @@ $$;
 
 create trigger on_auth_user_created after insert on auth.users
 for each row execute procedure public.handle_new_user();
+
+commit;

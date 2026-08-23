@@ -7,6 +7,7 @@
 /out
 /worker/dist
 /.vercel
+/supabase/.temp
 
 # local configuration and secrets
 .env
