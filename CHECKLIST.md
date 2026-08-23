@@ -106,8 +106,8 @@ npm.cmd run check
 - [ ] Pair WhatsApp from Roxanne Settings.
 - [x] Initial Vercel production build deployed and assigned to
   `https://roxanne-assistant.vercel.app`.
-- [ ] Deploy and verify the public launch page, dashboard, Groq, Agora, Redis,
-  and hardware bootstrap routes.
+- [x] Deploy and verify the public launch page, dashboard, live Groq/Qwen,
+  secured Agora tokens, reachable Redis, and hardware bootstrap routes.
 - [ ] Run the complete credential-backed golden path.
 - [ ] Record the Railway URL and final golden-path verification time below.
 
@@ -117,7 +117,8 @@ Release record:
 - Vercel URL: `https://roxanne-assistant.vercel.app` (live)
 - Railway worker URL: `https://roxanne-whatsapp-production.up.railway.app`
 - Supabase project ref: `cjogfunwcwytvooycjzv` (schema applied)
-- Infrastructure verified: 23 August 2026, 14:13 (Asia/Kuala_Lumpur)
+- Infrastructure verified: 23 August 2026, 14:52 (Asia/Kuala_Lumpur)
+- Registered hardware ID: `561bc32e-df1a-4b00-9f46-ef08cf2df9b9`
 - Golden-path result: pending
 
 ### Owner-only actions
