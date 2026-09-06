@@ -14,6 +14,8 @@ const serverEnvSchema = z.object({
   QWEN_API_KEY: z.string().optional(),
   QWEN_BASE_URL: optionalUrl,
   QWEN_MODEL: z.string().default("qwen-plus"),
+  ILMU_API_KEY: z.string().optional(),
+  ILMU_MODEL: z.string().default("ilmu-v3.1"),
   DEVIN_API_KEY: z.string().optional(),
   DEVIN_API_BASE_URL: optionalUrl,
   DEVIN_ORG_ID: z.string().optional(),
@@ -40,7 +42,7 @@ const serverEnvSchema = z.object({
   APP_TIMEZONE: z.string().default("Asia/Kuala_Lumpur"),
   ACTION_APPROVAL_SECRET: z.string().optional(),
   DEMO_USER_EMAIL: z.string().email().default("nathanhor2001@gmail.com"),
-  DEMO_USER_ID: z.string().uuid().optional(),
+  DEMO_USER_ID: z.preprocess((value) => value === "" ? undefined : value, z.string().uuid().optional()),
   DEMO_ACCESS_MODE: z.enum(["owner", "public"]).default("owner"),
 });
 
@@ -64,6 +66,7 @@ export function integrationStatus() {
     supabase: Boolean(value.NEXT_PUBLIC_SUPABASE_URL && value.SUPABASE_SERVICE_ROLE_KEY),
     elevenlabs: Boolean(value.ELEVENLABS_API_KEY || value.GROQ_API_KEY),
     qwen: Boolean(value.QWEN_API_KEY),
+    ilmu: Boolean(value.ILMU_API_KEY),
     devin: Boolean(value.DEVIN_API_KEY),
     google: Boolean(value.GOOGLE_CLIENT_ID && value.GOOGLE_CLIENT_SECRET && value.GOOGLE_REFRESH_TOKEN),
     whatsapp: Boolean(value.WHATSAPP_RELAY_URL && value.WHATSAPP_RELAY_TOKEN),

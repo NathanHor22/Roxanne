@@ -26,7 +26,8 @@ export async function PATCH(
   if (authError) return authError;
   try {
     const params = await context.params;
-    const { id, status } = parseFollowUpPatch(params.id, await request.json());
+    const { id, status, schedule } = parseFollowUpPatch(params.id, await request.json());
+    if (id.startsWith("sample:")) return json({ error: "Sample changes belong in the sample workspace." }, { status: 400 });
     const completedAt = status === "completed" ? new Date().toISOString() : null;
     const client = getServerSupabase();
     const readinessError = requireProductionPersistence(Boolean(client));
@@ -36,7 +37,8 @@ export async function PATCH(
     // row to mutate in local mode, so acknowledge the optimistic UI transition
     // without pretending it was persisted.
     if (!client || !uuidSchema.safeParse(id).success) {
-      return json(localFollowUpPatchResult(id, status));
+      if (process.env.NODE_ENV === "production") return json({ error: "The follow-up could not be found." }, { status: 404 });
+      return json(localFollowUpPatchResult(id, status || "pending"));
     }
 
     const userId = await resolveDemoUserId(client, { createIfMissing: false });
@@ -46,7 +48,7 @@ export async function PATCH(
 
     const { data, error } = await client
       .from("follow_ups")
-      .update({ status, completed_at: completedAt })
+      .update({ ...(status ? { status, completed_at: completedAt } : {}), ...(schedule ? { schedule_details: schedule } : {}) })
       .eq("id", id)
       .eq("user_id", userId)
       .select("id,status,completed_at")

@@ -9,7 +9,7 @@ import { normalizeAgoraTranscript } from "@/lib/hardware-transcript";
 import { parseLocale } from "@/lib/i18n";
 import { transcriptionResultSchema } from "@/lib/meeting-schema";
 import { persistProcessedMeeting } from "@/lib/persistence";
-import { extractMeetingInsights } from "@/lib/providers/qwen";
+import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { getRedis, rememberPerson, rememberSession, setProcessingState } from "@/lib/redis";
 import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
 import type { Contact, FollowUp, Meeting } from "@/lib/types";
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       language: metadata?.language || input.locale || "multilingual",
       provider: "agora",
     });
-    const extraction = await extractMeetingInsights(segments, {
+    const extraction = await extractConversationInsights(segments, {
       title: `${device.name} conversation`,
       outputLanguage: locale,
       referenceDate: startedAt,

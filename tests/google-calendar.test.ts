@@ -307,3 +307,51 @@ test("missing approval and unsafe recipient input never call the mocked Calendar
   );
   assert.equal(calls, 0);
 });
+
+test("approved calendar invitations preserve the reviewed 45- or 60-minute duration across midnight", async () => {
+  for (const durationMinutes of [45, 60]) {
+    let inserted: Parameters<CalendarInsertClient["events"]["insert"]>[0] | undefined;
+    const calendar: CalendarInsertClient = {
+      events: {
+        async insert(parameters) {
+          inserted = parameters;
+          return { data: { id: `duration-${durationMinutes}` } };
+        },
+      },
+    };
+    const result = await createGoogleCalendarEvent({
+      approved: true,
+      summary: "Client follow-up",
+      startAt: "2026-09-10T23:30:00+08:00",
+      durationMinutes,
+      attendees: ["chung@example.com"],
+    }, { calendar });
+
+    assert.ok(inserted);
+    assert.equal(Date.parse(result.endAt) - Date.parse(result.startAt), durationMinutes * 60_000);
+    assert.equal(inserted.requestBody.end?.timeZone, "Asia/Kuala_Lumpur");
+    assert.match(result.endAt, /^2026-09-11T00:(?:15|30):00\+08:00$/u);
+  }
+});
+
+test("invalid meeting durations never call Google Calendar", async () => {
+  let calls = 0;
+  const calendar: CalendarInsertClient = {
+    events: {
+      async insert() {
+        calls += 1;
+        return { data: { id: "must-not-exist" } };
+      },
+    },
+  };
+  for (const durationMinutes of [0, 4, 481, 45.5, -30, NaN]) {
+    await assert.rejects(() => createGoogleCalendarEvent({
+      approved: true,
+      summary: "Client follow-up",
+      startAt: "2026-09-10T13:00:00+08:00",
+      durationMinutes,
+      attendees: ["chung@example.com"],
+    }, { calendar }));
+  }
+  assert.equal(calls, 0);
+});

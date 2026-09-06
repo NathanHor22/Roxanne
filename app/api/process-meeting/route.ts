@@ -8,7 +8,7 @@ import { MAX_AUDIO_BYTES, normalizeAudioContentType } from "@/lib/audio-upload";
 import { parseLocale } from "@/lib/i18n";
 import { persistProcessedMeeting } from "@/lib/persistence";
 import { transcribeMeetingAudio } from "@/lib/providers/transcription";
-import { extractMeetingInsights } from "@/lib/providers/qwen";
+import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { rememberPerson, rememberSession, setProcessingState } from "@/lib/redis";
 import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
 import type { Contact, FollowUp, Meeting } from "@/lib/types";
@@ -264,7 +264,7 @@ export async function POST(request: Request) {
     await setProcessingState(input.processingId, { status: "processing", stage: "transcribing", fileName: input.fileName });
     const transcription = await transcribeMeetingAudio(input.audio, { fileName: input.fileName });
     await setProcessingState(input.processingId, { status: "processing", stage: "extracting", language: transcription.language });
-    const extraction = await extractMeetingInsights(transcription.segments, {
+    const extraction = await extractConversationInsights(transcription.segments, {
       title: input.title,
       contactHint: input.contactHint ? { name: input.contactHint.name, company: input.contactHint.company, role: input.contactHint.role, email: input.contactHint.email, phone: input.contactHint.phone } : undefined,
       outputLanguage: input.locale,
@@ -308,7 +308,7 @@ export async function POST(request: Request) {
       meeting,
       persisted: persistence.persisted,
       persistence,
-      providerStatus: { transcription: transcription.provider === "fallback" ? "fallback" : "live", extraction: extraction.provider === "qwen" ? "live" : "fallback", persistence: persistence.persisted ? "live" : "local" },
+      providerStatus: { transcription: transcription.provider === "fallback" ? "fallback" : "live", extraction: extraction.provider === "fallback" ? "fallback" : "live", persistence: persistence.persisted ? "live" : "local" },
       warnings: [transcription.warning, extraction.warning, persistence.warning].filter(Boolean),
     });
   } catch (error) {

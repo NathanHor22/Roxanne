@@ -148,7 +148,7 @@ export async function persistProcessedMeeting(
     title: input.meeting.title,
     start_at: input.meeting.startAt,
     end_at: input.meeting.endAt,
-    status: "ready",
+    status: "processing",
     source: input.meeting.source,
     recording_id: recordingId,
   }, { onConflict: "user_id,client_reference" }).select("id").single();
@@ -216,9 +216,14 @@ export async function persistProcessedMeeting(
   if (followUpsDeleteError) throw new Error(`Could not refresh follow-ups: ${followUpsDeleteError.message}`);
   const followUpIds = input.extraction.followUps.map(() => randomUUID());
   if (input.extraction.followUps.length) {
-    const { error } = await client.from("follow_ups").insert(input.extraction.followUps.map((item, index) => ({ id: followUpIds[index], user_id: userId, meeting_id: meetingId, contact_id: contactIds[0] || null, type: item.type, description: item.description, draft: item.draft, due_at: dueTimestamp(item.dueAt), status: "pending" })));
+    const { error } = await client.from("follow_ups").insert(input.extraction.followUps.map((item, index) => ({ id: followUpIds[index], user_id: userId, meeting_id: meetingId, contact_id: contactIds[0] || null, type: item.type, description: item.description, draft: item.draft, due_at: dueTimestamp(item.dueAt), ...(item.schedule ? { schedule_details: item.schedule } : {}), status: "pending" })));
     if (error) throw new Error(`Could not save follow-ups: ${error.message}`);
   }
+
+  // A partial write must not look like a completed import on a later retry.
+  const { error: readyError } = await client.from("meetings")
+    .update({ status: "ready" }).eq("id", meetingId).eq("user_id", userId);
+  if (readyError) throw new Error(`Could not finish saving the meeting: ${readyError.message}`);
 
   // The processing route serializes this same meeting object after persistence.
   // Mutating only the database-backed identifiers keeps its client reference
@@ -231,6 +236,7 @@ export async function persistProcessedMeeting(
     description: item.description,
     draft: item.draft,
     dueAt: item.dueAt,
+    schedule: item.schedule,
     status: "pending",
   }));
 

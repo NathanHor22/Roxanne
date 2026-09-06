@@ -125,6 +125,7 @@ export const googleCalendarEventSchema = z
     approved: z.literal(true),
     summary: z.string().trim().min(1).max(200),
     startAt: startAtSchema,
+    durationMinutes: z.number().int().min(5).max(480).default(30),
     attendees: z.array(attendeeEmailSchema).min(1).max(20),
     description: z.string().trim().max(5000).optional(),
     location: z.string().trim().max(500).optional(),
@@ -615,7 +616,7 @@ export function buildGoogleCalendarInsert(
   const parsed = googleCalendarEventSchema.parse(input);
   const startInstant = Date.parse(normalizeMalaysiaDateTime(parsed.startAt));
   const startAt = malaysiaRfc3339(startInstant);
-  const endAt = malaysiaRfc3339(startInstant + 30 * 60_000);
+  const endAt = malaysiaRfc3339(startInstant + parsed.durationMinutes * 60_000);
   const conferenceLine = parsed.conferenceUrl
     ? `Join the meeting: ${parsed.conferenceUrl}`
     : "";

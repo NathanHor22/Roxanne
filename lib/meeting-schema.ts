@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { scheduleDetailsSchema } from "./workspace/model";
 
 import type {
   InterestLevel,
@@ -27,6 +28,7 @@ export const dueAtSchema = z
 
 const transcriptSegmentObjectSchema = z
   .object({
+    id: compactText("segment ID", 120).optional(),
     speaker: compactText("speaker", 80),
     text: compactText("transcript text", 50_000),
     startSeconds: z.number().finite().nonnegative().optional(),
@@ -55,7 +57,7 @@ export const transcriptionResultSchema = z
     text: compactText("transcript", 250_000),
     segments: z.array(transcriptSegmentSchema).min(1).max(10_000),
     language: compactText("language", 40),
-    provider: z.enum(["elevenlabs", "groq", "agora", "fallback"]),
+    provider: z.enum(["elevenlabs", "groq", "agora", "import", "fallback"]),
     warning: compactText("warning", 500).optional(),
   })
   .strict();
@@ -100,6 +102,7 @@ export const extractedFollowUpSchema = z
     description: compactText("follow-up description", 240),
     dueAt: dueAtSchema.nullable(),
     draft: compactText("follow-up draft", 2_000).nullable(),
+    schedule: scheduleDetailsSchema.nullable().optional(),
   })
   .strict();
 
@@ -114,7 +117,7 @@ export const meetingExtractionSchema = z
 
 export const meetingExtractionResultSchema = meetingExtractionSchema
   .extend({
-    provider: z.enum(["qwen", "fallback"]),
+    provider: z.enum(["qwen", "ilmu", "fallback"]),
     warning: compactText("warning", 500).optional(),
   })
   .strict();

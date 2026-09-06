@@ -28,6 +28,7 @@ function internalIdempotencyKey(
   const canonicalPayload = JSON.stringify({
     summary: input.summary,
     startAt: input.startAt,
+    ...(input.durationMinutes !== 30 ? { durationMinutes: input.durationMinutes } : {}),
     attendees: [...input.attendees].sort(),
     description: input.description ?? null,
     location: input.location ?? null,
@@ -122,6 +123,9 @@ export async function POST(request: Request) {
       );
     }
     const input = googleCalendarEventSchema.parse(raw);
+    if ([input.meetingId, input.clientReference, input.followUpId].some((id) => id?.startsWith("sample:"))) {
+      return NextResponse.json({ error: "Sample approvals cannot create real invitations." }, { status: 400 });
+    }
     const runtime = env();
     const config = getGoogleOAuthConfig();
 
@@ -155,6 +159,8 @@ export async function POST(request: Request) {
     const googleEventId = idempotencyKey.slice("calendar:".length);
     let databaseMeetingId: string | null = null;
     let databaseFollowUpId: string | null = null;
+    let followUpCompleted = false;
+    let oauthClient: Awaited<ReturnType<typeof createAuthorizedGoogleOAuthClient>> | undefined;
     if (client && userId) {
       const meetingReference = input.clientReference ?? input.meetingId;
       if (meetingReference) {
@@ -177,15 +183,32 @@ export async function POST(request: Request) {
           databaseMeetingId = (byId?.id as string | undefined) ?? null;
         }
       }
+      if ((input.clientReference || input.meetingId) && !databaseMeetingId) {
+        return NextResponse.json({ error: "The source conversation could not be found." }, { status: 404 });
+      }
       if (input.followUpId && z.string().uuid().safeParse(input.followUpId).success) {
         const { data: followUp, error: followUpError } = await client
           .from("follow_ups")
-          .select("id")
+          .select("id,meeting_id,status")
           .eq("user_id", userId)
           .eq("id", input.followUpId)
           .maybeSingle();
         if (followUpError) throw new Error("Could not resolve the follow-up ID.");
         databaseFollowUpId = (followUp?.id as string | undefined) ?? null;
+        followUpCompleted = followUp?.status === "completed";
+        if (!followUp || !databaseMeetingId || followUp.meeting_id !== databaseMeetingId || followUp.status === "dismissed") {
+          return NextResponse.json({ error: "The pending approval could not be found for this conversation." }, { status: 404 });
+        }
+      }
+      if (input.followUpId && !databaseFollowUpId) {
+        return NextResponse.json({ error: "The approval could not be found." }, { status: 404 });
+      }
+      if (databaseFollowUpId) {
+        const { data: claimed, error: claimError } = await client.from("actions").select("id,idempotency_key").eq("user_id", userId).eq("follow_up_id", databaseFollowUpId).eq("type", "calendar_event").maybeSingle();
+        if (claimError) throw new Error("Could not check the approval's calendar action.");
+        if (claimed && claimed.idempotency_key !== idempotencyKey) {
+          return NextResponse.json({ error: "This approval has already been submitted with different details. Refresh your calendar before making changes." }, { status: 409 });
+        }
       }
       const { data: existing, error: existingError } = await client
         .from("actions")
@@ -208,7 +231,7 @@ export async function POST(request: Request) {
           },
         );
         const completedAt = new Date().toISOString();
-        await client
+        const { error: recoveryCompletionError } = await client
           .from("actions")
           .update({
             status: "completed",
@@ -217,6 +240,7 @@ export async function POST(request: Request) {
           })
           .eq("id", existing.id)
           .eq("user_id", userId);
+        if (recoveryCompletionError) throw new Error("Could not finish the recovered Calendar action log.");
         if (databaseFollowUpId) {
           const { error: followUpCompletionError } = await client
             .from("follow_ups")
@@ -239,12 +263,20 @@ export async function POST(request: Request) {
           duplicate: true,
         });
       }
+      if (followUpCompleted) return NextResponse.json({ error: "This meeting approval has already been completed. Refresh your calendar." }, { status: 409 });
+      if (!existing?.external_id && Date.parse(buildGoogleCalendarInsert(input).startAt) <= Date.now()) {
+        return NextResponse.json({ error: "This meeting time has passed. Update the date before approving." }, { status: 400 });
+      }
+      // Missing or unreadable credentials must not reserve this approval. Once
+      // the action is claimed, its original payload remains the retry boundary.
+      oauthClient = await createAuthorizedGoogleOAuthClient({ config, client, userId });
       const actionPayload = {
         summary: input.summary,
         startAt: input.startAt,
-        durationMinutes: 30,
+        durationMinutes: input.durationMinutes,
         timeZone: "Asia/Kuala_Lumpur",
         attendees: input.attendees,
+        location: input.location ?? null,
       };
       if (existing?.id) {
         actionId = existing.id as string;
@@ -282,7 +314,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const oauthClient = await createAuthorizedGoogleOAuthClient({
+    oauthClient ??= await createAuthorizedGoogleOAuthClient({
       config,
       client,
       userId,

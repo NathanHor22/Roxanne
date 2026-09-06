@@ -1,10 +1,10 @@
 import { LanguageProvider } from "@/components/i18n/LanguageProvider";
-import { RoxanneApp } from "@/components/RoxanneApp";
+import { Workspace } from "@/components/workspace/Workspace";
 
 export default function DashboardPage() {
   return (
     <LanguageProvider>
-      <RoxanneApp />
+      <Workspace />
     </LanguageProvider>
   );
 }

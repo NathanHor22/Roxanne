@@ -1,7 +1,7 @@
 export type Locale = "en" | "ms" | "zh-CN" | "yue" | "ta";
 
 export type MeetingStatus = "upcoming" | "processing" | "ready" | "failed";
-export type FollowUpStatus = "pending" | "approved" | "completed" | "failed";
+export type FollowUpStatus = "pending" | "approved" | "completed" | "failed" | "dismissed";
 export type InterestLevel = "low" | "medium" | "high" | "unknown";
 
 export interface Contact {
@@ -14,6 +14,7 @@ export interface Contact {
 }
 
 export interface TranscriptSegment {
+  id?: string;
   speaker: string;
   text: string;
   startSeconds?: number;
@@ -50,6 +51,17 @@ export interface FollowUp {
   dueAt: string | null;
   status: FollowUpStatus;
   draft?: string | null;
+  schedule?: ScheduleDetails | null;
+}
+
+/** Extracted facts only. Approval and provider execution are application-owned. */
+export interface ScheduleDetails {
+  agreement: "agreed" | "tentative";
+  startAt: string | null;
+  durationMinutes: number | null;
+  attendees: string[];
+  location: string | null;
+  evidence: string | null;
 }
 
 export interface Meeting {
@@ -65,6 +77,9 @@ export interface Meeting {
   transcript?: TranscriptSegment[];
   insight?: MeetingInsight | null;
   followUps?: FollowUp[];
+  calendarEventId?: string | null;
+  sourceConversationId?: string | null;
+  sourceApprovalId?: string | null;
 }
 
 export interface ProcessMeetingResult {
