@@ -1495,6 +1495,36 @@
 .recap section {
   margin: 0 0 27px;
 }
+.replayLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 15px;
+  margin-bottom: 26px;
+  border: 1px solid #dce6d6;
+  border-radius: 8px;
+  background: #f3f7ef;
+  color: #3f6134;
+  text-align: left;
+  cursor: pointer;
+}
+.replayLink:hover {
+  background: #eaf2e3;
+}
+.replayLink > span {
+  display: grid;
+  gap: 4px;
+}
+.replayLink strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.replayLink small {
+  color: #64765a;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .recap h3 {
   display: flex;
   align-items: center;

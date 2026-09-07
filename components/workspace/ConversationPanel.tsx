@@ -5,6 +5,10 @@ import { FileText, Headphones, MessageSquare, X } from "lucide-react";
 import type { Meeting } from "@/lib/types";
 import { sourceConversation } from "@/lib/workspace/model";
 import styles from "./workspace.module.css";
+import {
+  ConversationReplay,
+  type PlaybackProgress,
+} from "./ConversationReplay";
 
 export const dateLabel = (
   value: string,
@@ -47,7 +51,8 @@ export function ConversationPanel({
   error: string | null;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [tab, setTab] = useState<"recap" | "transcript">("recap");
+  const playbackProgress = useRef(new Map<string, PlaybackProgress>());
+  const [tab, setTab] = useState<"recap" | "replay">("recap");
   const conversation = meeting
     ? sourceConversation(meetings, meeting)
     : undefined;
@@ -56,7 +61,7 @@ export function ConversationPanel({
       setTab("recap");
       dialog.current?.showModal();
     } else dialog.current?.close();
-  }, [meeting]);
+  }, [meeting?.id]);
   if (!meeting) return null;
   const contact = conversation?.contacts[0] || meeting.contacts[0];
   const insight = conversation?.insight;
@@ -136,11 +141,11 @@ export function ConversationPanel({
             Summary & follow-ups
           </button>
           <button
-            aria-pressed={tab === "transcript"}
-            className={tab === "transcript" ? styles.activeTab : ""}
-            onClick={() => setTab("transcript")}
+            aria-pressed={tab === "replay"}
+            className={tab === "replay" ? styles.activeTab : ""}
+            onClick={() => setTab("replay")}
           >
-            Transcript
+            Replay & transcript
           </button>
         </div>
         {error && (
@@ -154,6 +159,21 @@ export function ConversationPanel({
             aria-label="Summary and follow-ups"
             className={styles.recap}
           >
+            {conversation && (
+              <button
+                type="button"
+                className={styles.replayLink}
+                onClick={() => setTab("replay")}
+              >
+                <Headphones />
+                <span>
+                  <strong>Replay the conversation</strong>
+                  <small>
+                    Listen to the original audio and follow the transcript.
+                  </small>
+                </span>
+              </button>
+            )}
             {insight ? (
               <>
                 <section>
@@ -271,47 +291,19 @@ export function ConversationPanel({
               </p>
             )}
           </div>
+        ) : conversation ? (
+          <ConversationReplay
+            key={conversation.id}
+            conversation={conversation}
+            initialProgress={playbackProgress.current.get(conversation.id)}
+            onProgress={(progress) =>
+              playbackProgress.current.set(conversation.id, progress)
+            }
+          />
         ) : (
-          <div
-            role="region"
-            aria-label="Transcript"
-            className={styles.transcript}
-          >
-            {conversation?.recordingUrl && (
-              <audio
-                controls
-                src={conversation.recordingUrl}
-                className={styles.audio}
-              />
-            )}
-            {conversation?.transcript?.length ? (
-              conversation.transcript.map((segment, index) => (
-                <article key={segment.id || index}>
-                  <div>
-                    <strong>{segment.speaker}</strong>
-                    {segment.startSeconds !== undefined && (
-                      <span>
-                        {String(Math.floor(segment.startSeconds / 60)).padStart(
-                          2,
-                          "0",
-                        )}
-                        :
-                        {String(Math.floor(segment.startSeconds % 60)).padStart(
-                          2,
-                          "0",
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <p>{segment.text}</p>
-                </article>
-              ))
-            ) : (
-              <p className={styles.subtle}>
-                No transcript is available for this meeting.
-              </p>
-            )}
-          </div>
+          <p className={styles.subtle}>
+            No conversation is linked to this calendar entry yet.
+          </p>
         )}
       </div>
     </dialog>

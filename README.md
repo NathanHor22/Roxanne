@@ -3,7 +3,8 @@
 Roxanne turns Malaysian business conversations into a recap, follow-ups, and
 meeting approvals. The dashboard combines captured conversations and upcoming
 meetings in a calendar. Open an approved meeting to review the conversation
-that led to it: bullet points, concerns, promises, and preparation tasks.
+that led to it: bullet points, concerns, promises, and preparation tasks. When
+the original recording is available, replay that conversation from its brief.
 
 This first phase implements the dashboard, a completed-transcript API, Ilmu
 extraction, and explicit Google Calendar actions. Passive wearable capture is
@@ -123,6 +124,21 @@ above. Browser microphone capture publishes through Agora and records a local
 audio file for this same upload flow. It requires `NEXT_PUBLIC_AGORA_APP_ID`
 and `AGORA_APP_CERTIFICATE`; it is not the future passive wearable transcript
 transport. Ilmu transcript imports do not require these audio-provider keys.
+
+### Replay original conversations
+
+The conversation brief's **Replay** section plays the original uploaded or
+browser-captured audio. Playback controls include speed, 15-second skips, and
+timestamped transcript entries that jump to the corresponding point. Audio
+remains in the private `recordings` bucket alongside its transcript metadata;
+the player uses a temporary signed URL for access.
+
+Transcript-only imports, sample conversations, and legacy hardware sessions
+without an archived recording show an explicit no-audio state. Roxanne does
+not synthesize a replacement voice track from the transcript. No passive
+wearable is connected by this change: future Agora capture must also archive
+the actual conversation audio with timestamps aligned to its transcript.
+See [replay architecture](ARCHITECTURE.md#original-audio-replay).
 
 Devin and the persistent WhatsApp worker remain legacy follow-up integrations.
 They are not prerequisites for transcript import, recaps, or Calendar

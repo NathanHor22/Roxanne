@@ -6,7 +6,8 @@ Roxanne separates a conversation that already happened from a meeting agreed
 for the future. A captured conversation holds the transcript, recap, and
 follow-ups. A schedule follow-up becomes a dashboard approval. Explicit
 approval creates a Google Calendar event; opening that event in Roxanne shows
-the original conversation's bullet recap and preparation tasks.
+the original conversation's bullet recap and preparation tasks. Conversations
+with an archived recording can also replay the original audio.
 
 The intended wearable path is Agora transcription followed by Ilmu
 understanding. This phase implements the completed-transcript boundary and
@@ -42,6 +43,7 @@ placeholder for future pairing, not a live device monitor.
 | Understanding | `lib/providers/ilmu.ts` | Calls Ilmu Chat Completions with strict JSON schema and validates the response and schedule evidence. |
 | Existing capture-provider selection | `lib/providers/meeting-extraction.ts` | Uses Ilmu when configured, otherwise Qwen, for recording and legacy hardware processing. |
 | Audio transcription | `lib/providers/transcription.ts` | Uses ElevenLabs when configured, otherwise Groq; separate from Ilmu understanding. |
+| Original-audio replay | Conversation brief, `recordingId`, and `recordingUrl` | Plays the private archived recording; transcript-only conversations have no replay audio. |
 | Persistence | `lib/persistence.ts`, `lib/meetings-store.ts` | Writes the existing Supabase model and reconstructs the dashboard's conversation/event relationships. |
 | Approval model | `lib/workspace/model.ts` | Derives approvals from schedule follow-ups and validates required scheduling details. |
 | Google execution | `app/api/actions/calendar/route.ts`, `lib/providers/google-calendar.ts` | Requires explicit approval, resolves source ownership, records the action, and creates the Calendar event. |
@@ -226,6 +228,60 @@ Keep the action record and original conversation intact when extending this
 model. Legacy or manually created events without a linked Calendar action
 show an empty recap state rather than an invented brief.
 
+## Original-audio replay
+
+Replay uses the original uploaded or browser-captured conversation, not a
+text-to-speech recreation. The private Supabase `recordings` bucket holds the
+audio object; `recordings.storage_path` identifies that object, and the related
+`transcripts` row holds its text and timestamps. The source conversation's
+`recordingId` and temporary `recordingUrl` supply playback from its brief or a
+linked Calendar event. Playback does not require another Ilmu or ASR request.
+
+The dedicated Replay section provides a seekable player, playback speed,
+15-second skips, and timestamped transcript entries that seek within the
+recording. Transcript `startSeconds` and `endSeconds` must refer to the same
+audio timeline. The UI can navigate recorded timestamps; it cannot repair
+misaligned or absent timing data.
+
+Playback pauses when leaving Replay. The conversation panel remembers the
+position and speed while the dashboard stays open, including when entering
+through its linked Calendar event. This progress is held in memory and resets
+on a page reload; the original audio is not downloaded into browser storage.
+
+The authenticated refresh boundary is
+`GET /api/recordings/[id]/playback`. It verifies the configured owner's
+recording UUID and owner-prefixed storage path, then returns
+`{ "url": "...", "expiresAt": "..." }` with a 7,200-second signed-URL
+lifetime and `Cache-Control: no-store`. Invalid IDs return `400`; absent or
+unowned audio returns `404`; unavailable configuration returns `503`; lookup
+or signing failures return `502`. Audio delivery goes directly from storage
+to the browser rather than through the Next.js route. URL refresh grants
+access to an existing object; it does not
+extend the recording's retention or create missing audio.
+
+Transcript imports currently create recording metadata without an audio
+object. Sample conversations and the legacy hardware transcript-completion
+path also have no archived original audio. Those cases show a no-audio state
+while keeping the recap and transcript available. A provider label such as
+`agora` is not evidence that playable audio exists.
+
+For future passive wearable capture, the gateway must archive the actual
+microphone audio as a complete recording or durable chunks that can be
+assembled for replay. Preserve each chunk's sequence, capture-clock offset,
+duration, and any gaps; align final transcript timestamps to the resulting
+recording. Attach the archive through verified owner-owned recording metadata
+and link it to the same conversation. The current transcript-import endpoint
+does not accept an audio attachment. STT output alone cannot recreate the
+original voices or conversation audio, and this phase does not connect that
+hardware capture path.
+
+The next capture phase should keep playback delivery in private object
+storage, use seekable encoded recordings, and load audio on demand rather than
+buffering an hour-long recording in the dashboard. Define configurable audio
+retention and deletion together with the associated recording metadata;
+retaining a recap after deleting its audio should leave an explicit no-audio
+state. Automatic retention and chunk assembly are not implemented here.
+
 ## Sample and live adapters
 
 `/dashboard?mode=sample` loads fictional records whose IDs start with `sample:`.
@@ -258,7 +314,7 @@ The following are deliberately deferred:
   normalized contract; the existing speaking-agent firmware is not this path.
 - Device pairing and revocation, hour-plus token renewal, offline capture,
   reconnect/resume, chunk acknowledgements, bounded buffers, and incremental
-  durable transcript storage.
+  durable transcript storage plus the original-audio archive required for replay.
 - A durable processing queue, recoverable background extraction, and complete
   failure reconciliation across providers, including abandoned import claims.
 - Validated speaker attribution and Malaysian mixed-language accuracy on real
