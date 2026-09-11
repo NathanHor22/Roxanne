@@ -44,9 +44,10 @@ import {
 } from "./ConversationPanel";
 import { ApprovalDialog } from "./ApprovalDialog";
 import { RecordingDialog } from "./RecordingDialog";
+import { LanternDevicePanel } from "./LanternDevicePanel";
 import styles from "./workspace.module.css";
 
-type View = "calendar" | "conversations" | "people" | "settings";
+type View = "calendar" | "conversations" | "people" | "device" | "settings";
 
 export function Workspace() {
   const workspace = useWorkspace();
@@ -124,7 +125,7 @@ export function Workspace() {
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
     if (
-      ["calendar", "conversations", "people", "settings"].includes(
+      ["calendar", "conversations", "people", "device", "settings"].includes(
         requested || "",
       )
     )
@@ -185,6 +186,7 @@ export function Workspace() {
               { id: "calendar", label: "Calendar", icon: CalendarDays },
               { id: "conversations", label: "Conversations", icon: Headphones },
               { id: "people", label: "People", icon: Users },
+              { id: "device", label: "Lantern", icon: Radio },
             ] as const
           ).map(({ id, label, icon: Icon }) => (
             <button
@@ -213,8 +215,8 @@ export function Workspace() {
                 ? "Explore a captured conversation."
                 : "No device connected"}
             </p>
-            <button aria-label="Settings" onClick={() => navigate("settings")}>
-              Device & connections <ArrowUpRight />
+            <button aria-label="Open Lantern" onClick={() => navigate("device")}>
+              Open Lantern <ArrowUpRight />
             </button>
           </div>
           <button
@@ -269,6 +271,8 @@ export function Workspace() {
               <p className={styles.eyebrow}>
                 {view === "calendar"
                   ? "A LITTLE CONTEXT. A BETTER FOLLOW-UP."
+                  : view === "device"
+                    ? "YOUR CONVERSATIONS, WITH YOU"
                   : "YOUR BUSINESS MEMORY"}
               </p>
               <h1>
@@ -278,6 +282,8 @@ export function Workspace() {
                     ? "Every conversation matters."
                     : view === "people"
                       ? "Pick up where you left off."
+                      : view === "device"
+                        ? "Meet Lantern."
                       : "Make yourself at home."}
               </h1>
               <p>
@@ -287,10 +293,12 @@ export function Workspace() {
                     ? "The important details, ready when you need them."
                     : view === "people"
                       ? "Conversations and commitments, organised around your clients."
+                      : view === "device"
+                        ? "Test the consent, capture, status report, and approval flow before connecting providers."
                       : "Manage your connections and workspace preferences."}
               </p>
             </div>
-            {view !== "settings" && (
+            {view !== "settings" && view !== "device" && (
               <button
                 className={styles.secondaryButton}
                 onClick={() =>
@@ -1022,6 +1030,7 @@ export function Workspace() {
                   )}
                 </section>
               )}
+              {view === "device" && <LanternDevicePanel mode={mode} />}
               {view === "settings" && (
                 <div className={styles.settingsGrid}>
                   <section className={styles.settingsCard}>

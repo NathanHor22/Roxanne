@@ -10,14 +10,15 @@ the original conversation's bullet recap and preparation tasks. Conversations
 with an archived recording can also replay the original audio.
 
 The intended wearable path is Agora transcription followed by Ilmu
-understanding. This phase implements the completed-transcript boundary and
-the downstream software. It does not yet implement a passive wearable
-transcription service or delivery gateway.
+understanding. This phase implements the completed-transcript boundary, the
+downstream software, and a provider-independent Lantern device core. It does
+not yet implement passive wearable audio transport or production provider
+adapters.
 
 ```mermaid
 flowchart TD
-    A[Future passive wearable and Agora transcription] -. final segments .-> B[Authenticated gateway - deferred]
-    B -. normalized transcript .-> C[POST /api/conversations]
+    A[Lantern quick meeting state machine] --> B[Device-authenticated gateway]
+    B -. future audio and final segments .-> C[POST /api/conversations]
     D[Completed transcript import] --> C
     C --> E[Ilmu structured extraction]
     E --> F[Supabase conversation, recap, follow-ups]
@@ -32,13 +33,17 @@ flowchart TD
 
 The calendar provides month and agenda views. Conversations and People provide
 other ways to reach the same context. Settings exposes the Google connection
-and sample/live workspace switch. The wearable connection state is a
-placeholder for future pairing, not a live device monitor.
+and sample/live workspace switch. Lantern provides an interactive simulator in
+sample mode and pairing, revocation, and telemetry in live mode.
 
 ## Provider and application boundaries
 
 | Boundary | Implementation | Current behavior |
 | --- | --- | --- |
+| Lantern state machine | `lib/lantern-state.ts` | Enforces consent, recording, pause/reconnect, status-report, and pending-approval transitions without provider calls. |
+| Device identity | `lib/lantern-device-auth.ts`, migration 004 | Claims an expiring one-time code and validates a revocable per-device secret whose digest is stored server-side. |
+| Device sessions | `/api/device/v1/sessions` and `/api/device/v1/sessions/[id]/events` | Stores versioned, idempotent state transitions and rejects stale events. |
+| Device telemetry | `/api/device/v1/heartbeat`, `/api/devices` | Reports device state, firmware, battery, network, heap, and last error to the owner dashboard. |
 | Completed transcripts | `lib/workspace/model.ts`, `app/api/conversations/route.ts` | Validates finalized, ordered segments and conversation timing; processes synchronously with Ilmu. |
 | Understanding | `lib/providers/ilmu.ts` | Calls Ilmu Chat Completions with strict JSON schema and validates the response and schedule evidence. |
 | Existing capture-provider selection | `lib/providers/meeting-extraction.ts` | Uses Ilmu when configured, otherwise Qwen, for recording and legacy hardware processing. |
@@ -62,6 +67,43 @@ original hardware session routes still start a speaking Agora Conversational
 AI agent, receive its transcript, and extract after completion. Those routes
 are legacy behavior; the passive wearable should later feed normalized final
 segments into the new boundary through authenticated device transport.
+
+## Lantern device core
+
+The standalone device never receives a browser cookie. An owner creates a
+pairing code through `POST /api/devices/pairing`; the device claims it through
+`POST /api/device/v1/claim`. The claim returns a device UUID and secret once.
+Subsequent requests use:
+
+```http
+Authorization: Device <device-uuid>.<device-secret>
+```
+
+`proxy.ts` permits only the four device protocol paths to reach their own
+authentication layer. The claim route is protected by a short-lived one-time
+code. Heartbeats and session routes validate the device credential and reject
+revoked devices. Owner routes continue to use the normal workspace login.
+
+The server is authoritative for time and transition order. Every session event
+has a UUID and expected state version. Migration 004 applies a transition in a
+database function that checks the stored version, writes the audit event, and
+updates device state in one transaction. Retrying an acknowledged event UUID
+returns the stored result. A new event with an old version receives `409`.
+
+Quick mode starts in `awaiting_recording_consent`. The exact prompt ID must be
+accepted within 30 seconds before state can enter `recording`. Connection loss
+then permits at most 30 seconds of modeled retry buffering. Stopping moves
+through `finalising`, `processing`, and `report_ready`; audio archive acceptance
+and processing completion are simulated until the capture service exists.
+
+Status mode moves through oath listening and the daily report. Confirming a
+read-back proposal produces `pending_dashboard_approval`. The state machine has
+no transition that sends an invitation from voice confirmation. Google
+execution continues to require the existing authenticated dashboard approval.
+
+The Lantern dashboard uses the same state machine locally as an executable
+prototype. This validates interaction rules but does not represent connected
+hardware, captured audio, Ilmu accuracy, or provider delivery.
 
 ## Completed-transcript API
 
@@ -300,7 +342,7 @@ wearable have been connected.
 
 ## Setup and remaining work
 
-Apply migrations 001, 002, and 003 before enabling structured approvals. Set
+Apply migrations 001 through 004 before enabling the Lantern device core. Set
 the Supabase values and owner identity, then `ILMU_API_KEY` and optionally
 `ILMU_MODEL`. Google execution additionally needs OAuth client configuration,
 a registered `/api/google/callback`, `ACTION_APPROVAL_SECRET`, and a connected
@@ -312,9 +354,9 @@ The following are deliberately deferred:
 
 - Passive wearable Agora transcription and a gateway that delivers the
   normalized contract; the existing speaking-agent firmware is not this path.
-- Device pairing and revocation, hour-plus token renewal, offline capture,
-  reconnect/resume, chunk acknowledgements, bounded buffers, and incremental
-  durable transcript storage plus the original-audio archive required for replay.
+- Hardware use of the implemented pairing/session protocol, hour-plus provider
+  token renewal, audio chunk acknowledgements, incremental durable transcript
+  storage, and the original-audio archive required for replay.
 - A durable processing queue, recoverable background extraction, and complete
   failure reconciliation across providers, including abandoned import claims.
 - Validated speaker attribution and Malaysian mixed-language accuracy on real

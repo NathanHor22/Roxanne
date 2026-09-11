@@ -1,6 +1,8 @@
 # Roxanne ESP32-S3 firmware
 
-Target: `zhengchen-1.54tft-ml307` / ESP32-S3 N16R8 on COM11.
+Legacy target: `zhengchen-1.54tft-ml307` / ESP32-S3 N16R8. This is the earlier
+speaking-agent experiment, not the new Lantern v1 client. Read the repository
+root `HARDWARE.md` before connecting or flashing it.
 
 ## Phase checklist
 
@@ -35,10 +37,14 @@ Hold the main/BOOT button, tap reset (or reconnect USB), then release BOOT when
 the serial connection begins.
 
 ```powershell
-python -m esptool --chip esp32s3 --port COM11 flash-id
-python -m esptool --chip esp32s3 --port COM11 read-flash 0 0x1000000 ../backups/factory-16mb.bin
-idf.py -p COM11 flash monitor
+python -m esptool --chip esp32s3 --port <confirmed-port> flash-id
+python -m esptool --chip esp32s3 --port <confirmed-port> read-flash 0 <verified-flash-size> ../backups/factory.bin
+idf.py -p <confirmed-port> flash monitor
 ```
+
+`COM5` currently exposes a CH340K bridge, but do not substitute it above until
+disconnecting the second board proves which ESP32 it belongs to. The old COM11
+note was historical.
 
 Press the main button once to start. The backlight turns on, Roxanne greets you,
 and the device becomes a two-way voice assistant. Press again to stop and send

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   authEnforcementMode,
+  isLanternDevicePath,
   isOwnerEmail,
   isPublicAuthPath,
 } from "@/lib/auth-policy";
@@ -85,6 +86,7 @@ export async function proxy(request: NextRequest) {
   }
 
   let response = NextResponse.next({ request });
+  if (isLanternDevicePath(request.nextUrl.pathname)) return response;
   const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
     cookies: {
       getAll() {

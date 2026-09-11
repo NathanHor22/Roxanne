@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   authEnforcementMode,
+  isLanternDevicePath,
   isOwnerEmail,
   isPublicAuthPath,
   sanitizeAuthReturnTo,
@@ -58,4 +59,18 @@ test("only login, auth callback and logout are public auth endpoints", () => {
   assert.equal(isPublicAuthPath("/api/auth/logout"), true);
   assert.equal(isPublicAuthPath("/api/agora/token"), false);
   assert.equal(isPublicAuthPath("/api/google/callback"), false);
+});
+
+test("only explicit Lantern routes bypass browser cookies for device authentication", () => {
+  assert.equal(isLanternDevicePath("/api/device/v1/claim"), true);
+  assert.equal(isLanternDevicePath("/api/device/v1/heartbeat"), true);
+  assert.equal(isLanternDevicePath("/api/device/v1/sessions"), true);
+  assert.equal(
+    isLanternDevicePath(
+      "/api/device/v1/sessions/11111111-1111-4111-8111-111111111111/events",
+    ),
+    true,
+  );
+  assert.equal(isLanternDevicePath("/api/device/v1/admin"), false);
+  assert.equal(isLanternDevicePath("/api/devices/pairing"), false);
 });

@@ -6,10 +6,12 @@ meetings in a calendar. Open an approved meeting to review the conversation
 that led to it: bullet points, concerns, promises, and preparation tasks. When
 the original recording is available, replay that conversation from its brief.
 
-This first phase implements the dashboard, a completed-transcript API, Ilmu
-extraction, and explicit Google Calendar actions. Passive wearable capture is
-the next integration. See [ARCHITECTURE.md](ARCHITECTURE.md) for the boundaries,
-request contract, data model, and remaining work.
+This phase implements the dashboard, a completed-transcript API, Ilmu
+extraction, explicit Google Calendar actions, and the provider-independent
+Lantern core. The Lantern page can exercise consent, recording, reconnect,
+status-report, and approval handoff states before Agora or Google is connected.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the boundaries, request contracts,
+data model, and remaining work.
 
 ## Run locally
 
@@ -33,10 +35,15 @@ Apply these migrations to the target Supabase project in order:
 1. `supabase/migrations/001_initial.sql`
 2. `supabase/migrations/002_worker_hardening.sql`
 3. `supabase/migrations/003_meeting_approvals.sql`
+4. `supabase/migrations/004_lantern_devices.sql`
 
 Migration 003 adds structured schedule details and dismissed approvals. It also
 adds a unique Calendar-action index per follow-up. Reconcile any existing
 duplicate Calendar actions for the same follow-up before applying that index.
+
+Migration 004 adds one-time Lantern pairing, revocable device credentials,
+telemetry, durable session state, and idempotent device-event records. It does
+not add provider credentials or raw-audio storage to the device.
 
 The live workspace requires `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Use
@@ -139,6 +146,27 @@ not synthesize a replacement voice track from the transcript. No passive
 wearable is connected by this change: future Agora capture must also archive
 the actual conversation audio with timestamps aligned to its transcript.
 See [replay architecture](ARCHITECTURE.md#original-audio-replay).
+
+### Lantern core
+
+Open **Lantern** in the dashboard. Sample mode contains an interactive device
+simulator that records no audio and makes no provider calls. It demonstrates
+the actual transition rules used by the server: recording starts only after a
+current consent prompt, offline buffering is capped at 30 seconds, and a voice
+confirmation creates a pending dashboard approval without sending anything.
+
+In live mode, an authenticated owner can create a ten-minute pairing code,
+view device telemetry, and revoke a paired device. Firmware claims that code
+once, stores the returned secret in protected device storage, and then uses the
+device session API. The secret is returned only during the claim; the database
+stores its SHA-256 digest. Request examples and the current hardware gate are in
+[HARDWARE.md](HARDWARE.md).
+
+The current ESP32 firmware has not been replaced or flashed. Windows must first
+enumerate the board consistently and the factory flash must be backed up. The
+implemented core deliberately stops at mocked capture: original-audio upload,
+Agora transcription, Ilmu processing, and Google execution remain subsequent
+adapters.
 
 Devin and the persistent WhatsApp worker remain legacy follow-up integrations.
 They are not prerequisites for transcript import, recaps, or Calendar

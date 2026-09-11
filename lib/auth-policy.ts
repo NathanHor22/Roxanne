@@ -52,3 +52,13 @@ export function isPublicAuthPath(pathname: string): boolean {
     pathname === "/api/auth/logout"
   );
 }
+
+/** Routes that authenticate the physical device instead of a browser user. */
+export function isLanternDevicePath(pathname: string): boolean {
+  return (
+    pathname === "/api/device/v1/claim" ||
+    pathname === "/api/device/v1/heartbeat" ||
+    pathname === "/api/device/v1/sessions" ||
+    /^\/api\/device\/v1\/sessions\/[0-9a-f-]{36}\/events$/iu.test(pathname)
+  );
+}
