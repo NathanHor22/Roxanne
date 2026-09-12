@@ -287,7 +287,7 @@ export function ConversationPanel({
             )}
             {meeting.sourceConversationId && (
               <p className={styles.privateNote}>
-                This brief is private to your Roxanne workspace.
+                This brief is private to your Lantern workspace.
               </p>
             )}
           </div>

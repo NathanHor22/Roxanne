@@ -2,7 +2,7 @@
 
 #include "driver/gpio.h"
 
-#define LANTERN_FIRMWARE_VERSION "0.2.0-agora-pilot"
+#define LANTERN_FIRMWARE_VERSION "0.2.0-lantern-pilot"
 #define LANTERN_MODEL "ZHENGCHEN-1.54-M1307"
 #define LANTERN_API_BASE_URL "https://roxanne-assistant.vercel.app"
 
@@ -32,4 +32,4 @@
 #define LANTERN_DISPLAY_WIDTH 240
 #define LANTERN_DISPLAY_HEIGHT 240
 
-#define LANTERN_SETUP_AP_PASSWORD "meetroxanne"
+#define LANTERN_SETUP_AP_PASSWORD "lanternsetup"

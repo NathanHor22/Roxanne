@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     const userId = await resolveDemoUserId(client, { createIfMissing: true });
     if (!userId) {
       return NextResponse.json(
-        { error: "No Roxanne user is available for this Google connection." },
+        { error: "No Lantern user is available for this Google connection." },
         { status: 503 },
       );
     }
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     );
     if (profileError) {
       return NextResponse.json(
-        { error: "The Roxanne profile could not be prepared for Google." },
+        { error: "The Lantern profile could not be prepared for Google." },
         { status: 503 },
       );
     }

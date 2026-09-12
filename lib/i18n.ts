@@ -3,8 +3,8 @@ import type { Locale } from "./types";
 export type { Locale } from "./types";
 
 export const DEFAULT_LOCALE: Locale = "en";
-export const LOCALE_STORAGE_KEY = "roxanne-locale";
-export const LOCALE_COOKIE_KEY = "roxanne-locale";
+export const LOCALE_STORAGE_KEY = "lantern-locale";
+export const LOCALE_COOKIE_KEY = "lantern-locale";
 
 export const LOCALES = ["en", "ms", "zh-CN", "yue", "ta"] as const satisfies readonly Locale[];
 
@@ -137,7 +137,7 @@ const en = {
     followUp: "Follow up",
     uploadRecording: "Upload recording",
     processing: "Processing conversation…",
-    processingHint: "Roxanne is transcribing and finding what mattered.",
+    processingHint: "Lantern is transcribing and finding what mattered.",
     failed: "Processing failed",
     retry: "Try again",
     schedule: "Schedule",
@@ -210,10 +210,10 @@ const en = {
   settings: {
     title: "Settings",
     language: "Language",
-    languageHelp: "Choose Roxanne’s display and insight language.",
-    languageHint: "Choose Roxanne’s display and insight language.",
+    languageHelp: "Choose Lantern’s display and insight language.",
+    languageHint: "Choose Lantern’s display and insight language.",
     integrations: "Integrations",
-    integrationsHint: "Live connection status for Roxanne’s services.",
+    integrationsHint: "Live connection status for Lantern’s services.",
     configured: "Configured",
     needsSetup: "Needs setup",
     connected: "Connected",
@@ -244,7 +244,7 @@ const en = {
   },
   upload: {
     title: "Upload a conversation",
-    description: "Add an audio recording for Roxanne to process.",
+    description: "Add an audio recording for Lantern to process.",
     dragDrop: "Drop an audio file here",
     or: "or",
     browse: "Choose a file",
@@ -262,7 +262,7 @@ const en = {
     extracting: "Finding what mattered",
     saving: "Saving meeting memory",
     ready: "Conversation ready",
-    mayTakeMoment: "This may take a moment. You can keep using Roxanne.",
+    mayTakeMoment: "This may take a moment. You can keep using Lantern.",
   },
   errors: {
     generic: "Something went wrong. Please try again.",
@@ -354,7 +354,7 @@ const ms = {
     followUp: "Tindakan susulan",
     uploadRecording: "Muat naik rakaman",
     processing: "Sedang memproses perbualan…",
-    processingHint: "Roxanne sedang mentranskripsi dan mencari perkara penting.",
+    processingHint: "Lantern sedang mentranskripsi dan mencari perkara penting.",
     failed: "Pemprosesan gagal",
     retry: "Cuba lagi",
     schedule: "Jadualkan",
@@ -427,10 +427,10 @@ const ms = {
   settings: {
     title: "Tetapan",
     language: "Bahasa",
-    languageHelp: "Pilih bahasa paparan dan dapatan Roxanne.",
-    languageHint: "Pilih bahasa paparan dan dapatan Roxanne.",
+    languageHelp: "Pilih bahasa paparan dan dapatan Lantern.",
+    languageHint: "Pilih bahasa paparan dan dapatan Lantern.",
     integrations: "Integrasi",
-    integrationsHint: "Status sambungan langsung untuk perkhidmatan Roxanne.",
+    integrationsHint: "Status sambungan langsung untuk perkhidmatan Lantern.",
     configured: "Sudah ditetapkan",
     needsSetup: "Perlu ditetapkan",
     connected: "Disambungkan",
@@ -461,7 +461,7 @@ const ms = {
   },
   upload: {
     title: "Muat naik perbualan",
-    description: "Tambah rakaman audio untuk diproses oleh Roxanne.",
+    description: "Tambah rakaman audio untuk diproses oleh Lantern.",
     dragDrop: "Lepaskan fail audio di sini",
     or: "atau",
     browse: "Pilih fail",
@@ -479,7 +479,7 @@ const ms = {
     extracting: "Mencari perkara penting",
     saving: "Menyimpan memori mesyuarat",
     ready: "Perbualan sudah tersedia",
-    mayTakeMoment: "Ini mungkin mengambil sedikit masa. Anda boleh terus menggunakan Roxanne.",
+    mayTakeMoment: "Ini mungkin mengambil sedikit masa. Anda boleh terus menggunakan Lantern.",
   },
   errors: {
     generic: "Ada masalah berlaku. Sila cuba lagi.",
@@ -561,7 +561,7 @@ const zhCN = {
     followUp: "跟进",
     uploadRecording: "上传录音",
     processing: "正在处理对话…",
-    processingHint: "Roxanne 正在转录并找出重要内容。",
+    processingHint: "Lantern 正在转录并找出重要内容。",
     failed: "处理失败",
     retry: "重试",
     schedule: "安排日程",
@@ -634,10 +634,10 @@ const zhCN = {
   settings: {
     title: "设置",
     language: "语言",
-    languageHelp: "选择 Roxanne 的界面和洞察语言。",
-    languageHint: "选择 Roxanne 的界面和洞察语言。",
+    languageHelp: "选择 Lantern 的界面和洞察语言。",
+    languageHint: "选择 Lantern 的界面和洞察语言。",
     integrations: "集成服务",
-    integrationsHint: "查看 Roxanne 各项服务的实时连接状态。",
+    integrationsHint: "查看 Lantern 各项服务的实时连接状态。",
     configured: "已配置",
     needsSetup: "需要设置",
     connected: "已连接",
@@ -668,7 +668,7 @@ const zhCN = {
   },
   upload: {
     title: "上传对话",
-    description: "添加一段录音，让 Roxanne 进行处理。",
+    description: "添加一段录音，让 Lantern 进行处理。",
     dragDrop: "将音频文件拖到这里",
     or: "或",
     browse: "选择文件",
@@ -686,7 +686,7 @@ const zhCN = {
     extracting: "正在提取重点",
     saving: "正在保存会议记忆",
     ready: "对话已就绪",
-    mayTakeMoment: "这可能需要一点时间。你可以继续使用 Roxanne。",
+    mayTakeMoment: "这可能需要一点时间。你可以继续使用 Lantern。",
   },
   errors: {
     generic: "出了点问题，请重试。",
@@ -768,7 +768,7 @@ const yue = {
     followUp: "跟進",
     uploadRecording: "上載錄音",
     processing: "正在處理對話…",
-    processingHint: "Roxanne 正在整理對話同搵出重要內容。",
+    processingHint: "Lantern 正在整理對話同搵出重要內容。",
     failed: "處理失敗",
     retry: "再試一次",
     schedule: "安排時間",
@@ -841,10 +841,10 @@ const yue = {
   settings: {
     title: "設定",
     language: "語言",
-    languageHelp: "選擇 Roxanne 嘅介面同重點語言。",
-    languageHint: "選擇 Roxanne 嘅介面同重點語言。",
+    languageHelp: "選擇 Lantern 嘅介面同重點語言。",
+    languageHint: "選擇 Lantern 嘅介面同重點語言。",
     integrations: "整合服務",
-    integrationsHint: "查看 Roxanne 各項服務嘅即時連線狀態。",
+    integrationsHint: "查看 Lantern 各項服務嘅即時連線狀態。",
     configured: "已設定",
     needsSetup: "需要設定",
     connected: "已連線",
@@ -875,7 +875,7 @@ const yue = {
   },
   upload: {
     title: "上載對話",
-    description: "加入錄音，等 Roxanne 幫你處理。",
+    description: "加入錄音，等 Lantern 幫你處理。",
     dragDrop: "將音訊檔案拖到呢度",
     or: "或者",
     browse: "選擇檔案",
@@ -893,7 +893,7 @@ const yue = {
     extracting: "正在搵出重點",
     saving: "正在儲存會面記憶",
     ready: "對話已準備好",
-    mayTakeMoment: "可能需要少少時間。你可以繼續使用 Roxanne。",
+    mayTakeMoment: "可能需要少少時間。你可以繼續使用 Lantern。",
   },
   errors: {
     generic: "出咗少少問題，請再試。",
@@ -975,7 +975,7 @@ const ta = {
     followUp: "தொடர் நடவடிக்கை",
     uploadRecording: "பதிவைப் பதிவேற்று",
     processing: "உரையாடல் செயலாக்கப்படுகிறது…",
-    processingHint: "Roxanne உரையை மாற்றி முக்கியமானவற்றைக் கண்டறிகிறது.",
+    processingHint: "Lantern உரையை மாற்றி முக்கியமானவற்றைக் கண்டறிகிறது.",
     failed: "செயலாக்கம் தோல்வியடைந்தது",
     retry: "மீண்டும் முயல்க",
     schedule: "திட்டமிடு",
@@ -1048,10 +1048,10 @@ const ta = {
   settings: {
     title: "அமைப்புகள்",
     language: "மொழி",
-    languageHelp: "Roxanne-ன் காட்சி மற்றும் நுண்ணறிவு மொழியைத் தேர்ந்தெடுக்கவும்.",
-    languageHint: "Roxanne-ன் காட்சி மற்றும் நுண்ணறிவு மொழியைத் தேர்ந்தெடுக்கவும்.",
+    languageHelp: "Lantern-ன் காட்சி மற்றும் நுண்ணறிவு மொழியைத் தேர்ந்தெடுக்கவும்.",
+    languageHint: "Lantern-ன் காட்சி மற்றும் நுண்ணறிவு மொழியைத் தேர்ந்தெடுக்கவும்.",
     integrations: "ஒருங்கிணைப்புகள்",
-    integrationsHint: "Roxanne சேவைகளின் நேரடி இணைப்பு நிலை.",
+    integrationsHint: "Lantern சேவைகளின் நேரடி இணைப்பு நிலை.",
     configured: "அமைக்கப்பட்டது",
     needsSetup: "அமைக்க வேண்டும்",
     connected: "இணைக்கப்பட்டது",
@@ -1082,7 +1082,7 @@ const ta = {
   },
   upload: {
     title: "உரையாடலைப் பதிவேற்று",
-    description: "Roxanne செயலாக்க ஓர் ஒலிப்பதிவைச் சேர்க்கவும்.",
+    description: "Lantern செயலாக்க ஓர் ஒலிப்பதிவைச் சேர்க்கவும்.",
     dragDrop: "ஒலிக்கோப்பை இங்கே விடவும்",
     or: "அல்லது",
     browse: "கோப்பைத் தேர்ந்தெடு",
@@ -1100,7 +1100,7 @@ const ta = {
     extracting: "முக்கியமானவை கண்டறியப்படுகின்றன",
     saving: "சந்திப்பு நினைவு சேமிக்கப்படுகிறது",
     ready: "உரையாடல் தயாராக உள்ளது",
-    mayTakeMoment: "இதற்குச் சிறிது நேரம் ஆகலாம். நீங்கள் Roxanne-ஐத் தொடர்ந்து பயன்படுத்தலாம்.",
+    mayTakeMoment: "இதற்குச் சிறிது நேரம் ஆகலாம். நீங்கள் Lantern-ஐத் தொடர்ந்து பயன்படுத்தலாம்.",
   },
   errors: {
     generic: "ஏதோ தவறு ஏற்பட்டது. மீண்டும் முயலவும்.",

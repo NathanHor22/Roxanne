@@ -113,7 +113,7 @@ async function parseDirectRequest(request: Request): Promise<ProcessInput> {
   }
   const userId = await resolveDemoUserId(client, { createIfMissing: false });
   if (!userId) {
-    throw new ProcessRequestError("No Roxanne owner is available.", 503);
+    throw new ProcessRequestError("No Lantern owner is available.", 503);
   }
 
   // Atomically claim an upload that belongs to this app's owner. Matching both
@@ -193,7 +193,7 @@ async function parseDirectRequest(request: Request): Promise<ProcessInput> {
 
 async function parseLocalMultipartRequest(request: Request): Promise<ProcessInput> {
   // Vercel buffers Route Handler request bodies and has a much smaller request
-  // limit than Roxanne's 25 MB file limit. Multipart is intentionally confined
+  // limit than Lantern's 25 MB file limit. Multipart is intentionally confined
   // to credential-free local development and tiny deterministic smoke tests.
   if (process.env.NODE_ENV === "production" || getServerSupabase()) {
     throw new ProcessRequestError("Upload audio directly to private storage before processing.", 415);

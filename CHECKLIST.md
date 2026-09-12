@@ -1,6 +1,6 @@
-# Roxanne delivery checklist
+# Lantern delivery checklist
 
-Last verified: 23 August 2026 (Asia/Kuala_Lumpur)
+Last verified: 12 September 2026 (Asia/Kuala_Lumpur)
 
 This file separates code-complete work from live infrastructure work. A phase is
 only marked complete when its checks pass; a provider is not called "live"
@@ -9,16 +9,20 @@ until it has been exercised with real credentials.
 ## Phase 1 — Foundation and safety
 
 - [x] Next.js application and persistent Baileys worker are separate services.
-- [x] Hackathon production uses the explicitly requested public launch mode;
-  owner-only Google Auth remains available with `DEMO_ACCESS_MODE=owner`.
+- [x] Owner-only Google Auth is implemented and fails closed when production
+  credentials are incomplete.
+- [ ] Change the deployed `DEMO_ACCESS_MODE` from `public` to `owner` after the
+  Lantern build and Supabase redirect allowlist are deployed.
 - [x] WhatsApp pairing and sends are restricted to `601154444038`.
 - [x] Provider secrets stay server-side.
 - [x] External sends require an explicit approved action.
 
 Reviewer check:
 
-- Open `/`, click **Open dashboard**, and confirm `/dashboard` loads directly.
-- Restore `DEMO_ACCESS_MODE=owner` before using this workspace beyond the demo.
+- Open `/dashboard` signed out and confirm Lantern redirects to `/login`.
+- Sign in with the configured owner Google account and confirm the dashboard
+  opens; confirm a different Google account is rejected.
+- Use **Settings > Access & privacy > Sign out** and confirm the session closes.
 
 ## Phase 2 — Product experience
 
@@ -40,11 +44,13 @@ Reviewer check:
 - [x] Browser uploads audio directly to the private Supabase bucket.
 - [x] Owner/path validation, 25 MB limit, MIME allowlist, and failed-state handling.
 - [x] ElevenLabs Scribe v2 transcription adapter with diarization.
-- [x] Groq Whisper production transcription when ElevenLabs is not configured.
-- [x] Qwen strict structured extraction for people, insights, and commitments.
+- [x] Agora device transcription and final-caption ingestion for the first
+  hardware capture slice.
+- [x] Ilmu strict structured extraction with the authoritative Malaysia clock.
+- [x] Groq Whisper/Qwen remain available for browser-upload compatibility.
 - [x] Devin produces proposals only; it cannot execute a send.
 - [x] Production rejects credential-free fixture fallbacks.
-- [ ] Run one real audio through Groq Whisper → Qwen → Supabase.
+- [ ] Run one real ESP32 recording through Agora → Ilmu → Supabase.
 - [ ] Prepare one real Devin follow-up proposal.
 
 Reviewer check:
@@ -72,7 +78,7 @@ Reviewer check:
 
 - [x] Application TypeScript check passes.
 - [x] Worker TypeScript check passes.
-- [x] 60/60 automated tests pass.
+- [x] 109/109 application tests pass.
 - [x] 2/2 worker hardening tests pass.
 - [x] Next.js production build passes.
 - [x] Baileys worker build passes.
@@ -89,13 +95,15 @@ npm.cmd run check
 
 - [x] Vercel account authenticated and `nathans-projects-b0bfd21e/roxanne` linked.
 - [x] GitHub repository connected to the Vercel project.
-- [x] Current application code committed and pushed to `origin/main`.
-- [x] Roxanne Supabase project created and linked as `cjogfunwcwytvooycjzv`.
+- [ ] Commit and push the current Lantern application and firmware rebrand.
+- [x] Lantern Supabase project created and linked as `cjogfunwcwytvooycjzv`.
 - [x] Local Supabase configuration records the production URL and Auth redirects.
 - [x] Remote migrations `001_initial.sql` and `002_worker_hardening.sql` applied;
   14 tables, 12 public RLS policies, and the private recording bucket verified.
+- [ ] Apply migrations `003_meeting_approvals.sql`,
+  `004_lantern_devices.sql`, and `005_lantern_recording_pipeline.sql`.
 - [x] Supabase Google Auth is enabled and email/password signup is disabled.
-- [ ] Add the Supabase and Roxanne callback URLs to the Google Cloud OAuth client.
+- [ ] Add the Supabase and Lantern callback URLs to the Google Cloud OAuth client.
 - [x] Provision and connect Vercel Marketplace Upstash Redis.
 - [x] Add Supabase, application Google OAuth, WhatsApp relay, owner, timezone,
   and action-approval variables to Vercel Production.
@@ -103,11 +111,11 @@ npm.cmd run check
 - [ ] Add Devin credentials if the proposal step is required for judging.
 - [x] Deploy and health-check the one-replica Baileys worker on Railway; live
   state is `qr_ready` and awaits owner pairing.
-- [ ] Pair WhatsApp from Roxanne Settings.
+- [ ] Pair WhatsApp from Lantern Settings.
 - [x] Initial Vercel production build deployed and assigned to
   `https://roxanne-assistant.vercel.app`.
-- [x] Deploy and verify the public launch page, dashboard, live Groq/Qwen,
-  secured Agora tokens, reachable Redis, and hardware bootstrap routes.
+- [ ] Deploy and verify the Lantern launch/login theme, v1 device routes,
+  Agora/Ilmu readiness, and authenticated dashboard.
 - [ ] Run the complete credential-backed golden path.
 - [ ] Record the Railway URL and final golden-path verification time below.
 
@@ -130,7 +138,7 @@ cannot be completed by repository automation alone:
 - [ ] Add `https://cjogfunwcwytvooycjzv.supabase.co/auth/v1/callback` and
   `https://roxanne-assistant.vercel.app/api/google/callback` to the existing Google
   Cloud OAuth client's authorized redirect URIs, then complete the one-time
-  Google Calendar consent from Roxanne Settings.
+  Google Calendar consent from Lantern Settings.
 - [ ] Scan the WhatsApp QR or enter the pairing code on the phone for
   `01154444038`.
 - [ ] Approve the real WhatsApp self-send and Google Calendar invitation during
@@ -138,8 +146,8 @@ cannot be completed by repository automation alone:
 
 ## Explicit MVP scope decisions
 
-- [x] Gmail/email sending is replaced by the user-requested WhatsApp preview and
-  approved self-send flow.
+- [x] Approved Google Calendar events send the attendee invitation; a separate
+  free-form Gmail message remains outside the first golden path.
 - [x] Browser Agora recording plus device registration and short-lived hardware
   Agora bootstrap endpoints are implemented.
 - [ ] Existing Google Calendar event import and automatic recording matching
@@ -149,9 +157,10 @@ cannot be completed by repository automation alone:
 
 ## Live golden path — final gate
 
-- [ ] Click **Open dashboard**; no Google login is required in hackathon mode.
-- [ ] Record or upload real audio.
-- [ ] Confirm live Groq Whisper transcription and live Qwen extraction.
+- [ ] Sign in with the owner Google account and open the live dashboard.
+- [ ] Pair the Lantern through `Lantern-XXXX` and `http://192.168.4.1`.
+- [ ] Record real audio on the ESP32-S3.
+- [ ] Confirm live Agora transcription and live Ilmu extraction.
 - [ ] Reload and confirm the meeting, audio, transcript, and follow-ups persist.
 - [ ] Generate a Devin proposal, review it, then approve WhatsApp send.
 - [ ] Confirm the message arrives only at `01154444038`.

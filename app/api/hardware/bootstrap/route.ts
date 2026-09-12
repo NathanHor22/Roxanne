@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const input = bootstrapSchema.parse(await request.json());
     if (!client) throw new Error("Supabase is unavailable.");
     const userId = await resolveDemoUserId(client, { createIfMissing: true });
-    if (!userId) throw new Error("The Roxanne workspace is unavailable.");
+    if (!userId) throw new Error("The Lantern workspace is unavailable.");
 
     const { data: device, error: deviceError } = await client
       .from("devices")
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     }
 
     const compactDeviceId = input.deviceId.replaceAll("-", "");
-    const channel = `roxanne-hw-${compactDeviceId}`;
+    const channel = `lantern-hw-${compactDeviceId}`;
     const uid =
       input.uid ??
       ((Number.parseInt(compactDeviceId.slice(-7), 16) % 2_147_483_646) + 1);

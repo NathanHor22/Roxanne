@@ -41,17 +41,27 @@ export async function POST(request: Request) {
   let sessionId = "";
   try {
     const input = headerSchema.parse({
-      deviceId: request.headers.get("x-roxanne-device-id"),
-      sessionId: request.headers.get("x-roxanne-session-id"),
-      agentId: request.headers.get("x-roxanne-agent-id") || undefined,
-      locale: request.headers.get("x-roxanne-locale") || undefined,
+      deviceId:
+        request.headers.get("x-lantern-device-id") ||
+        request.headers.get("x-roxanne-device-id"),
+      sessionId:
+        request.headers.get("x-lantern-session-id") ||
+        request.headers.get("x-roxanne-session-id"),
+      agentId:
+        request.headers.get("x-lantern-agent-id") ||
+        request.headers.get("x-roxanne-agent-id") ||
+        undefined,
+      locale:
+        request.headers.get("x-lantern-locale") ||
+        request.headers.get("x-roxanne-locale") ||
+        undefined,
     });
     sessionId = input.sessionId;
     const raw = await request.text();
     if (raw.length > 250_000) return NextResponse.json({ error: "Hardware transcript is too large." }, { status: 413 });
     if (!client) throw new Error("Supabase is unavailable.");
     const userId = await resolveDemoUserId(client, { createIfMissing: false });
-    if (!userId) throw new Error("The Roxanne workspace is unavailable.");
+    if (!userId) throw new Error("The Lantern workspace is unavailable.");
     const { data: device } = await client.from("devices").select("id,name").eq("id", input.deviceId).eq("user_id", userId).maybeSingle();
     if (!device) return NextResponse.json({ error: "Unknown hardware device." }, { status: 404 });
 

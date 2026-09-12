@@ -353,8 +353,8 @@ export function sanitizeGoogleReturnTo(value: string | null | undefined): string
   }
   if (candidate.includes("\\")) return "/";
   try {
-    const parsed = new URL(candidate, "https://roxanne.local");
-    if (parsed.origin !== "https://roxanne.local") return "/";
+    const parsed = new URL(candidate, "https://lantern.local");
+    if (parsed.origin !== "https://lantern.local") return "/";
     return `${parsed.pathname}${parsed.search}`;
   } catch {
     return "/";

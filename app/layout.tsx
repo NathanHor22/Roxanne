@@ -1,9 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Roxanne — Business memory",
-  description: "You talk to people. Roxanne remembers what mattered.",
+  applicationName: "Lantern",
+  title: {
+    default: "Lantern — Conversation intelligence",
+    template: "%s · Lantern",
+  },
+  description:
+    "Capture client conversations, remember what mattered, and approve every follow-up before it leaves your workspace.",
+  category: "business",
+  manifest: "/manifest.webmanifest",
+};
+
+export const viewport: Viewport = {
+  colorScheme: "light",
+  themeColor: "#071a13",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

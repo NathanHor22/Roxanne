@@ -1,11 +1,11 @@
-# Roxanne architecture
+# Lantern architecture
 
 ## First-phase behavior
 
-Roxanne separates a conversation that already happened from a meeting agreed
+Lantern separates a conversation that already happened from a meeting agreed
 for the future. A captured conversation holds the transcript, recap, and
 follow-ups. A schedule follow-up becomes a dashboard approval. Explicit
-approval creates a Google Calendar event; opening that event in Roxanne shows
+approval creates a Google Calendar event; opening that event in Lantern shows
 the original conversation's bullet recap and preparation tasks. Conversations
 with an archived recording can also replay the original audio.
 
@@ -327,7 +327,7 @@ state. Automatic retention and chunk assembly are not implemented here.
 ## Sample and live adapters
 
 `/dashboard?mode=sample` loads fictional records whose IDs start with `sample:`.
-The preview stores changes under `roxanne:sample-workspace:v1` in browser
+The preview stores changes under `lantern:sample-workspace:v1` in browser
 storage. Sample approval creates a local calendar entry linked to its sample
 conversation; it does not call Ilmu, Agora, Google, or live mutation endpoints.
 Reset replaces only the sample workspace. Browser-storage failures leave the
@@ -342,21 +342,24 @@ wearable have been connected.
 
 ## Setup and remaining work
 
-Apply migrations 001 through 004 before enabling the Lantern device core. Set
-the Supabase values and owner identity, then `ILMU_API_KEY` and optionally
-`ILMU_MODEL`. Google execution additionally needs OAuth client configuration,
+Apply migrations 001 through 005 before enabling the Lantern device core. Set
+the Supabase values and owner identity, then the Agora Speech-to-Text and Ilmu
+credentials. Google execution additionally needs OAuth client configuration,
 a registered `/api/google/callback`, `ACTION_APPROVAL_SECRET`, and a connected
-Google account. [README.md](README.md) contains the setup steps. Audio uploads
-also need ElevenLabs or Groq transcription; completed transcript imports do
-not. Devin and WhatsApp are optional legacy paths outside this approval flow.
+Google account. [README.md](README.md) contains the setup steps. Browser audio
+uploads also need ElevenLabs or Groq transcription; the ESP32 pilot uses Agora
+captions. Devin and WhatsApp are optional legacy paths outside this approval
+flow.
 
 The following are deliberately deferred:
 
-- Passive wearable Agora transcription and a gateway that delivers the
-  normalized contract; the existing speaking-agent firmware is not this path.
-- Hardware use of the implemented pairing/session protocol, hour-plus provider
-  token renewal, audio chunk acknowledgements, incremental durable transcript
-  storage, and the original-audio archive required for replay.
+- Hour-plus wearable capture with provider token renewal, acknowledged audio
+  chunks, reconnect/resume, incremental durable transcript storage, and
+  explicit gap records. The implemented 29-second pilot validates the complete
+  contract before this reliability work.
+- Wake-word activation and the spoken daily Status Report flow. Quick Mode is
+  currently controlled by the device button and all external actions still
+  require approval in the dashboard.
 - A durable processing queue, recoverable background extraction, and complete
   failure reconciliation across providers, including abandoned import claims.
 - Validated speaker attribution and Malaysian mixed-language accuracy on real
@@ -366,6 +369,6 @@ The following are deliberately deferred:
   access bypasses login and does not provide multiuser isolation.
 - Two-way Google Calendar synchronization, watch/webhook handling, importing
   unrelated events, and reconciling edits/deletions made in Google. The
-  dashboard currently uses Roxanne's own stored meeting/event records.
+  dashboard currently uses Lantern's own stored meeting/event records.
 - Automatic conflict checks and richer handling of rescheduled or cancelled
   meetings. Explicit approval remains a requirement before sending invitations.

@@ -35,7 +35,7 @@ function collect(value: unknown, inherited: { uid?: string; turnId?: string }, o
     .find((item): item is string => typeof item === "string" && Boolean(item.trim()));
   if (directText) {
     const text = cleanText(directText);
-    if (text) out.push({ turnId, speaker: uid === "1000" ? "Roxanne" : "You", text });
+    if (text) out.push({ turnId, speaker: uid === "1000" ? "Lantern" : "You", text });
   }
   for (const child of Object.values(record)) {
     if (child !== directText) collect(child, { uid, turnId }, out);

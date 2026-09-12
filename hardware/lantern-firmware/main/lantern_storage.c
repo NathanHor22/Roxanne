@@ -6,6 +6,8 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 
+/* Kept stable so devices already provisioned under the prototype name retain
+ * their Wi-Fi and pairing credentials after the Lantern rebrand. */
 #define STORAGE_NAMESPACE "roxanne"
 
 static esp_err_t read_string(nvs_handle_t handle, const char *key, char *destination, size_t size) {

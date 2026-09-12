@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   List,
   LoaderCircle,
+  LogOut,
   MessageSquare,
   MoreHorizontal,
   Plus,
@@ -35,6 +36,7 @@ import {
   type MeetingApproval,
 } from "@/lib/workspace/model";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { LanternMark } from "@/components/brand/LanternMark";
 import { useWorkspace } from "./useWorkspace";
 import {
   ConversationPanel,
@@ -166,17 +168,17 @@ export function Workspace() {
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
-        <a href="/dashboard" className={styles.brand} aria-label="Roxanne home">
-          <span>
-            r<span className={styles.brandDot}>.</span>
+        <a href="/dashboard" className={styles.brand} aria-label="Lantern home">
+          <span className={styles.brandMark}>
+            <LanternMark />
           </span>
-          <strong>roxanne</strong>
+          <strong>Lantern</strong>
         </a>
         <div className={styles.workspaceLabel}>
-          <span className={styles.workspaceMark}>R</span>
+          <span className={styles.workspaceMark}><i /></span>
           <div>
             <strong>Your workspace</strong>
-            <small>Business, remembered.</small>
+            <small>Listening securely</small>
           </div>
         </div>
         <span className={styles.navLabel}>WORKSPACE</span>
@@ -229,7 +231,7 @@ export function Workspace() {
           </button>
           <div className={styles.account}>
             <span className={styles.accountAvatar}>
-              {mode === "sample" ? "S" : "R"}
+              {mode === "sample" ? "S" : "ME"}
             </span>
             <div>
               <strong>
@@ -1041,7 +1043,7 @@ export function Workspace() {
                     </span>
                     <h2>Google Calendar</h2>
                     <p>
-                      Approve a meeting in Roxanne and keep it on your calendar.
+                      Approve a meeting in Lantern and keep it on your calendar.
                     </p>
                     <span className={styles.connectionState}>
                       <i
@@ -1142,15 +1144,34 @@ export function Workspace() {
                       </button>
                     )}
                   </section>
+                  <section className={styles.settingsCard}>
+                    <span className={styles.settingsIcon}>
+                      <ShieldCheck />
+                    </span>
+                    <h2>Access & privacy</h2>
+                    <p>
+                      Your source recordings, transcripts, and meeting briefs
+                      stay inside your private Lantern workspace.
+                    </p>
+                    <span className={styles.connectionState}>
+                      <i className={styles.greenDot} />
+                      Owner access only
+                    </span>
+                    <form action="/api/auth/logout" method="post">
+                      <button className={styles.secondaryButton} type="submit">
+                        Sign out <LogOut />
+                      </button>
+                    </form>
+                  </section>
                 </div>
               )}
             </>
           )}
           <footer className={styles.pageFooter}>
             <span className={styles.footerBrand}>
-              roxanne<span> · Your business memory</span>
+              Lantern<span> · Conversation intelligence</span>
             </span>
-            <span>Built around your conversations.</span>
+            <span>Listen. Understand. Follow through.</span>
           </footer>
         </div>
       </main>

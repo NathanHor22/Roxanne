@@ -11,6 +11,7 @@ import {
 } from "@/lib/workspace/model";
 import {
   createSampleWorkspace,
+  LEGACY_SAMPLE_STORAGE_KEY,
   readSampleWorkspace,
   SAMPLE_STORAGE_KEY,
 } from "@/lib/workspace/sample";
@@ -33,7 +34,9 @@ export function useWorkspace() {
     try {
       if (!reset)
         data =
-          readSampleWorkspace(localStorage.getItem(SAMPLE_STORAGE_KEY)) || data;
+          readSampleWorkspace(localStorage.getItem(SAMPLE_STORAGE_KEY)) ||
+          readSampleWorkspace(localStorage.getItem(LEGACY_SAMPLE_STORAGE_KEY)) ||
+          data;
     } catch {
       /* Memory-only sample remains usable when storage is unavailable. */
     }
@@ -128,6 +131,7 @@ export function useWorkspace() {
         SAMPLE_STORAGE_KEY,
         JSON.stringify({ version: 1, meetings }),
       );
+      localStorage.removeItem(LEGACY_SAMPLE_STORAGE_KEY);
     } catch {
       setNotice(
         "Changes are available in this tab. Browser storage is unavailable.",
@@ -170,7 +174,7 @@ export function useWorkspace() {
           payload.error || "The calendar invitation could not be created.",
         );
       const created: Meeting = {
-        id: payload.roxanneMeetingId || `calendar:${payload.event.id}`,
+        id: payload.meetingId || `calendar:${payload.event.id}`,
         title: payload.event.summary,
         startAt: payload.event.startAt,
         endAt: payload.event.endAt,

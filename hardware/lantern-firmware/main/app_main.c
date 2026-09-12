@@ -30,7 +30,7 @@ typedef enum {
   LOCAL_ERROR,
 } local_state_t;
 
-static const char *TAG = "roxanne_lantern";
+static const char *TAG = "lantern";
 static lantern_config_t s_config;
 static local_state_t s_state = LOCAL_READY;
 static adc_oneshot_unit_handle_t s_adc;
@@ -335,7 +335,7 @@ static void telemetry_task(void *argument) {
 }
 
 void app_main(void) {
-  ESP_LOGI(TAG, "Roxanne Lantern %s booting", LANTERN_FIRMWARE_VERSION);
+  ESP_LOGI(TAG, "Lantern %s booting", LANTERN_FIRMWARE_VERSION);
   s_state_entered_at = xTaskGetTickCount();
   power_and_battery_init();
   ESP_ERROR_CHECK(lantern_storage_init());

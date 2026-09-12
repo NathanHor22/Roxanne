@@ -10,7 +10,7 @@ https://roxanne-assistant.vercel.app
 
 The target board is the ZHENGCHEN 1.54-inch M1307 ESP32-S3 variant with a
 240 x 240 ST7789 display, microphone, speaker path, buttons, battery support,
-and an ML307 cellular module. The active Roxanne firmware is under
+and an ML307 cellular module. The active Lantern firmware is under
 `hardware/lantern-firmware`; the earlier Agora experiment remains under
 `hardware/firmware` for reference.
 
@@ -18,16 +18,16 @@ Windows exposes the ZHENGCHEN board as `USB-SERIAL CH340K (COM5)`, with USB
 VID `1A86` and PID `7522`. The original factory boot log confirmed ESP32-S3
 revision 0.2, 8 MB octal PSRAM, 16 MB quad flash at 3.3 V, and Xiaozhi 2.4.0.
 
-Roxanne Lantern `0.1.0-bringup` was first flashed and boot-verified on 12
+Lantern `0.1.0-bringup` was first flashed and boot-verified on 12
 September 2026. Version `0.1.1-bringup` was then flashed with every block hash
 verified and ran continuously with changing microphone and battery readings,
 stable heap, and the full 8 MB PSRAM buffer available. The firmware preserves
 the factory partition layout and initializes the ST7789 display, I2S microphone
-and speaker, buttons, battery telemetry, and first-boot `Roxanne-XXXX` setup
+and speaker, buttons, battery telemetry, and first-boot `Lantern-XXXX` setup
 network. Version `0.1.1-bringup` also adds a 30-second consent timeout, local WAV
 download, five-second on-device replay, settings reset, and development OTA.
 Version `0.1.2-bringup` removed the startup speaker noise and is the currently
-flashed bench image. Version `0.2.0-agora-pilot` now builds successfully but has
+flashed bench image. Version `0.2.0-lantern-pilot` now builds successfully but has
 not been flashed: its matching backend routes, migration 005, Agora credentials,
 and Ilmu credentials must be live first.
 
@@ -54,16 +54,16 @@ markings before cellular work begins.
 
 ## Network model
 
-The ESP32-S3 needs an internet path to reach Roxanne. For the first release,
+The ESP32-S3 needs an internet path to reach Lantern. For the first release,
 use 2.4 GHz Wi-Fi from a phone hotspot or trusted router. Hotspot credentials
-stay in device NVS; Roxanne's backend does not receive them. The field-pilot
+stay in device NVS; Lantern's backend does not receive them. The field-pilot
 firmware must add encrypted NVS, flash encryption, secure boot and signed OTA
 before device credentials are treated as hardware-protected.
 The ML307 can become a later cellular fallback after its exact variant and SIM
 behavior are verified.
 
-Google, Ilmu, and other provider credentials stay on Roxanne's backend. The
-device receives only its own Roxanne credential and, later, short-lived capture
+Google, Ilmu, and other provider credentials stay on Lantern's backend. The
+device receives only its own Lantern credential and, later, short-lived capture
 session credentials. It never stores a Google refresh token or sends a Google
 invitation directly.
 
@@ -83,7 +83,7 @@ Content-Type: application/json
   "pairingCode": "24G7N-8R5XQ",
   "hardwareId": "esp32s3:<factory-mac>",
   "model": "ZHENGCHEN-1.54-M1307",
-  "firmwareVersion": "0.2.0-agora-pilot"
+  "firmwareVersion": "0.2.0-lantern-pilot"
 }
 ```
 
@@ -125,7 +125,7 @@ Content-Type: application/json
 
 {
   "eventId": "11111111-1111-4111-8111-111111111111",
-  "firmwareVersion": "0.2.0-agora-pilot",
+  "firmwareVersion": "0.2.0-lantern-pilot",
   "state": "ready",
   "stateVersion": 0,
   "batteryLevel": 82,
@@ -209,7 +209,7 @@ authority that sends a Calendar invitation.
 
 ## Current capture pilot and remaining scale work
 
-The `0.2.0-agora-pilot` image adds the v1 session client, server-confirmed
+The `0.2.0-lantern-pilot` image adds the v1 session client, server-confirmed
 consent and capture clock, 16 kHz mono publishing to Agora, final caption
 collection, private WAV upload, Ilmu extraction, and automatic dashboard
 delivery. It keeps the existing local setup, pairing, heartbeat, display,

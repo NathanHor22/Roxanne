@@ -34,14 +34,15 @@ export function isOwnerEmail(
 
 /** Prevent OAuth callbacks from becoming open redirects. */
 export function sanitizeAuthReturnTo(value: string | null | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
+  if (!value || !value.startsWith("/") || value.startsWith("//"))
+    return "/dashboard";
 
   try {
-    const parsed = new URL(value, "https://roxanne.invalid");
-    if (parsed.origin !== "https://roxanne.invalid") return "/";
+    const parsed = new URL(value, "https://lantern.invalid");
+    if (parsed.origin !== "https://lantern.invalid") return "/dashboard";
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
-    return "/";
+    return "/dashboard";
   }
 }
 
@@ -59,6 +60,8 @@ export function isLanternDevicePath(pathname: string): boolean {
     pathname === "/api/device/v1/claim" ||
     pathname === "/api/device/v1/heartbeat" ||
     pathname === "/api/device/v1/sessions" ||
-    /^\/api\/device\/v1\/sessions\/[0-9a-f-]{36}\/events$/iu.test(pathname)
+    /^\/api\/device\/v1\/sessions\/[0-9a-f-]{36}\/(?:events|transcript|audio|complete)$/iu.test(
+      pathname,
+    )
   );
 }

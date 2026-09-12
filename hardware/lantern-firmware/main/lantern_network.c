@@ -122,7 +122,7 @@ static int post_binary(const char *path, const char *content_type, const void *b
   esp_http_client_set_method(client, HTTP_METHOD_POST);
   esp_http_client_set_header(client, "Content-Type", content_type);
   if (authorization && authorization[0]) esp_http_client_set_header(client, "Authorization", authorization);
-  if (event_id && event_id[0]) esp_http_client_set_header(client, "X-Roxanne-Event-Id", event_id);
+  if (event_id && event_id[0]) esp_http_client_set_header(client, "X-Lantern-Event-Id", event_id);
   esp_http_client_set_post_field(client, (const char *)body, (int)body_length);
   esp_err_t result = esp_http_client_perform(client);
   int status = result == ESP_OK ? esp_http_client_get_status_code(client) : -1;
@@ -282,19 +282,19 @@ static void form_field(const char *body, const char *name, char *destination, si
 static esp_err_t setup_page(httpd_req_t *request) {
   static const char page[] =
     "<!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'>"
-    "<title>Roxanne Lantern</title><style>body{font:16px system-ui;background:#03110c;color:#e8fff2;"
-    "max-width:420px;margin:40px auto;padding:24px}h1{color:#35ff8c}label{display:block;margin-top:18px}"
-    "input{width:100%;box-sizing:border-box;padding:13px;margin-top:7px;border-radius:8px;border:1px solid #28704c}"
-    "button{margin-top:24px;width:100%;padding:14px;border:0;border-radius:8px;background:#35ff8c;font-weight:700}</style></head>"
-    "<body><h1>Roxanne Lantern</h1><p>Connect this device to a 2.4 GHz hotspot. A dashboard pairing code is optional for the hardware test.</p>"
+    "<title>Lantern setup</title><style>body{font:16px system-ui;background:#03110c;color:#e8fff2;"
+    "max-width:420px;margin:40px auto;padding:24px}h1{color:#35ff8c}p{color:#a9c9b7;line-height:1.55}label{display:block;margin-top:18px;color:#d9f7e5}"
+    "input{width:100%;box-sizing:border-box;padding:13px;margin-top:7px;border-radius:8px;border:1px solid #28704c;background:#071b12;color:#effff5}"
+    "button{margin-top:24px;width:100%;padding:14px;border:0;border-radius:8px;background:#35ff8c;color:#03110c;font-weight:700}</style></head>"
+    "<body><h1>Lantern</h1><p>Connect this device to a 2.4 GHz Wi-Fi network or phone hotspot. Use the one-time pairing code from your Lantern dashboard.</p>"
     "<form method=post action=/configure><label>Wi-Fi name<input name=ssid maxlength=32 required></label>"
     "<label>Wi-Fi password<input name=password type=password maxlength=64></label>"
-    "<label>Pairing code<input name=code maxlength=20 placeholder='Optional'></label><button>Save and restart</button></form>"
+    "<label>Pairing code (required on first setup)<input name=code maxlength=20 placeholder='XXXXX-XXXXX'></label><button>Connect Lantern</button></form>"
     "<p><a href=/audio.wav style='color:#35ff8c'>Download the latest microphone test</a></p>"
     "<hr style='border-color:#164d34'><h2>Local firmware update</h2><input id=firmware type=file accept=.bin>"
     "<button type=button onclick='updateFirmware()'>Install update</button><p id=result></p>"
     "<script>async function updateFirmware(){const f=document.getElementById(\"firmware\").files[0];"
-    "if(!f){result.textContent=\"Choose roxanne_lantern.bin first\";return;}result.textContent=\"Uploading...\";"
+    "if(!f){result.textContent=\"Choose lantern.bin first\";return;}result.textContent=\"Uploading...\";"
     "const r=await fetch(\"/firmware\",{method:\"POST\",headers:{\"Content-Type\":\"application/octet-stream\"},body:f});"
     "result.textContent=await r.text();}</script></body></html>";
   httpd_resp_set_type(request, "text/html");
@@ -341,7 +341,7 @@ static esp_err_t audio_download(httpd_req_t *request) {
   char length[16];
   snprintf(length, sizeof(length), "%u", (unsigned)(44 + data_bytes));
   httpd_resp_set_type(request, "audio/wav");
-  httpd_resp_set_hdr(request, "Content-Disposition", "attachment; filename=roxanne-mic-test.wav");
+  httpd_resp_set_hdr(request, "Content-Disposition", "attachment; filename=lantern-mic-test.wav");
   httpd_resp_set_hdr(request, "Content-Length", length);
   ESP_RETURN_ON_ERROR(httpd_resp_send_chunk(request, (const char *)header, sizeof(header)), TAG, "WAV header");
   int16_t chunk[512];
@@ -404,7 +404,7 @@ static esp_err_t firmware_update(httpd_req_t *request) {
     return result;
   }
   ESP_LOGI(TAG, "OTA image accepted in %s (%u bytes)", partition->label, (unsigned)request->content_len);
-  httpd_resp_send(request, "Update installed. Roxanne is restarting.", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_send(request, "Update installed. Lantern is restarting.", HTTPD_RESP_USE_STRLEN);
   xTaskCreate(delayed_restart, "ota_restart", 2048, NULL, 4, NULL);
   return ESP_OK;
 }
@@ -422,7 +422,9 @@ static esp_err_t configure(httpd_req_t *request) {
   form_field(body, "ssid", ssid, sizeof(ssid));
   form_field(body, "password", password, sizeof(password));
   form_field(body, "code", code, sizeof(code));
-  if (!ssid[0] || (code[0] && !normalize_pairing_code(code))) {
+  bool has_valid_code = code[0] && normalize_pairing_code(code);
+  if (!ssid[0] || (!lantern_storage_is_paired(s_config) && !has_valid_code) ||
+      (code[0] && !has_valid_code)) {
     httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Check the Wi-Fi name and 10-character pairing code");
     return ESP_FAIL;
   }
@@ -432,7 +434,7 @@ static esp_err_t configure(httpd_req_t *request) {
     return result;
   }
   httpd_resp_set_type(request, "text/html");
-  httpd_resp_send(request, "<h1>Saved</h1><p>Roxanne is restarting now.</p>", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_send(request, "<h1>Connected</h1><p>Lantern is restarting now.</p>", HTTPD_RESP_USE_STRLEN);
   xTaskCreate(delayed_restart, "restart", 2048, NULL, 4, NULL);
   return ESP_OK;
 }
@@ -441,7 +443,7 @@ static esp_err_t start_setup_portal(void) {
   if (s_server) return ESP_OK;
   uint8_t mac[6];
   ESP_ERROR_CHECK(esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP));
-  snprintf(s_status.setup_ssid, sizeof(s_status.setup_ssid), "Roxanne-%02X%02X", mac[4], mac[5]);
+  snprintf(s_status.setup_ssid, sizeof(s_status.setup_ssid), "Lantern-%02X%02X", mac[4], mac[5]);
   wifi_config_t ap = {0};
   ap.ap.ssid_len = strnlen(s_status.setup_ssid, sizeof(ap.ap.ssid));
   memcpy(ap.ap.ssid, s_status.setup_ssid, ap.ap.ssid_len);
@@ -661,7 +663,7 @@ esp_err_t lantern_network_upload_transcript(const lantern_cloud_session_t *sessi
   device_authorization(authorization);
   uuid_v4(event_id);
   response_buffer_t response;
-  int status = post_binary(path, "application/x-roxanne-agora-caption-batch",
+  int status = post_binary(path, "application/x-lantern-agora-caption-batch",
     lantern_transcript_data(), lantern_transcript_size(), authorization, event_id, &response);
   if (status != 201 && status != 200) {
     provider_error("Transcript upload", status, &response);

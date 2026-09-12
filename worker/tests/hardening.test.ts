@@ -25,13 +25,13 @@ test("worker requires a distinct 32-byte auth encryption key", () => {
       }),
     /must be separate/u,
   );
-  assert.equal(loadConfig(baseEnv).workspaceKey, "roxanne");
+  assert.equal(loadConfig(baseEnv).workspaceKey, "lantern");
 });
 
 test("auth values are encrypted and bound to their workspace and data key", () => {
   const cipher = new AuthValueCipher(
     AUTH_KEY,
-    "roxanne",
+    "lantern",
   );
   const plaintext = '{"privateKey":"super-secret"}';
   const encrypted = cipher.encrypt("auth:creds", plaintext);

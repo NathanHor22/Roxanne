@@ -1,12 +1,14 @@
 .shell {
-  --w-ink: #202d2a;
-  --w-muted: #6b7773;
-  --w-line: #e5eae6;
-  --w-green: #24624f;
-  --w-pale: #edf4ef;
-  --w-paper: #f7f9f7;
+  --w-ink: #10271c;
+  --w-muted: #64776d;
+  --w-line: #dce8df;
+  --w-green: #087a43;
+  --w-pale: #e8f7ed;
+  --w-paper: #f3f8f4;
   min-height: 100vh;
-  background: var(--w-paper);
+  background:
+    radial-gradient(circle at 93% 2%, #dff8e7 0, transparent 24%),
+    var(--w-paper);
   color: var(--w-ink);
   font-family: "Segoe UI", Arial, sans-serif;
   font-size: 14px;
@@ -22,7 +24,7 @@
 .shell a:focus-visible,
 .drawer button:focus-visible,
 .approvalDialog button:focus-visible {
-  outline: 3px solid #65a48e;
+  outline: 3px solid #31d978;
   outline-offset: 3px;
 }
 .shell button {
@@ -40,7 +42,11 @@
   position: fixed;
   inset: 0 auto 0 0;
   width: 226px;
-  background: #173e32;
+  overflow: hidden;
+  border-right: 1px solid #2cf17b1c;
+  background:
+    radial-gradient(circle at 12% 6%, #154b31 0, transparent 27%),
+    linear-gradient(175deg, #071a12, #04100b 74%);
   color: #e9f1eb;
   padding: 30px 18px 16px;
   display: flex;
@@ -52,24 +58,29 @@
   align-items: center;
   gap: 11px;
   padding: 0 14px 28px;
-  color: #f6faf5;
+  color: #f4fff7;
   text-decoration: none;
 }
-.brand > span {
-  font-family: Georgia, serif;
-  font-size: 38px;
-  font-style: italic;
-  line-height: 1;
-  letter-spacing: -5px;
+.brandMark {
+  display: grid;
+  width: 35px;
+  height: 35px;
+  place-items: center;
+  border: 1px solid #50ff9138;
+  border-radius: 50%;
+  color: #50fa8f;
+  background: #36f27a0b;
+  box-shadow: 0 0 24px #35f57d1f;
 }
-.brandDot {
-  color: #a8d296;
+.brandMark svg {
+  width: 23px !important;
+  height: 23px !important;
 }
 .brand strong {
   font-family: Georgia, serif;
-  font-size: 28px;
+  font-size: 25px;
   font-weight: 500;
-  letter-spacing: -1.2px;
+  letter-spacing: -0.8px;
 }
 .workspaceLabel {
   display: flex;
@@ -77,8 +88,8 @@
   align-items: center;
   padding: 16px 10px;
   margin: 0 2px 28px;
-  border-top: 1px solid #ffffff13;
-  border-bottom: 1px solid #ffffff13;
+  border-top: 1px solid #5dff9c17;
+  border-bottom: 1px solid #5dff9c17;
 }
 .workspaceLabel > div {
   display: grid;
@@ -90,23 +101,29 @@
 }
 .workspaceLabel small {
   font-size: 12px;
-  color: #a6baaf;
+  color: #88aa97;
 }
 .workspaceMark {
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  background: #ffffff13;
-  border: 1px solid #ffffff17;
-  border-radius: 9px;
-  font-family: Georgia, serif;
+  background: #2af5770d;
+  border: 1px solid #50ff912e;
+  border-radius: 50%;
+}
+.workspaceMark i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #51f891;
+  box-shadow: 0 0 13px #42f385;
 }
 .navLabel {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 1.6px;
-  color: #8eab9d;
+  color: #6e9b82;
   margin: 0 14px 10px;
 }
 .sidebar nav {
@@ -119,7 +136,7 @@
   gap: 11px;
   border: 0;
   background: transparent;
-  color: #b8ccc0;
+  color: #9eb8a8;
   width: 100%;
   min-height: 45px;
   padding: 11px 13px;
@@ -138,10 +155,10 @@
   font-size: 12px;
 }
 .navActive {
-  background: #ffffff13 !important;
+  background: #43f28512 !important;
   color: #fff !important;
   font-weight: 600;
-  box-shadow: inset 3px 0 #b3d69b;
+  box-shadow: inset 3px 0 #4ff991, 0 0 24px #24d56d0a;
 }
 .sidebarBottom {
   margin-top: auto;
@@ -150,13 +167,13 @@
 .deviceCard {
   padding: 17px 15px;
   margin: 0 2px 20px;
-  border: 1px solid #ffffff17;
-  background: #ffffff04;
+  border: 1px solid #4df58d1b;
+  background: linear-gradient(145deg, #3aff7f0a, #ffffff03);
   border-radius: 9px;
 }
 .deviceIcon {
   display: block;
-  color: #adca9e;
+  color: #4df38b;
   margin-bottom: 12px;
 }
 .deviceCard > strong {
@@ -216,8 +233,9 @@
   height: 31px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #d9e5d4;
-  color: #254336;
+  border: 1px solid #61f59a33;
+  background: #1b5236;
+  color: #c8ffdc;
   font-size: 12px;
 }
 .main {
@@ -228,7 +246,8 @@
   height: 69px;
   border-bottom: 1px solid var(--w-line);
   padding: 0 34px;
-  background: #ffffff8c;
+  background: #ffffffb8;
+  backdrop-filter: blur(16px);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -281,7 +300,7 @@
   font-size: 12px !important;
   font-weight: 650;
   letter-spacing: 1.5px;
-  color: #6b8675;
+  color: #078348;
   margin: 0 0 7px;
 }
 .pageHeader h1 {
@@ -312,12 +331,12 @@
   white-space: nowrap;
 }
 .primaryButton {
-  border: 1px solid #285f4d;
-  background: #285f4d;
+  border: 1px solid #087a43;
+  background: #087a43;
   color: #fff;
 }
 .primaryButton:hover {
-  background: #1b4b3a;
+  background: #056437;
 }
 .secondaryButton {
   border: 1px solid #dce3dc;
@@ -361,8 +380,8 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  background: #eef3eb;
-  border: 1px solid #e0e8db;
+  background: #eaf8ee;
+  border: 1px solid #d6ecdd;
   border-radius: 6px;
   padding: 9px 13px;
   margin-bottom: 22px;
@@ -1068,7 +1087,7 @@
   font:
     400 17px Georgia,
     serif;
-  color: #697e60;
+  color: #176a3f;
 }
 .footerBrand > span {
   font:
@@ -2079,12 +2098,13 @@
   }
   .navItem {
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: 2px;
     padding: 4px 7px;
     height: 48px;
     min-height: 0;
-    min-width: 63px;
+    min-width: 0;
     font-size: 12px !important;
     border-radius: 6px;
   }
@@ -2105,7 +2125,7 @@
     display: flex;
   }
   .sidebarBottom .navItem {
-    width: 65px;
+    width: clamp(48px, 16vw, 65px);
   }
   .main {
     margin-left: 0;

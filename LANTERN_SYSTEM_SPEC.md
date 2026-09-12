@@ -7,7 +7,7 @@
 
 ## 1. Product contract
 
-Lantern is a portable, voice-first capture device connected to Roxanne. It records a disclosed, consented business conversation, preserves the original audio, produces a transcript and evidence-linked summary, and prepares follow-up actions for approval.
+Lantern is a portable, voice-first capture device connected to the Lantern cloud workspace. It records a disclosed, consented business conversation, preserves the original audio, produces a transcript and evidence-linked summary, and prepares follow-up actions for approval.
 
 The device has two modes:
 
@@ -20,8 +20,8 @@ The device has two modes:
 2. **Status report mode**
    - "Ring, status report" opens the ritual.
    - The full oath is accepted as an activation ritual, not as authentication.
-   - Lantern reads the day's meetings, key facts, commitments and pending actions from saved Roxanne records.
-   - A proposed meeting or email is read back in full and placed in Roxanne for approval.
+   - Lantern reads the day's meetings, key facts, commitments and pending actions from saved Lantern records.
+   - A proposed meeting or email is read back in full and placed in Lantern for approval.
    - The report ends with "Status report complete. Lantern, Sector 2418 — Nathan Hor."
 
 The ring image and oath establish the product's character. The dashboard login, device credential, consent state and versioned approval provide security and authorization.
@@ -41,7 +41,7 @@ The ring image and oath establish the product's character. The dashboard login, 
 The repository targets `zhengchen-1.54tft-ml307`, built around an ESP32-S3. A
 factory boot log has now confirmed ESP32-S3 revision 0.2 and 8 MB octal PSRAM.
 The ROM-loader audit confirmed 16 MB flash, and the complete factory image was
-backed up and digest-verified before Roxanne firmware was flashed.
+backed up and digest-verified before Lantern firmware was flashed.
 
 The ESP32-S3 itself provides a dual-core 240 MHz processor, 512 KB internal SRAM, 2.4 GHz 802.11 b/g/n Wi-Fi and Bluetooth LE. It is capable of audio I/O, display control, local state handling, buffering and lightweight wake-word processing. It is not the place to run the full speech-to-text and language model pipeline. See the [Espressif ESP32-S3 overview](https://www.espressif.com/en/products/socs/esp32-s3/).
 
@@ -50,7 +50,7 @@ The ESP32-S3 itself provides a dual-core 240 MHz processor, 512 KB internal SRAM
 | Processor | ESP32-S3 revision 0.2; local build expects N16R8 | Audio, UI, networking, state machine and device security |
 | Display | 1.54-inch ST7789, 240 × 240, RGB565; factory boot initializes LVGL and the panel | Ring art, prompts, timer, connectivity, battery and error states |
 | Microphone | Digital I²S, 16 kHz in the supported board configuration | Meeting capture and bounded command listening |
-| Speaker path | I²S simplex output, 24 kHz upstream; current Roxanne firmware uses 8 kHz RTC output | Prompts and spoken status reports, silent during meetings |
+| Speaker path | I²S simplex output, 24 kHz upstream; current Lantern firmware uses 8 kHz RTC output | Prompts and spoken status reports, silent during meetings |
 | Controls | Main/boot, volume up and volume down | Wake, physical stop/pause fallback and volume |
 | Wi-Fi | ESP32-S3 2.4 GHz Wi-Fi | Prototype transport through phone hotspot or known Wi-Fi |
 | Cellular | ML307 UART path and upstream dual-network support | Later portable mode after modem and Malaysian carrier validation |
@@ -117,18 +117,18 @@ assets partition.
 
 ### Toolchain constraint
 
-The local Roxanne firmware is pinned to ESP-IDF 5.2.3 to match its current Agora embedded SDK. The current upstream Xiaozhi board project requires ESP-IDF 6.1. Board pin definitions remain useful, but its newest display, cellular and power code cannot be assumed to compile unchanged in the Roxanne toolchain. Phase 1 should keep the known Agora-compatible toolchain and port only the required peripheral drivers. An ESP-IDF upgrade should happen only after the supported Agora version is checked and the audio path has regression tests. See the current [upstream project requirements](https://github.com/78/xiaozhi-esp32#development-environment).
+The local Lantern firmware is pinned to ESP-IDF 5.2.3 to match its current Agora embedded SDK. The current upstream Xiaozhi board project requires ESP-IDF 6.1. Board pin definitions remain useful, but its newest display, cellular and power code cannot be assumed to compile unchanged in the Lantern toolchain. Phase 1 should keep the known Agora-compatible toolchain and port only the required peripheral drivers. An ESP-IDF upgrade should happen only after the supported Agora version is checked and the audio path has regression tests. See the current [upstream project requirements](https://github.com/78/xiaozhi-esp32#development-environment).
 
 ## 3. System architecture
 
 ```mermaid
 flowchart LR
-    H[Lantern ESP32-S3] -->|TLS device channel| G[Roxanne device gateway]
+    H[Lantern ESP32-S3] -->|TLS device channel| G[Lantern device gateway]
     H -->|meeting audio transport| C[Capture service]
     C --> A[Private audio archive]
     C --> T[Speech-to-text adapter]
     T --> I[Ilmu understanding adapter]
-    I --> R[Roxanne meeting record]
+    I --> R[Lantern meeting record]
     R --> D[Dashboard and replay]
     R --> P[Versioned action proposal]
     P -->|owner approval| X[External action executor]
@@ -146,7 +146,7 @@ flowchart LR
 - Maintain a short PSRAM retry buffer with explicit gap reporting.
 - Render the screen and operate the speaker and buttons.
 - Maintain time synchronization, battery telemetry and connection status.
-- Authenticate to Roxanne with a revocable per-device credential.
+- Authenticate to Lantern with a revocable per-device credential.
 - Accept only signed configuration and firmware updates.
 
 ### Backend responsibilities
@@ -205,7 +205,7 @@ Meeting capture and voice interaction are separate paths over the same microphon
 
 The device should remain silent while recording. The current board implementation is simplex and does not establish acoustic echo cancellation. Status speech and prompts should pause microphone publication or use a controlled half-duplex state.
 
-The current Roxanne firmware downsamples the 16 kHz microphone to 8 kHz G.711 µ-law for Agora. That is sufficient for an early voice-agent experiment but is not the desired archival format for multilingual meeting transcription. The capture design should retain 16 kHz mono speech and use a seekable compressed archive.
+The current Lantern firmware downsamples the 16 kHz microphone to 8 kHz G.711 µ-law for Agora. That is sufficient for an early voice-agent experiment but is not the desired archival format for multilingual meeting transcription. The capture design should retain 16 kHz mono speech and use a seekable compressed archive.
 
 Every durable audio chunk requires:
 
@@ -252,7 +252,7 @@ The backend owns the authoritative session state. The device mirrors that state 
 | State | Required display |
 | --- | --- |
 | Boot | Lantern mark and firmware version |
-| Unpaired | Short pairing code or QR and "Open Roxanne" |
+| Unpaired | Short pairing code or QR and "Open Lantern" |
 | Connecting | Wi-Fi/cellular symbol and useful error text |
 | Ready | Green ring mark, battery and network |
 | Consent | "Waiting for recording consent" |
@@ -260,7 +260,7 @@ The backend owns the authoritative session state. The device mirrors that state 
 | Offline buffering | Amber warning and buffered seconds |
 | Finalizing | Upload/progress state; no premature summary |
 | Processing | Transcribing or summarizing stage |
-| Approval pending | Recipient and exact meeting time with "Review in Roxanne" |
+| Approval pending | Recipient and exact meeting time with "Review in Lantern" |
 | Error | Plain recovery instruction and error code |
 
 With the current voice-and-screen board, use "State your oath" or "Press to begin." The screen can use the Lantern ring animation as visual feedback.
@@ -280,7 +280,7 @@ A free-floating "yes" has no meaning. It is accepted only while a named prompt i
 | Prompt state | Accepted meaning of yes | Result |
 | --- | --- | --- |
 | `AWAITING_RECORDING_CONSENT` | Owner confirms everyone has agreed to disclosed recording | Start capture, announce it and show `REC` |
-| `AWAITING_ACTION_CONFIRMATION` | Owner confirms the read-back details | Freeze a proposal version in Roxanne |
+| `AWAITING_ACTION_CONFIRMATION` | Owner confirms the read-back details | Freeze a proposal version in Lantern |
 | `PENDING_DASHBOARD_APPROVAL` | Voice alone has no authority in the first release | Wait for dashboard approval |
 
 The device cannot prove that every nearby person consented or identify each voice reliably. It records the owner's confirmation, prompt ID and timestamp, then gives an audible and visible recording notice.
@@ -296,7 +296,7 @@ Owner: Yes, everyone has agreed.
 Lantern: Recording started.
 
 Owner: Ring, we're done.
-Lantern: Recording stopped. I am saving the conversation to Roxanne.
+Lantern: Recording stopped. I am saving the conversation to Lantern.
 Lantern: Saved. The summary will appear when processing finishes.
 ```
 
@@ -311,12 +311,12 @@ Lantern: With Mr. Chung, you agreed to meet on Friday, 18 September 2026,
          at 1:00 PM Malaysia time for 45 minutes. I heard the address
          n-i-g-e-l-t-a-n-j-c at gmail dot com. Shall I prepare the invitation?
 Owner: Yes.
-Lantern: It is waiting for approval in Roxanne.
+Lantern: It is waiting for approval in Lantern.
 ```
 
 If a required field is missing, Lantern asks one bounded question. It does not guess email characters, dates, timezones or duration. A corrected field creates a new proposal version and invalidates any earlier approval.
 
-## 8. Existing Roxanne foundation and required work
+## 8. Existing Lantern foundation and required work
 
 | Area | Present in repository | Required for Lantern |
 | --- | --- | --- |
@@ -461,7 +461,7 @@ Steps:
 2. Add PSRAM retry buffering, acknowledgements and reconnect handling.
 3. Assemble chunks into one seekable private recording.
 4. Record capture gaps explicitly.
-5. Link the audio to an existing Roxanne conversation and replay component.
+5. Link the audio to an existing Lantern conversation and replay component.
 6. Test at 5, 30 and 90 minutes.
 
 Exit gate:
@@ -518,7 +518,7 @@ Exit gate:
 
 Steps:
 
-1. Convert agreed future meetings into pending Roxanne calendar items.
+1. Convert agreed future meetings into pending Lantern calendar items.
 2. Push them to an open dashboard in real time.
 3. Show recipient, absolute date/time, duration, timezone, title and Meet choice.
 4. Require approval of the exact proposal version.
@@ -544,7 +544,7 @@ Exit gate:
 
 - Only a dashboard-approved version can execute.
 - The device never receives Google credentials.
-- Roxanne distinguishes sent, failed, awaiting attendee response, accepted and declined.
+- Lantern distinguishes sent, failed, awaiting attendee response, accepted and declined.
 - Retrying cannot create a duplicate Calendar event.
 
 ### Phase 9 — Portable field pilot
@@ -589,6 +589,6 @@ Exit gate:
 5. Use the oath once for Status Report mode, not for every Quick meeting.
 6. Treat the oath and ring as ritual, never as identity proof.
 7. Make voice confirmation prepare a proposal; require dashboard approval to contact a client.
-8. Keep Google credentials and all external action execution on the Roxanne backend.
+8. Keep Google credentials and all external action execution on the Lantern backend.
 9. Preserve original audio with timestamp alignment; a transcript alone is not a completed recording.
 10. Preserve the verified factory recovery image before every partition or bootloader change.

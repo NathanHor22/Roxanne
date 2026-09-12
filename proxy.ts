@@ -43,7 +43,7 @@ function forbiddenResponse(
     return copyCookies(
       refreshedResponse,
       NextResponse.json(
-        { error: "This account is not authorized for Roxanne." },
+        { error: "This account is not authorized for Lantern." },
         { status: 403 },
       ),
     );
@@ -75,7 +75,7 @@ export async function proxy(request: NextRequest) {
 
   if (mode === "misconfigured") {
     const message =
-      "Roxanne authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.";
+      "Lantern authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.";
     if (request.nextUrl.pathname.startsWith("/api/")) {
       return NextResponse.json({ error: message }, { status: 503 });
     }
@@ -131,7 +131,7 @@ export async function proxy(request: NextRequest) {
 
   if (request.nextUrl.pathname === "/login") {
     const destination = request.nextUrl.clone();
-    destination.pathname = "/";
+    destination.pathname = "/dashboard";
     destination.search = "";
     return copyCookies(response, NextResponse.redirect(destination));
   }

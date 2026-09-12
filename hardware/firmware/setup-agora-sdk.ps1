@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $FirmwareRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Components = Join-Path $FirmwareRoot "components"
 $SdkRoot = Join-Path $Components "agora_iot_sdk"
-$Archive = Join-Path $env:TEMP "roxanne-agora-iot-sdk.tar"
+$Archive = Join-Path $env:TEMP "lantern-agora-iot-sdk.tar"
 
 if (Test-Path (Join-Path $SdkRoot "include\agora_rtc_api.h")) {
   Write-Host "Agora IoT SDK is already installed."

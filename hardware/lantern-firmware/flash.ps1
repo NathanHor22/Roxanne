@@ -27,7 +27,7 @@ if ($ManualBootloader) {
     "--before", "no_reset", "--after", "hard_reset", "write_flash",
     "--flash_mode", "dio", "--flash_freq", "80m", "--flash_size", "16MB",
     "0x0", "build\bootloader\bootloader.bin",
-    "0x20000", "build\roxanne_lantern.bin",
+    "0x20000", "build\lantern.bin",
     "0x8000", "build\partition_table\partition-table.bin",
     "0xd000", "build\ota_data_initial.bin"
   )

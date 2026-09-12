@@ -122,7 +122,7 @@ test("Agora STT subscribes only to the wearable with Malaysian languages", async
     AGORA_CUSTOMER_ID: "customer",
     AGORA_CUSTOMER_SECRET: "secret",
     AGORA_STT_LANGUAGES: "ms-MY,en-SG,ms-MY",
-    AGORA_STT_KEYWORDS: "Roxanne,ringgit",
+    AGORA_STT_KEYWORDS: "Lantern,ringgit",
   };
   const transport = buildAgoraLanternTransport(
     "3c3376de-fc6e-47cd-b2b6-658fcb61db23",

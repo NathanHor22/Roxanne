@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const input = requestSchema.parse(await request.json());
     if (!client) throw new Error("Supabase is unavailable.");
     const userId = await resolveDemoUserId(client, { createIfMissing: false });
-    if (!userId) throw new Error("The Roxanne workspace is unavailable.");
+    if (!userId) throw new Error("The Lantern workspace is unavailable.");
     const { data: device, error } = await client
       .from("devices")
       .update({ status: "online", last_seen_at: new Date().toISOString() })
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     const sessionId = randomUUID();
     const compactDeviceId = input.deviceId.replaceAll("-", "");
-    const channel = `roxanne-${compactDeviceId.slice(0, 12)}-${sessionId.replaceAll("-", "").slice(0, 12)}`;
+    const channel = `lantern-${compactDeviceId.slice(0, 12)}-${sessionId.replaceAll("-", "").slice(0, 12)}`;
     const uid = (Number.parseInt(compactDeviceId.slice(-7), 16) % 2_000_000_000) + 10_000;
     const agora = buildHardwareRtcCredentials(channel, uid);
     const voiceAgent = await startHardwareVoiceAgent(channel, uid, input.language);

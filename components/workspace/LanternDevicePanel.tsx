@@ -53,12 +53,12 @@ const statusCopy: Record<LanternState, string> = {
   offline_buffering: "Holding a short protected audio buffer",
   finalising: "Closing and checking the audio manifest",
   processing: "The recording is safe. Preparing the recap.",
-  report_ready: "The conversation is ready in Roxanne",
+  report_ready: "The conversation is ready in Lantern",
   oath_listening: "Green Lantern of Sector 2418, state your oath",
   status_report: "Three conversations. One approval needs you.",
   awaiting_action_confirmation:
     "Nigel, Friday 18 September, 1:00 PM MYT, 45 minutes",
-  pending_dashboard_approval: "Prepared in Roxanne. Nothing has been sent.",
+  pending_dashboard_approval: "Prepared in Lantern. Nothing has been sent.",
   error: "Use the recovery instruction shown below",
 };
 
@@ -202,7 +202,7 @@ export function LanternDevicePanel({
       const response = await fetch("/api/devices/pairing", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Nathan's Lantern" }),
+        body: JSON.stringify({ name: "My Lantern" }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         pairing?: { code: string; expiresAt: string };
@@ -492,6 +492,38 @@ export function LanternDevicePanel({
           {transitionError ? <p className={styles.error} role="alert">{transitionError}</p> : null}
         </section>
       </div>
+
+      <section className={styles.setupGuide} aria-labelledby="lantern-setup-title">
+        <header>
+          <div>
+            <span className={styles.kicker}>FIRST-TIME SETUP</span>
+            <h2 id="lantern-setup-title">Pair the Lantern with your workspace</h2>
+          </div>
+          <span className={styles.setupBadge}><Wifi /> 2.4 GHz Wi-Fi</span>
+        </header>
+        <ol>
+          <li>
+            <span>1</span>
+            <div><strong>Create a pairing code</strong><p>Generate the one-time code in the registered device card below.</p></div>
+          </li>
+          <li>
+            <span>2</span>
+            <div><strong>Join Lantern-XXXX</strong><p>On your phone, use the setup password <code>lanternsetup</code>.</p></div>
+          </li>
+          <li>
+            <span>3</span>
+            <div><strong>Open 192.168.4.1</strong><p>Enter your hotspot name, password, and the Lantern pairing code.</p></div>
+          </li>
+          <li>
+            <span>4</span>
+            <div><strong>Wait for Ready</strong><p>Return here and confirm the device appears online before recording.</p></div>
+          </li>
+        </ol>
+        <p className={styles.setupPrivacy}>
+          Your Wi-Fi password stays on the device. Agora, Ilmu, Google, and Gmail
+          credentials stay in the Lantern server environment.
+        </p>
+      </section>
 
       <div className={styles.infoGrid}>
         <section className={styles.infoCard}>

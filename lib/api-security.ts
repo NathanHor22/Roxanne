@@ -37,7 +37,7 @@ export async function requireOwnerSession(): Promise<NextResponse | null> {
   if (mode === "disabled") return null;
   if (mode === "misconfigured") {
     return noStoreError(
-      "Roxanne authentication is not configured correctly.",
+      "Lantern authentication is not configured correctly.",
       503,
     );
   }
@@ -47,7 +47,7 @@ export async function requireOwnerSession(): Promise<NextResponse | null> {
   const { createSessionSupabase } = await import("@/lib/supabase/session");
   const supabase = await createSessionSupabase();
   if (!supabase) {
-    return noStoreError("Roxanne authentication is unavailable.", 503);
+    return noStoreError("Lantern authentication is unavailable.", 503);
   }
   const {
     data: { user },
@@ -60,7 +60,7 @@ export async function requireOwnerSession(): Promise<NextResponse | null> {
   const ownerEmail = process.env.DEMO_USER_EMAIL || "nathanhor2001@gmail.com";
   if (!isOwnerEmail(user.email, ownerEmail)) {
     await supabase.auth.signOut();
-    return noStoreError("This account is not authorized for Roxanne.", 403);
+    return noStoreError("This account is not authorized for Lantern.", 403);
   }
   return null;
 }

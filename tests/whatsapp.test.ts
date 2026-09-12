@@ -43,12 +43,12 @@ test("send payload requires approved recipient, bounded text, and idempotency", 
   assert.deepEqual(
     parseSendPayload({
       to: "011 5444 4038",
-      text: "  Hello from Roxanne  ",
+      text: "  Hello from Lantern  ",
       idempotencyKey: "followup:12345678",
     }),
     {
       to: "601154444038",
-      text: "Hello from Roxanne",
+      text: "Hello from Lantern",
       idempotencyKey: "followup:12345678",
     },
   );

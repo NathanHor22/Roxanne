@@ -1,6 +1,6 @@
-# Roxanne WhatsApp worker
+# Lantern WhatsApp worker
 
-This service owns Roxanne's one long-lived Baileys socket. Deploy it as a
+This service owns Lantern's one long-lived Baileys socket. Deploy it as a
 **separate Railway service with exactly one replica**. Do not deploy this worker
 to Vercel: serverless instances cannot reliably retain a WhatsApp Web socket.
 
@@ -16,7 +16,7 @@ to Vercel: serverless instances cannot reliably retain a WhatsApp Web socket.
 4. Generate a different high-entropy value of at least 32 bytes for
    `WHATSAPP_AUTH_ENCRYPTION_KEY`. Store it only in Railway and keep a secure
    backup: changing or losing it makes the persisted Baileys session unreadable.
-5. Set `WHATSAPP_WORKSPACE_KEY=roxanne` and let Railway provide `PORT`.
+5. Set `WHATSAPP_WORKSPACE_KEY=lantern` and let Railway provide `PORT`.
 6. Apply both `001_initial.sql` and `002_worker_hardening.sql`. The second
    migration adds atomic delivery leases. On first start, any legacy plaintext
    Baileys auth rows are encrypted transactionally before the socket opens.

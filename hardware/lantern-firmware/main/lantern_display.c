@@ -193,7 +193,7 @@ void lantern_display_show(lantern_screen_t screen, const char *detail) {
   const uint16_t amber = rgb565(255, 184, 72);
   const uint16_t red = rgb565(255, 78, 86);
   uint16_t accent = green;
-  const char *title = "ROXANNE";
+  const char *title = "LANTERN";
   const char *status = "BOOTING";
 
   switch (screen) {

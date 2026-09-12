@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       );
     }
     const userId = await resolveDemoUserId(client, { createIfMissing: false });
-    if (!userId) throw new Error("The Roxanne workspace is unavailable.");
+    if (!userId) throw new Error("The Lantern workspace is unavailable.");
 
     const code = createPairingCode();
     const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
@@ -85,4 +85,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

@@ -1,4 +1,4 @@
-# Roxanne ESP32-S3 firmware
+# Lantern ESP32-S3 firmware
 
 Legacy target: `zhengchen-1.54tft-ml307` / ESP32-S3 N16R8. This is the earlier
 speaking-agent experiment, not the new Lantern v1 client. Read the repository
@@ -8,7 +8,7 @@ root `HARDWARE.md` before connecting or flashing it.
 
 - [x] Exact board, mic, speaker, button, and backlight pins identified
 - [x] Phone-hotspot Wi-Fi client
-- [x] Short-lived Agora token retrieval from Roxanne
+- [x] Short-lived Agora token retrieval from Lantern
 - [x] Agora RTC microphone publish and speaker playback
 - [x] Groq-powered Agora voice agent start/stop
 - [x] Agora transcript return to dashboard and Qwen extraction
@@ -46,7 +46,7 @@ idf.py -p <confirmed-port> flash monitor
 disconnecting the second board proves which ESP32 it belongs to. The old COM11
 note was historical.
 
-Press the main button once to start. The backlight turns on, Roxanne greets you,
+Press the main button once to start. The backlight turns on, Lantern greets you,
 and the device becomes a two-way voice assistant. Press again to stop and send
 the transcript through Qwen into the dashboard. The dashboard polls for new
 hardware meetings every five seconds.

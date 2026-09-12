@@ -28,7 +28,7 @@ export async function resolveDemoUserId(
   if (runtime.DEMO_USER_ID) return runtime.DEMO_USER_ID;
 
   const { data: listed, error: listError } = await client.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (listError) throw new Error(`Could not resolve the Roxanne user: ${listError.message}`);
+  if (listError) throw new Error(`Could not resolve the Lantern user: ${listError.message}`);
   const existing = listed.users.find((user) => user.email?.toLowerCase() === runtime.DEMO_USER_EMAIL.toLowerCase());
   if (existing) return existing.id;
 
@@ -40,7 +40,7 @@ export async function resolveDemoUserId(
     user_metadata: { full_name: "Nathan Hor" },
   });
   if (createError || !created.user) {
-    throw new Error(`Could not create the Roxanne user: ${createError?.message || "unknown error"}`);
+    throw new Error(`Could not create the Lantern user: ${createError?.message || "unknown error"}`);
   }
   return created.user.id;
 }

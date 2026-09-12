@@ -48,9 +48,9 @@ test("owner email comparison is trimmed and case insensitive", () => {
 
 test("OAuth return path accepts only same-origin relative paths", () => {
   assert.equal(sanitizeAuthReturnTo("/people?view=active#top"), "/people?view=active#top");
-  assert.equal(sanitizeAuthReturnTo("https://attacker.invalid"), "/");
-  assert.equal(sanitizeAuthReturnTo("//attacker.invalid/path"), "/");
-  assert.equal(sanitizeAuthReturnTo(undefined), "/");
+  assert.equal(sanitizeAuthReturnTo("https://attacker.invalid"), "/dashboard");
+  assert.equal(sanitizeAuthReturnTo("//attacker.invalid/path"), "/dashboard");
+  assert.equal(sanitizeAuthReturnTo(undefined), "/dashboard");
 });
 
 test("only login, auth callback and logout are public auth endpoints", () => {
@@ -71,6 +71,20 @@ test("only explicit Lantern routes bypass browser cookies for device authenticat
     ),
     true,
   );
+  for (const endpoint of ["transcript", "audio", "complete"]) {
+    assert.equal(
+      isLanternDevicePath(
+        `/api/device/v1/sessions/11111111-1111-4111-8111-111111111111/${endpoint}`,
+      ),
+      true,
+    );
+  }
   assert.equal(isLanternDevicePath("/api/device/v1/admin"), false);
   assert.equal(isLanternDevicePath("/api/devices/pairing"), false);
+  assert.equal(
+    isLanternDevicePath(
+      "/api/device/v1/sessions/11111111-1111-4111-8111-111111111111/audio/extra",
+    ),
+    false,
+  );
 });

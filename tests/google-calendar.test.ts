@@ -120,7 +120,7 @@ test("OAuth authorization URL requests event and free-busy access without exposi
     config: {
       clientId: "client-id.apps.googleusercontent.com",
       clientSecret: "never-put-this-in-the-url",
-      redirectUri: "https://roxanne.example/api/google/callback",
+      redirectUri: "https://lantern.example/api/google/callback",
       calendarId: "primary",
     },
     loginHint: "nathanhor2001@gmail.com",
@@ -160,7 +160,7 @@ test("approved invitation uses only validated recipients and exactly 30 Malaysia
       attendees: [" NathanHor2001@GMAIL.com ", "client@example.com"],
       meetingId: "meeting-james-acme-2026-08-23",
       description: "Review the ERP integration.",
-      conferenceUrl: "https://roxanne.example/room/acme",
+      conferenceUrl: "https://lantern.example/room/acme",
     },
     { calendar: mockedCalendar, calendarId: "primary", eventId: "a1b2c3d4e5" },
   );

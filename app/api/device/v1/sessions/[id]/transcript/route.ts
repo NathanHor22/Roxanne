@@ -24,8 +24,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   try {
     const { id } = paramsSchema.parse(await context.params);
-    const eventId = eventIdSchema.parse(request.headers.get("x-roxanne-event-id"));
-    if (request.headers.get("content-type")?.split(";", 1)[0] !== "application/x-roxanne-agora-caption-batch") {
+    const eventId = eventIdSchema.parse(
+      request.headers.get("x-lantern-event-id") ||
+        request.headers.get("x-roxanne-event-id"),
+    );
+    const contentType = request.headers.get("content-type")?.split(";", 1)[0];
+    if (
+      contentType !== "application/x-lantern-agora-caption-batch" &&
+      contentType !== "application/x-roxanne-agora-caption-batch"
+    ) {
       return response("Caption batch content type is invalid.", 415);
     }
     const declaredLength = Number(request.headers.get("content-length") || 0);

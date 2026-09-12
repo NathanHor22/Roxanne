@@ -114,7 +114,7 @@ export class WhatsAppWorker {
         auth: state,
         logger: baileysLogger,
         printQRInTerminal: false,
-        browser: ["Roxanne", "Desktop", "0.1.0"],
+        browser: ["Lantern", "Desktop", "0.1.0"],
         markOnlineOnConnect: false,
         syncFullHistory: false,
       });

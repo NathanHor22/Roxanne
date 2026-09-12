@@ -46,7 +46,7 @@ export function LiveRecorder({ onRecorded, onError }: { onRecorded: (file: File,
       const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
       if (generation !== generationRef.current) return;
       AgoraRTC.setLogLevel(3);
-      const channel = `roxanne-${crypto.randomUUID()}`;
+      const channel = `lantern-${crypto.randomUUID()}`;
       const uid = Math.floor(Math.random() * 2_000_000_000) + 1;
       const credentials = await fetch("/api/agora/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ channel, uid }) });
       const payload = await credentials.json();
@@ -91,7 +91,7 @@ export function LiveRecorder({ onRecorded, onError }: { onRecorded: (file: File,
     await cleanup();
     setState("idle");
     if (!blob.size) return onError("The live recording was empty.");
-    onRecorded(new File([blob], `roxanne-${Date.now()}.webm`, { type: blob.type }), channelRef.current, { startAt: startedAtRef.current, endAt: new Date().toISOString() });
+    onRecorded(new File([blob], `lantern-${Date.now()}.webm`, { type: blob.type }), channelRef.current, { startAt: startedAtRef.current, endAt: new Date().toISOString() });
   };
 
   const live = state === "live" || state === "stopping";

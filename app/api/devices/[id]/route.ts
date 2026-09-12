@@ -33,7 +33,7 @@ export async function PATCH(
     requestSchema.parse(await request.json());
     if (!client) throw new Error("Lantern storage is unavailable.");
     const userId = await resolveDemoUserId(client, { createIfMissing: false });
-    if (!userId) throw new Error("The Roxanne workspace is unavailable.");
+    if (!userId) throw new Error("The Lantern workspace is unavailable.");
     const now = new Date().toISOString();
     const { data, error } = await client
       .from("devices")
@@ -77,4 +77,3 @@ export async function PATCH(
     );
   }
 }
-

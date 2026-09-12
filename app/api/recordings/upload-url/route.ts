@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
     const userId = await resolveDemoUserId(client, { createIfMissing: true });
-    if (!userId) throw new Error("No Roxanne owner is available.");
+    if (!userId) throw new Error("No Lantern owner is available.");
 
     const contentType = normalizeAudioContentType(input.fileName, input.contentType);
     if (!contentType) {

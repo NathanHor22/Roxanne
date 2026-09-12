@@ -1,4 +1,4 @@
--- Roxanne V0.1 — permanent relationship memory.
+-- Lantern V0.1 — permanent relationship memory.
 begin;
 
 create extension if not exists pgcrypto;

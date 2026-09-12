@@ -32,7 +32,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
     );
   }
 
-  const workspaceKey = (env.WHATSAPP_WORKSPACE_KEY || "roxanne").trim();
+  const workspaceKey = (env.WHATSAPP_WORKSPACE_KEY || "lantern").trim();
   if (!/^[A-Za-z0-9._:-]{1,80}$/u.test(workspaceKey)) {
     throw new Error("WHATSAPP_WORKSPACE_KEY contains unsupported characters.");
   }

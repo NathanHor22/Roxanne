@@ -111,7 +111,7 @@ export function createDatabasePool(databaseUrl: string): DatabasePool {
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 8_000,
     query_timeout: 10_000,
-    application_name: "roxanne-whatsapp-worker",
+    application_name: "lantern-whatsapp-worker",
   });
   pool.on("error", (error) => {
     // A checked-out client error reaches its caller; this catches idle-client failures.

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Check, Headphones, ShieldCheck } from "lucide-react";
 
+import { LanternMark } from "@/components/brand/LanternMark";
 import { sanitizeAuthReturnTo } from "@/lib/auth-policy";
 import { publicSupabaseConfig } from "@/lib/supabase/session";
 
@@ -26,30 +28,51 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className={styles.page}>
-      <section className={styles.card} aria-labelledby="login-title">
-        <div className={styles.logo} aria-hidden="true">R</div>
-        <p className={styles.eyebrow}>ROXANNE</p>
-        <h1 id="login-title">Your business memory, kept private.</h1>
-        <p className={styles.description}>
-          Sign in with the workspace owner’s Google account to continue.
-        </p>
-
-        {message ? <p className={styles.notice} role="alert">{message}</p> : null}
-
-        {configured ? (
-          <LoginButton nextPath={nextPath} />
-        ) : (
-          <div className={styles.localNotice}>
-            <strong>Local development mode</strong>
-            <span>Supabase Auth is not configured, so local access remains open.</span>
-            <Link href={nextPath}>Return to Roxanne</Link>
+      <div className={styles.gridGlow} aria-hidden="true" />
+      <div className={styles.authShell}>
+        <section className={styles.intro} aria-label="About Lantern">
+          <div className={styles.brandLockup}>
+            <span className={styles.logo}><LanternMark /></span>
+            <strong>Lantern</strong>
           </div>
-        )}
+          <p className={styles.eyebrow}>CONVERSATION INTELLIGENCE</p>
+          <h1>Carry every conversation forward.</h1>
+          <p className={styles.introCopy}>
+            Your meetings, source audio, commitments, and follow-ups stay in one
+            private workspace.
+          </p>
+          <ul className={styles.signalList}>
+            <li><Headphones /><span>Replay the original conversation</span></li>
+            <li><Check /><span>Review every extracted commitment</span></li>
+            <li><ShieldCheck /><span>Approve before Lantern acts</span></li>
+          </ul>
+        </section>
 
-        <p className={styles.footnote}>
-          Access is restricted to the email configured for this deployment.
-        </p>
-      </section>
+        <section className={styles.card} aria-labelledby="login-title">
+          <span className={styles.accessPill}><i /> SECURE ACCESS</span>
+          <p className={styles.cardKicker}>WELCOME BACK</p>
+          <h2 id="login-title">Sign in to your Lantern.</h2>
+          <p className={styles.description}>
+            Continue with the Google account assigned to this workspace.
+          </p>
+
+          {message ? <p className={styles.notice} role="alert">{message}</p> : null}
+
+          {configured ? (
+            <LoginButton nextPath={nextPath} />
+          ) : (
+            <div className={styles.localNotice}>
+              <strong>Local development mode</strong>
+              <span>Supabase Auth is not configured, so local access remains open.</span>
+              <Link href={nextPath}>Return to Lantern</Link>
+            </div>
+          )}
+
+          <p className={styles.footnote}>
+            Access is restricted to the account configured for this deployment.
+          </p>
+        </section>
+      </div>
     </main>
   );
 }

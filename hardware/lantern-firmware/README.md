@@ -1,8 +1,8 @@
-# Roxanne Lantern firmware
+# Lantern firmware
 
 This is the active firmware for the ZHENGCHEN 1.54-inch M1307/ML307 ESP32-S3
 board. It uses the board manufacturer's proven pin map. The
-`0.2.0-agora-pilot` source builds the first complete 29-second conversation
+`0.2.0-lantern-pilot` source builds the first complete 29-second conversation
 path; it has not replaced the currently flashed bring-up image yet.
 
 ## What this build proves
@@ -29,16 +29,16 @@ On the saved screen, press volume-up to replay the latest five seconds through
 the speaker. Hold both volume buttons for three seconds to clear Wi-Fi and
 pairing settings.
 
-The setup network is named `Roxanne-XXXX`. Connect to it with password
-`meetroxanne`, then open `http://192.168.4.1`. Enter a 2.4 GHz Wi-Fi or phone
-hotspot. If migrations 004 and 005 are deployed and a live dashboard pairing code exists,
-enter that code too.
+The setup network is named `Lantern-XXXX`. Connect to it with password
+`lanternsetup`, then open `http://192.168.4.1`. Enter a 2.4 GHz Wi-Fi or phone
+hotspot and the required one-time pairing code from the live dashboard. A
+paired device can later change Wi-Fi without claiming a second identity.
 
 After a local recording, the setup page can download the buffered PCM as a WAV
 file. This gives the bring-up build an independent mic/replay check before the
 durable cloud archive is connected.
 
-The setup page can also install a locally built `build/roxanne_lantern.bin`
+The setup page can also install a locally built `build/lantern.bin`
 into the inactive OTA slot. This removes the repeated manual BOOT-button step
 during prototype development. The local updater is a development mechanism;
 production firmware still requires signed updates and rollback validation.
@@ -87,7 +87,7 @@ duplicate conversation.
 
 ## Provider boundary
 
-Configure Agora and Ilmu only on the Roxanne backend. The device receives a
+Configure Agora and Ilmu only on the Lantern backend. The device receives a
 short-lived Agora RTC token for its own session; it never receives Agora REST,
 Ilmu, or Google credentials. The backend stamps `CAPTURE_STARTED` with its own
 clock and returns the local `Asia/Kuala_Lumpur` date/time for the device screen

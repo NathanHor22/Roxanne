@@ -32,7 +32,7 @@ export function LanguageSwitcher({
   compact = false,
 }: LanguageSwitcherProps) {
   const generatedId = useId();
-  const selectId = id ?? `roxanne-language-${generatedId.replaceAll(":", "")}`;
+  const selectId = id ?? `lantern-language-${generatedId.replaceAll(":", "")}`;
   const { dict, locale, setLocale } = useLanguage();
   const rootClassName = [
     "language-switcher",

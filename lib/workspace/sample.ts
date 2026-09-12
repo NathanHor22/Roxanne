@@ -8,7 +8,8 @@ import {
   transcriptSegmentSchema,
 } from "../meeting-schema";
 
-export const SAMPLE_STORAGE_KEY = "roxanne:sample-workspace:v1";
+export const SAMPLE_STORAGE_KEY = "lantern:sample-workspace:v1";
+export const LEGACY_SAMPLE_STORAGE_KEY = "roxanne:sample-workspace:v1";
 const contacts: Contact[] = [
   {
     id: "sample:chung",

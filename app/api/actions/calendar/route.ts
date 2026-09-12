@@ -80,7 +80,7 @@ async function persistCalendarMeeting(
     .select("id")
     .single();
   if (error || !meeting) {
-    throw new Error("The Calendar event was created but Roxanne could not save it.");
+    throw new Error("The Calendar event was created but Lantern could not save it.");
   }
 
   const { data: contacts, error: contactsError } = await client
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
       if (existing?.external_id) {
         actionId = existing.id as string;
         const existingEvent = buildGoogleCalendarInsert(input, config.calendarId);
-        const roxanneMeetingId = await persistCalendarMeeting(
+        const meetingId = await persistCalendarMeeting(
           client,
           userId,
           input,
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
             timeZone: "Asia/Kuala_Lumpur",
             attendees: input.attendees,
           },
-          roxanneMeetingId,
+          meetingId,
           duplicate: true,
         });
       }
@@ -325,7 +325,7 @@ export async function POST(request: Request) {
       eventId: googleEventId,
     });
 
-    let roxanneMeetingId: string | null = null;
+    let meetingId: string | null = null;
     if (client && userId && actionId) {
       const completedAt = new Date().toISOString();
       const { error: executionRecordError } = await client
@@ -340,7 +340,7 @@ export async function POST(request: Request) {
       if (executionRecordError) {
         throw new Error("The Calendar event was created but its result could not be recorded.");
       }
-      roxanneMeetingId = await persistCalendarMeeting(client, userId, input, event);
+      meetingId = await persistCalendarMeeting(client, userId, input, event);
       const { error: completionError } = await client
         .from("actions")
         .update({
@@ -362,7 +362,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { event, roxanneMeetingId, duplicate: false },
+      { event, meetingId, duplicate: false },
       { status: 201 },
     );
   } catch (error) {

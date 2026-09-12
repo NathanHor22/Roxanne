@@ -1,6 +1,6 @@
-﻿# Roxanne
+# Lantern
 
-Roxanne turns Malaysian business conversations into a recap, follow-ups, and
+Lantern turns Malaysian business conversations into a recap, follow-ups, and
 meeting approvals. The dashboard combines captured conversations and upcoming
 meetings in a calendar. Open an approved meeting to review the conversation
 that led to it: bullet points, concerns, promises, and preparation tasks. When
@@ -48,7 +48,7 @@ telemetry, durable session state, and idempotent device-event records. It does
 not add provider credentials or raw-audio storage to the device.
 
 Migration 005 adds the Agora session identifiers, staged final captions,
-private device recording linkage, provider retry fields, and completed Roxanne
+private device recording linkage, provider retry fields, and completed Lantern
 meeting link used by the first capture pilot.
 
 The live workspace requires `NEXT_PUBLIC_SUPABASE_URL`,
@@ -132,9 +132,9 @@ in `provider_connections`. `GOOGLE_REFRESH_TOKEN` is also supported as an
 environment-configured owner connection.
 
 Review or complete the date, time, duration, and attendee emails, then approve.
-The live action creates the Google event and sends attendee updates. Roxanne
+The live action creates the Google event and sends attendee updates. Lantern
 saves the event and its source-conversation relationship through the action
-record. The dashboard currently shows Roxanne's stored conversations and
+record. The dashboard currently shows Lantern's stored conversations and
 events, not a two-way mirror of everything in Google Calendar. The existing
 availability endpoint is not automatically called by this approval flow.
 
@@ -162,7 +162,7 @@ remains in the private `recordings` bucket alongside its transcript metadata;
 the player uses a temporary signed URL for access.
 
 Transcript-only imports, sample conversations, and legacy hardware sessions
-without an archived recording show an explicit no-audio state. Roxanne does
+without an archived recording show an explicit no-audio state. Lantern does
 not synthesize a replacement voice track from the transcript. No passive
 wearable is connected by this change: future Agora capture must also archive
 the actual conversation audio with timestamps aligned to its transcript.
@@ -184,7 +184,7 @@ stores its SHA-256 digest. Request examples and the current hardware status are
 in [HARDWARE.md](HARDWARE.md).
 
 The active ESP32-S3 firmware is in `hardware/lantern-firmware`. Version
-`0.2.0-agora-pilot` builds the first provider-connected path: server-confirmed
+`0.2.0-lantern-pilot` builds the first provider-connected path: server-confirmed
 consent and capture time, Agora audio and captions, a private WAV upload, Ilmu
 processing, and dashboard delivery. The pilot deliberately stops at 29 seconds
 while we verify the complete loop; hour-long chunked capture, reconnect and

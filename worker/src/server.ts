@@ -82,7 +82,7 @@ async function main(): Promise<void> {
       if (method === "GET" && pathname === "/health") {
         json(response, 200, {
           ok: true,
-          service: "roxanne-whatsapp-worker",
+          service: "lantern-whatsapp-worker",
           uptimeSeconds: Math.floor(process.uptime()),
           whatsapp: worker.snapshot().status,
         });

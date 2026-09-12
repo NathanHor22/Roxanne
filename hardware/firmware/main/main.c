@@ -21,7 +21,7 @@
 #include "freertos/task.h"
 #include "nvs_flash.h"
 
-#include "roxanne_config.h"
+#include "lantern_config.h"
 
 #define WIFI_CONNECTED_BIT BIT0
 #define RTC_JOINED_BIT BIT0
@@ -30,7 +30,7 @@
 #define MIC_INPUT_SAMPLES 320
 #define RTC_OUTPUT_SAMPLES 160
 
-static const char *TAG = "roxanne";
+static const char *TAG = "lantern";
 
 static EventGroupHandle_t s_wifi_events;
 static EventGroupHandle_t s_rtc_events;
@@ -98,10 +98,10 @@ static int http_post(const char *url, const char *content_type, const char *body
   esp_http_client_set_method(client, HTTP_METHOD_POST);
   esp_http_client_set_header(client, "Content-Type", content_type);
   if (session_id) {
-    esp_http_client_set_header(client, "x-roxanne-device-id", ROXANNE_DEVICE_ID);
-    esp_http_client_set_header(client, "x-roxanne-session-id", session_id);
-    esp_http_client_set_header(client, "x-roxanne-agent-id", agent_id ? agent_id : "");
-    esp_http_client_set_header(client, "x-roxanne-locale", ROXANNE_LOCALE);
+    esp_http_client_set_header(client, "x-lantern-device-id", LANTERN_DEVICE_ID);
+    esp_http_client_set_header(client, "x-lantern-session-id", session_id);
+    esp_http_client_set_header(client, "x-lantern-agent-id", agent_id ? agent_id : "");
+    esp_http_client_set_header(client, "x-lantern-locale", LANTERN_LOCALE);
   }
   esp_http_client_set_post_field(client, body, (int)body_length);
   esp_err_t result = esp_http_client_perform(client);
@@ -137,8 +137,8 @@ static void wifi_init(void) {
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL));
   wifi_config_t wifi = {
     .sta = {
-      .ssid = ROXANNE_WIFI_SSID,
-      .password = ROXANNE_WIFI_PASSWORD,
+      .ssid = LANTERN_WIFI_SSID,
+      .password = LANTERN_WIFI_PASSWORD,
       .threshold.authmode = WIFI_AUTH_WPA2_PSK,
     },
   };
@@ -154,13 +154,13 @@ static void audio_init(void) {
   speaker_channel.dma_frame_num = 240;
   ESP_ERROR_CHECK(i2s_new_channel(&speaker_channel, &s_speaker_tx, NULL));
   i2s_std_config_t speaker = {
-    .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(ROXANNE_RTC_SAMPLE_RATE),
+    .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(LANTERN_RTC_SAMPLE_RATE),
     .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_MONO),
     .gpio_cfg = {
       .mclk = I2S_GPIO_UNUSED,
-      .bclk = ROXANNE_SPK_BCLK_GPIO,
-      .ws = ROXANNE_SPK_LRCK_GPIO,
-      .dout = ROXANNE_SPK_DATA_GPIO,
+      .bclk = LANTERN_SPK_BCLK_GPIO,
+      .ws = LANTERN_SPK_LRCK_GPIO,
+      .dout = LANTERN_SPK_DATA_GPIO,
       .din = I2S_GPIO_UNUSED,
       .invert_flags = { false, false, false },
     },
@@ -174,14 +174,14 @@ static void audio_init(void) {
   mic_channel.dma_frame_num = 240;
   ESP_ERROR_CHECK(i2s_new_channel(&mic_channel, NULL, &s_mic_rx));
   i2s_std_config_t mic = {
-    .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(ROXANNE_MIC_SAMPLE_RATE),
+    .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(LANTERN_MIC_SAMPLE_RATE),
     .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_MONO),
     .gpio_cfg = {
       .mclk = I2S_GPIO_UNUSED,
-      .bclk = ROXANNE_MIC_SCK_GPIO,
-      .ws = ROXANNE_MIC_WS_GPIO,
+      .bclk = LANTERN_MIC_SCK_GPIO,
+      .ws = LANTERN_MIC_WS_GPIO,
       .dout = I2S_GPIO_UNUSED,
-      .din = ROXANNE_MIC_DATA_GPIO,
+      .din = LANTERN_MIC_DATA_GPIO,
       .invert_flags = { false, false, false },
     },
   };
@@ -276,10 +276,10 @@ static void on_rtm_send_result(const char *uid, uint32_t message_id, rtm_msg_sta
 static int request_session(void) {
   char url[192];
   char request_body[160];
-  snprintf(url, sizeof(url), "%s/api/hardware/session/start", ROXANNE_API_BASE_URL);
+  snprintf(url, sizeof(url), "%s/api/hardware/session/start", LANTERN_API_BASE_URL);
   snprintf(request_body, sizeof(request_body),
            "{\"deviceId\":\"%s\",\"language\":\"%s\"}",
-           ROXANNE_DEVICE_ID, ROXANNE_LANGUAGE);
+           LANTERN_DEVICE_ID, LANTERN_LANGUAGE);
   http_response_t response;
   int status = http_post(url, "application/json", request_body, strlen(request_body), &response, NULL, NULL);
   if (status != 200) {
@@ -325,7 +325,7 @@ static int rtc_start(void) {
   options.auto_subscribe_audio = true;
   options.auto_subscribe_video = false;
   options.audio_codec_opt.audio_codec_type = AUDIO_CODEC_TYPE_G711U;
-  options.audio_codec_opt.pcm_sample_rate = ROXANNE_RTC_SAMPLE_RATE;
+  options.audio_codec_opt.pcm_sample_rate = LANTERN_RTC_SAMPLE_RATE;
   options.audio_codec_opt.pcm_channel_num = 1;
   options.audio_codec_opt.pcm_duration = 20;
   xEventGroupClearBits(s_rtc_events, RTC_JOINED_BIT);
@@ -357,7 +357,7 @@ static void rtc_stop(void) {
 
 static void complete_session(void) {
   char url[192];
-  snprintf(url, sizeof(url), "%s/api/hardware/session/complete", ROXANNE_API_BASE_URL);
+  snprintf(url, sizeof(url), "%s/api/hardware/session/complete", LANTERN_API_BASE_URL);
   http_response_t response;
   int status = http_post(url, "text/plain; charset=utf-8", s_transcript,
                          s_transcript_length, &response, s_session_id, s_agent_id);
@@ -369,29 +369,29 @@ static void complete_session(void) {
 }
 
 static void start_session(void) {
-  ESP_LOGI(TAG, "Starting Roxanne voice session");
-  gpio_set_level(ROXANNE_STATUS_GPIO, 1);
+  ESP_LOGI(TAG, "Starting Lantern voice session");
+  gpio_set_level(LANTERN_STATUS_GPIO, 1);
   transcript_reset();
   if (request_session() != 0) {
     ESP_LOGE(TAG, "Could not start voice session");
-    gpio_set_level(ROXANNE_STATUS_GPIO, 0);
+    gpio_set_level(LANTERN_STATUS_GPIO, 0);
     return;
   }
   if (rtc_start() != 0) {
     ESP_LOGE(TAG, "Could not join the Agora voice session");
     rtc_stop();
     complete_session();
-    gpio_set_level(ROXANNE_STATUS_GPIO, 0);
+    gpio_set_level(LANTERN_STATUS_GPIO, 0);
     return;
   }
   s_session_active = true;
-  ESP_LOGI(TAG, "Roxanne is listening");
+  ESP_LOGI(TAG, "Lantern is listening");
 }
 
 static void stop_session(void) {
-  ESP_LOGI(TAG, "Stopping Roxanne voice session");
+  ESP_LOGI(TAG, "Stopping Lantern voice session");
   s_session_active = false;
-  gpio_set_level(ROXANNE_STATUS_GPIO, 0);
+  gpio_set_level(LANTERN_STATUS_GPIO, 0);
   rtc_stop();
   complete_session();
   ESP_LOGI(TAG, "Ready for another conversation");
@@ -428,7 +428,7 @@ static void button_task(void *argument) {
   bool previous = true;
   int64_t last_press = 0;
   while (true) {
-    bool released = gpio_get_level(ROXANNE_BUTTON_GPIO) != 0;
+    bool released = gpio_get_level(LANTERN_BUTTON_GPIO) != 0;
     if (previous && !released && esp_timer_get_time() - last_press > 400000) {
       last_press = esp_timer_get_time();
       if (s_session_active) stop_session(); else start_session();
@@ -456,13 +456,13 @@ void app_main(void) {
   transcript_reset();
 
   gpio_config_t output = {
-    .pin_bit_mask = 1ULL << ROXANNE_STATUS_GPIO,
+    .pin_bit_mask = 1ULL << LANTERN_STATUS_GPIO,
     .mode = GPIO_MODE_OUTPUT,
   };
   ESP_ERROR_CHECK(gpio_config(&output));
-  gpio_set_level(ROXANNE_STATUS_GPIO, 0);
+  gpio_set_level(LANTERN_STATUS_GPIO, 0);
   gpio_config_t button = {
-    .pin_bit_mask = 1ULL << ROXANNE_BUTTON_GPIO,
+    .pin_bit_mask = 1ULL << LANTERN_BUTTON_GPIO,
     .mode = GPIO_MODE_INPUT,
     .pull_up_en = GPIO_PULLUP_ENABLE,
   };
@@ -470,10 +470,10 @@ void app_main(void) {
 
   audio_init();
   wifi_init();
-  ESP_LOGI(TAG, "Connecting to hotspot: %s", ROXANNE_WIFI_SSID);
+  ESP_LOGI(TAG, "Connecting to hotspot: %s", LANTERN_WIFI_SSID);
   xEventGroupWaitBits(s_wifi_events, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
-  xTaskCreatePinnedToCore(microphone_task, "roxanne_mic", 6144, NULL, 20, NULL, 1);
-  xTaskCreate(button_task, "roxanne_button", 6144, NULL, 8, NULL);
-  ESP_LOGI(TAG, "Firmware ready. Press the main button to talk to Roxanne.");
+  xTaskCreatePinnedToCore(microphone_task, "lantern_mic", 6144, NULL, 20, NULL, 1);
+  xTaskCreate(button_task, "lantern_button", 6144, NULL, 8, NULL);
+  ESP_LOGI(TAG, "Firmware ready. Press the main button to talk to Lantern.");
 }

@@ -29,7 +29,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   let recordingId: string | null = null;
   try {
     const { id } = paramsSchema.parse(await context.params);
-    const eventId = eventIdSchema.parse(request.headers.get("x-roxanne-event-id"));
+    const eventId = eventIdSchema.parse(
+      request.headers.get("x-lantern-event-id") ||
+        request.headers.get("x-roxanne-event-id"),
+    );
     if (request.headers.get("content-type")?.split(";", 1)[0] !== "audio/wav") {
       return response("Lantern audio must be a WAV file.", 415);
     }
