@@ -10,14 +10,26 @@ https://roxanne-assistant.vercel.app
 
 The target board is the ZHENGCHEN 1.54-inch M1307 ESP32-S3 variant with a
 240 x 240 ST7789 display, microphone, speaker path, buttons, battery support,
-and an ML307 cellular module. The repository also contains earlier Agora
-firmware under `hardware/firmware`.
+and an ML307 cellular module. The active Roxanne firmware is under
+`hardware/lantern-firmware`; the earlier Agora experiment remains under
+`hardware/firmware` for reference.
 
-Do not flash the connected board yet. Windows exposes the ZHENGCHEN board as
-`USB-SERIAL CH340K (COM5)`, with USB VID `1A86` and PID `7522`. A factory boot
-log confirms ESP32-S3 revision 0.2, 8 MB octal PSRAM, and factory firmware
-`xiaozhi` 2.4.0 built with ESP-IDF 5.5.2. Esptool also confirms 16 MB quad
-flash at 3.3 V.
+Windows exposes the ZHENGCHEN board as `USB-SERIAL CH340K (COM5)`, with USB
+VID `1A86` and PID `7522`. The original factory boot log confirmed ESP32-S3
+revision 0.2, 8 MB octal PSRAM, 16 MB quad flash at 3.3 V, and Xiaozhi 2.4.0.
+
+Roxanne Lantern `0.1.0-bringup` was first flashed and boot-verified on 12
+September 2026. Version `0.1.1-bringup` was then flashed with every block hash
+verified and ran continuously with changing microphone and battery readings,
+stable heap, and the full 8 MB PSRAM buffer available. The firmware preserves
+the factory partition layout and initializes the ST7789 display, I2S microphone
+and speaker, buttons, battery telemetry, and first-boot `Roxanne-XXXX` setup
+network. Version `0.1.1-bringup` also adds a 30-second consent timeout, local WAV
+download, five-second on-device replay, settings reset, and development OTA.
+Version `0.1.2-bringup` removed the startup speaker noise and is the currently
+flashed bench image. Version `0.2.0-agora-pilot` now builds successfully but has
+not been flashed: its matching backend routes, migration 005, Agora credentials,
+and Ilmu credentials must be live first.
 
 The recovery gate is complete. Holding the main/BOOT button on GPIO0 while
 reconnecting enters the ROM downloader. The full 16,777,216-byte flash image is
@@ -36,17 +48,17 @@ The factory partition layout is preserved as CSV in the same ignored folder:
 | OTA slot 1 | `0x410000` | 4,032 KB |
 | Assets | `0x800000` | 8 MB |
 
-The remaining bench check is to photograph or transcribe the printed ESP32-S3
-module and exact ML307 markings before cellular work begins.
-
-The dashboard, state machine, and gateway can run before this gate. Firmware
-integration and flashing wait until the gate passes.
+The remaining bench checks are visual confirmation of screen orientation and
+color, audible chime/replay quality, button sequences, and the printed ML307
+markings before cellular work begins.
 
 ## Network model
 
 The ESP32-S3 needs an internet path to reach Roxanne. For the first release,
 use 2.4 GHz Wi-Fi from a phone hotspot or trusted router. Hotspot credentials
-stay in protected device storage; Roxanne's backend does not receive them.
+stay in device NVS; Roxanne's backend does not receive them. The field-pilot
+firmware must add encrypted NVS, flash encryption, secure boot and signed OTA
+before device credentials are treated as hardware-protected.
 The ML307 can become a later cellular fallback after its exact variant and SIM
 behavior are verified.
 
@@ -57,7 +69,7 @@ invitation directly.
 
 ## Pair once
 
-Apply migrations 001 through 004 and open **Lantern** in the authenticated live
+Apply migrations 001 through 005 and open **Lantern** in the authenticated live
 dashboard. Choose **Create pairing code**. The code lasts ten minutes and can be
 claimed once.
 
@@ -71,7 +83,7 @@ Content-Type: application/json
   "pairingCode": "24G7N-8R5XQ",
   "hardwareId": "esp32s3:<factory-mac>",
   "model": "ZHENGCHEN-1.54-M1307",
-  "firmwareVersion": "0.1.0"
+  "firmwareVersion": "0.2.0-agora-pilot"
 }
 ```
 
@@ -90,7 +102,9 @@ A successful claim returns the device UUID and a 32-byte secret once:
 }
 ```
 
-Store both values in encrypted/protected NVS. Every later device request uses:
+The bring-up firmware stores both values in ordinary NVS. Every later device
+request uses the following header; field-pilot hardening must encrypt that
+storage:
 
 ```http
 Authorization: Device <device-uuid>.<device-secret>
@@ -111,7 +125,7 @@ Content-Type: application/json
 
 {
   "eventId": "11111111-1111-4111-8111-111111111111",
-  "firmwareVersion": "0.1.0",
+  "firmwareVersion": "0.2.0-agora-pilot",
   "state": "ready",
   "stateVersion": 0,
   "batteryLevel": 82,
@@ -170,11 +184,17 @@ start recording or approve an action. A valid response returns the new session
 and version. A new event based on stale state receives `409`; retrying the same
 event UUID returns its stored result.
 
+After the ESP32 has joined its Agora channel and played the visible and audible
+start cue, it sends `CAPTURE_STARTED`. The backend replaces that event's time
+with its own clock and returns both UTC and `Asia/Kuala_Lumpur` date/time. That
+timestamp becomes the recording origin for Ilmu relative-date interpretation,
+the dashboard calendar, the WAV metadata, and transcript seek positions.
+
 The implemented transition types are defined in `lib/lantern-state.ts`. The
 critical Quick path is:
 
 ```text
-ready -> awaiting_recording_consent -> recording -> finalising
+ready -> awaiting_recording_consent -> recording (CAPTURE_STARTED) -> finalising
       -> processing -> report_ready
 ```
 
@@ -187,14 +207,19 @@ status_report -> awaiting_action_confirmation -> pending_dashboard_approval
 Voice confirmation never calls Google. The authenticated dashboard remains the
 authority that sends a Calendar invitation.
 
-## Still to connect
+## Current capture pilot and remaining scale work
 
-The gateway currently persists identity, telemetry, and state; the dashboard
-simulates the flow without recording audio. The next hardware milestones are
-display/buttons/audio bring-up, protected credential storage, Wi-Fi recovery,
-and the device protocol client. Durable audio chunks, original-audio assembly,
-Agora transcription, Ilmu extraction, and Google/Gmail execution follow behind
-their existing provider boundaries.
+The `0.2.0-agora-pilot` image adds the v1 session client, server-confirmed
+consent and capture clock, 16 kHz mono publishing to Agora, final caption
+collection, private WAV upload, Ilmu extraction, and automatic dashboard
+delivery. It keeps the existing local setup, pairing, heartbeat, display,
+buttons, microphone, speaker and PSRAM diagnostics.
+
+This first vertical slice intentionally records for at most 29 seconds. It
+keeps the complete WAV in PSRAM and stages final captions before upload. The
+next capture phase must replace that bounded pilot with acknowledged chunks,
+reconnect/resume, hour-long token renewal, explicit gap records and encrypted
+device storage. Google/Gmail execution remains behind dashboard approval.
 
 The old `/api/devices/register` and `/api/hardware/*` routes belong to the
 earlier speaking-agent experiment. New Lantern firmware should use the v1

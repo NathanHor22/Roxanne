@@ -1030,7 +1030,9 @@ export function Workspace() {
                   )}
                 </section>
               )}
-              {view === "device" && <LanternDevicePanel mode={mode} />}
+              {view === "device" && (
+                <LanternDevicePanel mode={mode} integrations={integrations} />
+              )}
               {view === "settings" && (
                 <div className={styles.settingsGrid}>
                   <section className={styles.settingsCard}>

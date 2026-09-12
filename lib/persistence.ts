@@ -8,6 +8,8 @@ import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
 export interface PersistMeetingInput {
   clientReference: string;
   meeting: Meeting;
+  /** Device-authenticated ingestion pins data to the paired device owner. */
+  ownerUserId?: string;
   /** Omitted for live Agora hardware sessions where no source file exists. */
   audio?: Blob;
   fileName?: string;
@@ -72,7 +74,8 @@ export async function persistProcessedMeeting(
     }
     return { persisted: false, warning: "Supabase is not configured; the result is available in this browser only." };
   }
-  const userId = await resolveDemoUserId(client, { createIfMissing: true });
+  const userId = input.ownerUserId ||
+    (await resolveDemoUserId(client, { createIfMissing: true }));
   if (!userId) {
     if (production) {
       throw new PersistenceConfigurationError(

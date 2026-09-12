@@ -143,6 +143,7 @@ export const lanternEventSchema = z.discriminatedUnion("type", [
     accepted: z.boolean(),
   }),
   z.object({ type: z.literal("PAUSE"), at: timestamp }),
+  z.object({ type: z.literal("CAPTURE_STARTED"), at: timestamp }),
   z.object({ type: z.literal("RESUME"), at: timestamp }),
   z.object({ type: z.literal("STOP"), at: timestamp }),
   z.object({ type: z.literal("ARCHIVE_ACCEPTED"), at: timestamp }),
@@ -308,6 +309,12 @@ export function advanceLantern(
         recordingStartedAt: event.at,
         consentConfirmedAt: event.at,
       };
+    case "CAPTURE_STARTED":
+      requireState(machine, event, "recording");
+      if (machine.recordingStartedAt !== machine.consentConfirmedAt) {
+        throw new LanternTransitionError("Capture start has already been stamped.");
+      }
+      return { ...next, recordingStartedAt: event.at };
     case "PAUSE":
       requireState(machine, event, "recording");
       return { ...next, state: "paused" };

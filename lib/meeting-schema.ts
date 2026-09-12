@@ -139,6 +139,7 @@ export const extractionContextSchema = z
     outputLanguage: compactText("output language", 40).default("English"),
     referenceDate: z.string().datetime({ offset: true }).optional(),
     timezone: compactText("timezone", 80).optional(),
+    referenceLocalDateTime: compactText("local reference time", 160).optional(),
   })
   .strict();
 

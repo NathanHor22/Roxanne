@@ -43,6 +43,18 @@ test("quick mode cannot record before its exact consent prompt is confirmed", ()
   assert.equal(recording.state, "recording");
   assert.equal(recording.consentConfirmedAt, later);
   assert.equal(recording.prompt, null);
+
+  const captureAt = "2026-09-11T10:00:12+08:00";
+  const capturing = advanceLantern(recording, {
+    type: "CAPTURE_STARTED",
+    at: captureAt,
+  });
+  assert.equal(capturing.recordingStartedAt, captureAt);
+  assert.equal(capturing.consentConfirmedAt, later);
+  assert.throws(
+    () => advanceLantern(capturing, { type: "CAPTURE_STARTED", at: captureAt }),
+    /already been stamped/,
+  );
 });
 
 test("an expired consent response does not start recording", () => {

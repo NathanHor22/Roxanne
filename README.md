@@ -7,11 +7,12 @@ that led to it: bullet points, concerns, promises, and preparation tasks. When
 the original recording is available, replay that conversation from its brief.
 
 This phase implements the dashboard, a completed-transcript API, Ilmu
-extraction, explicit Google Calendar actions, and the provider-independent
-Lantern core. The Lantern page can exercise consent, recording, reconnect,
-status-report, and approval handoff states before Agora or Google is connected.
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the boundaries, request contracts,
-data model, and remaining work.
+extraction, explicit Google Calendar actions, and the first Lantern capture
+loop. The ESP32-S3 can open a consented session, publish microphone audio to
+Agora, upload the final captions and original WAV, and ask Ilmu to create the
+dashboard brief. The server supplies the authoritative Malaysia date and time
+when capture starts. See [ARCHITECTURE.md](ARCHITECTURE.md) for the boundaries,
+request contracts, data model, and remaining work.
 
 ## Run locally
 
@@ -36,6 +37,7 @@ Apply these migrations to the target Supabase project in order:
 2. `supabase/migrations/002_worker_hardening.sql`
 3. `supabase/migrations/003_meeting_approvals.sql`
 4. `supabase/migrations/004_lantern_devices.sql`
+5. `supabase/migrations/005_lantern_recording_pipeline.sql`
 
 Migration 003 adds structured schedule details and dismissed approvals. It also
 adds a unique Calendar-action index per follow-up. Reconcile any existing
@@ -44,6 +46,10 @@ duplicate Calendar actions for the same follow-up before applying that index.
 Migration 004 adds one-time Lantern pairing, revocable device credentials,
 telemetry, durable session state, and idempotent device-event records. It does
 not add provider credentials or raw-audio storage to the device.
+
+Migration 005 adds the Agora session identifiers, staged final captions,
+private device recording linkage, provider retry fields, and completed Roxanne
+meeting link used by the first capture pilot.
 
 The live workspace requires `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Use
@@ -89,6 +95,21 @@ configured, otherwise the Qwen adapter. A configured Ilmu failure is reported;
 it does not silently switch providers or return sample content. Qwen remains
 configurable through `QWEN_API_KEY`, `QWEN_BASE_URL`, and `QWEN_MODEL` for those
 older paths.
+
+### Agora wearable transcription
+
+Set `NEXT_PUBLIC_AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`,
+`AGORA_CUSTOMER_ID`, and `AGORA_CUSTOMER_SECRET`, then enable Speech-to-Text
+for that Agora project. The first hardware pilot publishes 16 kHz mono Opus and
+starts Agora Speech-to-Text with `ms-MY,en-SG`. Change
+`AGORA_STT_LANGUAGES` or `AGORA_STT_KEYWORDS` after measuring real Malaysian
+conversations.
+
+The browser never receives Agora REST credentials. The backend creates a
+short-lived device RTC token and subscribes the transcription bot only to that
+device UID. Final Agora protobuf captions are staged until the ESP32 uploads
+its local WAV; Ilmu then receives those captions with the server-stamped
+`Asia/Kuala_Lumpur` date and time.
 
 ### Google Calendar
 
@@ -157,16 +178,20 @@ confirmation creates a pending dashboard approval without sending anything.
 
 In live mode, an authenticated owner can create a ten-minute pairing code,
 view device telemetry, and revoke a paired device. Firmware claims that code
-once, stores the returned secret in protected device storage, and then uses the
-device session API. The secret is returned only during the claim; the database
-stores its SHA-256 digest. Request examples and the current hardware gate are in
-[HARDWARE.md](HARDWARE.md).
+once, stores the returned secret in device NVS, and then uses the device
+heartbeat API. The secret is returned only during the claim; the database
+stores its SHA-256 digest. Request examples and the current hardware status are
+in [HARDWARE.md](HARDWARE.md).
 
-The current ESP32 firmware has not been replaced or flashed. Windows must first
-enumerate the board consistently and the factory flash must be backed up. The
-implemented core deliberately stops at mocked capture: original-audio upload,
-Agora transcription, Ilmu processing, and Google execution remain subsequent
-adapters.
+The active ESP32-S3 firmware is in `hardware/lantern-firmware`. Version
+`0.2.0-agora-pilot` builds the first provider-connected path: server-confirmed
+consent and capture time, Agora audio and captions, a private WAV upload, Ilmu
+processing, and dashboard delivery. The pilot deliberately stops at 29 seconds
+while we verify the complete loop; hour-long chunked capture, reconnect and
+token renewal are the next reliability phase. Run its
+`setup-agora-sdk.ps1` once before a clean firmware build. The currently flashed
+board remains on the earlier bring-up image until this backend and migration
+are deployed and the provider credentials are configured.
 
 Devin and the persistent WhatsApp worker remain legacy follow-up integrations.
 They are not prerequisites for transcript import, recaps, or Calendar
@@ -183,5 +208,5 @@ npm run build
 
 `npm run check` also checks and builds the persistent worker; install its
 dependencies separately with `npm --prefix worker install` first. Automated
-checks do not establish live Ilmu accuracy, Google account connectivity, or
-hour-long wearable reliability.
+checks do not establish live Agora delivery, Ilmu accuracy, Google account
+connectivity, or hour-long wearable reliability.

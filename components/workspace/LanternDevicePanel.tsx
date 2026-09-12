@@ -78,7 +78,13 @@ function elapsedLabel(startedAt: string | null, tick: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function LanternDevicePanel({ mode }: { mode: WorkspaceMode }) {
+export function LanternDevicePanel({
+  mode,
+  integrations,
+}: {
+  mode: WorkspaceMode;
+  integrations: Record<string, boolean>;
+}) {
   const [machine, setMachine] = useState<LanternMachine>(() =>
     createLanternMachine("ready"),
   );
@@ -260,9 +266,14 @@ export function LanternDevicePanel({ mode }: { mode: WorkspaceMode }) {
       <div className={styles.prototypeNotice}>
         <ShieldCheck />
         <span>
-          <strong>Provider-independent prototype</strong>
-          This exercises Lantern’s consent and approval rules. It records no
-          audio and contacts nobody.
+          <strong>
+            {mode === "sample" ? "Interactive flow preview" : "Agora capture pilot"}
+          </strong>
+          {mode === "sample"
+            ? "This exercises Lantern’s consent and approval rules. It records no audio and contacts nobody."
+            : integrations.agora && integrations.ilmu
+              ? "A paired Lantern can capture a 30-second conversation, send it through Agora and Ilmu, and add the recording and recap here automatically."
+              : "The capture build is ready. Connect Agora and Ilmu in the server environment before installing it on the Lantern."}
         </span>
       </div>
 
@@ -530,16 +541,22 @@ export function LanternDevicePanel({ mode }: { mode: WorkspaceMode }) {
           )}
         </section>
         <section className={styles.infoCard}>
-          <header><Gauge /><span>Hardware gate</span></header>
-          <strong>USB identification required</strong>
-          <p>Back up the factory flash before the first firmware write.</p>
-          <span className={styles.detailPill}>Phase 0</span>
+          <header><Gauge /><span>Hardware build</span></header>
+          <strong>Lantern 0.2 capture firmware</strong>
+          <p>The ESP32-S3 build is ready for the first provider-connected device test.</p>
+          <span className={styles.detailPill}>
+            {mode === "sample"
+              ? "30-second flow preview"
+              : integrations.agora && integrations.ilmu
+                ? "Providers ready"
+                : "Provider setup required"}
+          </span>
         </section>
         <section className={styles.infoCard}>
           <header><Mic2 /><span>Capture contract</span></header>
-          <strong>16 kHz mono · bounded buffer</strong>
-          <p>Audio must be acknowledged continuously; gaps remain visible.</p>
-          <span className={styles.detailPill}>Next adapter</span>
+          <strong>16 kHz mono · Agora Opus</strong>
+          <p>The server stamps the exact Malaysia date and time when capture begins.</p>
+          <span className={styles.detailPill}>Asia/Kuala_Lumpur</span>
         </section>
         <section className={styles.infoCard}>
           <header><ShieldCheck /><span>Action boundary</span></header>

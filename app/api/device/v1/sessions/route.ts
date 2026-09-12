@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { authenticateLantern } from "@/lib/lantern-device-auth";
+import { conversationClock } from "@/lib/conversation-clock";
+import { env } from "@/lib/env";
 import {
   advanceLantern,
   createLanternMachine,
@@ -105,8 +107,20 @@ export async function POST(request: Request) {
       throw new Error(sessionError.message);
     }
 
+    const timezone = env().APP_TIMEZONE;
+    const { error: contextError } = await client
+      .from("lantern_sessions")
+      .update({ conversation_timezone: timezone })
+      .eq("id", sessionId)
+      .eq("device_id", device.id);
+    if (contextError) throw new Error(contextError.message);
+
     return NextResponse.json(
-      { session: machine, duplicate: false },
+      {
+        session: machine,
+        clock: conversationClock(now, timezone),
+        duplicate: false,
+      },
       { status: 201, headers: { "cache-control": "no-store" } },
     );
   } catch (error) {

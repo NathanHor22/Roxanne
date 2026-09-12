@@ -2,7 +2,7 @@
 
 **Version:** 0.2  
 **Date:** 11 September 2026  
-**Status:** Proposed for discussion before implementation  
+**Status:** First 30-second Agora/Ilmu capture slice implemented; live deployment pending
 **Primary user:** An individual business developer capturing client conversations and arranging follow-ups
 
 ## 1. Product contract
@@ -33,15 +33,15 @@ The ring image and oath establish the product's character. The dashboard login, 
 - English and Malaysian code-switching are product requirements; accuracy must be measured using real recordings.
 - One active meeting at a time.
 - Original audio, transcript, summary, action items and approvals remain linked.
-- Google and Agora adapters are deferred until the device, capture contract and approval state machine work with test services.
+- Agora is the first live capture adapter. Google execution stays behind the existing dashboard approval boundary.
 - The ESP32-CAM is outside the core first release. It remains an optional future ring-recognition accessory.
 
 ## 2. Hardware audit
 
 The repository targets `zhengchen-1.54tft-ml307`, built around an ESP32-S3. A
 factory boot log has now confirmed ESP32-S3 revision 0.2 and 8 MB octal PSRAM.
-The local firmware configuration identifies the module as N16R8, but its 16 MB
-flash size still needs a ROM-loader `flash_id` check before flashing.
+The ROM-loader audit confirmed 16 MB flash, and the complete factory image was
+backed up and digest-verified before Roxanne firmware was flashed.
 
 The ESP32-S3 itself provides a dual-core 240 MHz processor, 512 KB internal SRAM, 2.4 GHz 802.11 b/g/n Wi-Fi and Bluetooth LE. It is capable of audio I/O, display control, local state handling, buffering and lightweight wake-word processing. It is not the place to run the full speech-to-text and language model pipeline. See the [Espressif ESP32-S3 overview](https://www.espressif.com/en/products/socs/esp32-s3/).
 
@@ -324,21 +324,20 @@ If a required field is missing, Lantern asks one bounded question. It does not g
 | Audio replay | Private signed playback and timestamp seeking | Hardware audio archive and aligned chunk assembly |
 | Ilmu | Structured extraction from completed transcripts | Real mixed-language evaluation and uncertainty handling |
 | Calendar approval | Versioned review and Google event execution path | Voice-created proposal handoff and clearer pending state |
-| Hardware firmware | Button, Wi-Fi, mic/speaker, Agora session and transcript buffer | Display, battery, secure pairing, consent states, archive stream and recovery |
-| Hardware routes | Session start/complete and registration | Device authentication independent of browser cookies |
-| Transcript ingestion | Completed transcript boundary | Durable final segments with timestamps and hour-long scale |
+| Hardware firmware | Flashed bring-up image plus a built 0.2 Agora pilot with the v1 session client, clock sync, WAV and caption upload | Hour-long chunking, reconnect, encrypted storage and signed OTA |
+| Hardware routes | Device-authenticated pairing, heartbeat, session transitions, transcript/audio staging and completion | Operational monitoring and long-session recovery |
+| Transcript ingestion | Final Agora protobuf segments with aligned timestamps for the 30-second pilot | Speaker diarization evaluation and hour-long scale |
 
 Material current gaps:
 
-- The standalone firmware hard-codes a device UUID and Wi-Fi credentials.
-- Hardware routes currently require the owner's browser session, which the standalone device cannot supply.
-- The firmware starts a talkative Agora voice agent rather than a silent meeting recorder.
-- It stores only a 96 KB transcript buffer and no original audio.
-- It has no display driver, battery UI or volume-button behavior in the Roxanne firmware.
-- Session credentials last one hour and are not renewed during a long meeting.
-- Transcript normalization loses capture timestamps and reduces speakers to "You" and "Roxanne."
+- The capture pilot holds at most 29 seconds of audio in PSRAM, not an hour-long archive.
+- Quick mode drives the server session and providers; Status mode is still a local hardware interaction.
+- Device NVS is not yet encrypted and signed OTA is not enabled.
+- The 0.2 Agora pilot is built but must wait for migration 005 and provider configuration before it is flashed.
+- Session credentials last four hours in the pilot and are not renewed during a long meeting.
+- One wearable microphone produces a neutral `Conversation` speaker label; it cannot prove who spoke.
 - There is no durable chunk acknowledgement, reconnect/resume protocol or explicit gap record.
-- The local ESP-IDF 5.2.3 and current upstream board-code ESP-IDF 6.1 requirements need an explicit compatibility decision.
+- Agora and Ilmu accuracy has not yet been measured with real Malaysian code-switching audio.
 
 These gaps mean the existing binary is an integration experiment, not yet the Lantern meeting product.
 
@@ -410,7 +409,9 @@ Exit gate:
 ### Phase 2 — Device state machine and mocked experience
 
 Software status: the shared TypeScript state machine and dashboard simulator
-are implemented. Firmware integration waits for Phase 0 and Phase 1.
+are implemented. The flashed bring-up firmware now implements local Quick and
+Status test states; the built 0.2 image also drives the server-confirmed Quick
+path.
 
 Steps:
 
@@ -432,7 +433,8 @@ Exit gate:
 
 Software status: pairing, revocation, heartbeat, idempotent session events, and
 the dashboard device view are implemented in migration 004 and the v1 routes.
-Firmware credential storage and live device validation remain after bring-up.
+Firmware credential storage, pairing, heartbeat and the session client are
+implemented. Production hardening and longer field validation remain.
 
 Steps:
 
@@ -449,6 +451,9 @@ Exit gate:
 - Replayed commands and stale consent responses are rejected.
 
 ### Phase 4 — Durable capture and replay without production providers
+
+Pilot status: a bounded 29-second WAV can be uploaded to private storage and
+replayed from the resulting conversation. Chunked 90-minute capture remains.
 
 Steps:
 
@@ -468,6 +473,10 @@ Exit gate:
 
 ### Phase 5 — Agora capture and transcription
 
+Pilot status: short-lived RTC credentials, wearable-only STT subscription,
+Opus publishing, final protobuf captions and aligned recording timestamps are
+implemented for the bounded slice. Live provider validation remains.
+
 Steps:
 
 1. Replace the staging transport with short-lived Agora credentials.
@@ -484,6 +493,10 @@ Exit gate:
 - Provider disconnects produce a visible incomplete state rather than a fabricated success.
 
 ### Phase 6 — Ilmu understanding and status reports
+
+Pilot status: Quick-mode final captions are sent to Ilmu with the authoritative
+Malaysia date/time and persisted as a dashboard brief. Daily spoken status
+reports and a real-language accuracy corpus remain.
 
 Steps:
 
@@ -578,4 +591,4 @@ Exit gate:
 7. Make voice confirmation prepare a proposal; require dashboard approval to contact a client.
 8. Keep Google credentials and all external action execution on the Roxanne backend.
 9. Preserve original audio with timestamp alignment; a transcript alone is not a completed recording.
-10. Start firmware work with Phase 0 only: identify, back up and recover the board before flashing. Build the provider-independent web core in parallel.
+10. Preserve the verified factory recovery image before every partition or bootloader change.

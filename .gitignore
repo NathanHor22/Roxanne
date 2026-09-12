@@ -36,4 +36,7 @@ Thumbs.db
 /hardware/firmware/components/agora_iot_sdk/
 /hardware/firmware/main/secrets.h
 /hardware/firmware/sdkconfig
+/hardware/lantern-firmware/build/
+/hardware/lantern-firmware/.ccache/
+/hardware/lantern-firmware/sdkconfig
 /hardware/backups/

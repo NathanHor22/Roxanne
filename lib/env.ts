@@ -35,6 +35,8 @@ const serverEnvSchema = z.object({
   AGORA_CUSTOMER_SECRET: z.string().optional(),
   AGORA_CONVOAI_ASR_LANGUAGE: z.string().default("en-US"),
   AGORA_CONVOAI_TTS: z.string().optional(),
+  AGORA_STT_LANGUAGES: z.string().default("ms-MY,en-SG"),
+  AGORA_STT_KEYWORDS: z.string().default("Roxanne,Malaysia,ringgit"),
   UPSTASH_REDIS_REST_URL: optionalUrl,
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   KV_REST_API_URL: optionalUrl,

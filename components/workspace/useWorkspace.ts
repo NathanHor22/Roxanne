@@ -25,6 +25,7 @@ export function useWorkspace() {
   const [working, setWorking] = useState<string | null>(null);
   const generation = useRef(0);
   const actionLock = useRef(false);
+  const liveRefreshRunning = useRef(false);
 
   const loadSample = useCallback((reset = false) => {
     generation.current++;
@@ -48,16 +49,20 @@ export function useWorkspace() {
   }, []);
 
   const loadLive = useCallback(
-    async (allowSample = false) => {
+    async (allowSample = false, silent = false) => {
+      if (silent && (liveRefreshRunning.current || actionLock.current)) return;
+      if (silent) liveRefreshRunning.current = true;
       const current = ++generation.current;
-      setMode("live");
-      setMeetings([]);
-      setLoading(true);
-      setError(null);
-      setIntegrations({});
-      const url = new URL(window.location.href);
-      url.searchParams.delete("mode");
-      window.history.replaceState({}, "", url);
+      if (!silent) {
+        setMode("live");
+        setMeetings([]);
+        setLoading(true);
+        setError(null);
+        setIntegrations({});
+        const url = new URL(window.location.href);
+        url.searchParams.delete("mode");
+        window.history.replaceState({}, "", url);
+      }
       try {
         const response = await fetch("/api/meetings", { cache: "no-store" });
         const payload = await response.json();
@@ -76,18 +81,21 @@ export function useWorkspace() {
           );
         }
         setMeetings(payload.meetings || []);
-        const result = await fetch("/api/integrations", { cache: "no-store" });
-        if (result.ok && current === generation.current)
-          setIntegrations((await result.json()).integrations || {});
+        if (!silent) {
+          const result = await fetch("/api/integrations", { cache: "no-store" });
+          if (result.ok && current === generation.current)
+            setIntegrations((await result.json()).integrations || {});
+        }
       } catch (cause) {
-        if (current === generation.current)
+        if (!silent && current === generation.current)
           setError(
             cause instanceof Error
               ? cause.message
               : "Your workspace could not be loaded.",
           );
       } finally {
-        if (current === generation.current) setLoading(false);
+        if (!silent && current === generation.current) setLoading(false);
+        if (silent) liveRefreshRunning.current = false;
       }
     },
     [loadSample],
@@ -101,6 +109,17 @@ export function useWorkspace() {
       generation.current++;
     };
   }, [loadLive, loadSample]);
+
+  useEffect(() => {
+    if (mode !== "live" || loading) return;
+    const refresh = () => void loadLive(false, true);
+    const interval = window.setInterval(refresh, 10_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [loading, loadLive, mode]);
 
   useEffect(() => {
     if (mode !== "sample" || loading) return;
@@ -127,6 +146,7 @@ export function useWorkspace() {
   ): Promise<Meeting | null> => {
     if (actionLock.current) return null;
     actionLock.current = true;
+    if (mode === "live") generation.current++;
     setWorking(approval.id);
     setError(null);
     try {
@@ -195,6 +215,7 @@ export function useWorkspace() {
   ) => {
     if (actionLock.current) return false;
     actionLock.current = true;
+    if (mode === "live") generation.current++;
     setWorking(id);
     setError(null);
     try {
