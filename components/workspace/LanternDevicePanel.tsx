@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   BatteryMedium,
@@ -191,11 +192,6 @@ export function LanternDevicePanel({
   };
 
   const createPairing = async () => {
-    if (mode === "sample") {
-      setPairingCode("24G7N-8R5XQ");
-      setPairingExpiresAt(new Date(Date.now() + 10 * 60_000).toISOString());
-      return;
-    }
     setPairingWorking(true);
     setDeviceError(null);
     try {
@@ -504,7 +500,45 @@ export function LanternDevicePanel({
         <ol>
           <li>
             <span>1</span>
-            <div><strong>Create a pairing code</strong><p>Generate the one-time code in the registered device card below.</p></div>
+            <div>
+              <strong>{mode === "sample" ? "Sign in to pair your device" : "Create a pairing code"}</strong>
+              <p>
+                {mode === "sample"
+                  ? "Pairing codes belong to your private workspace."
+                  : pairingCode
+                    ? "Enter this one-time code in the Lantern setup page."
+                    : "Generate a one-time code before joining the Lantern setup network."}
+              </p>
+              {mode === "sample" ? (
+                <Link
+                  className={styles.setupAction}
+                  href="/login?next=%2Fdashboard%3Fview%3Ddevice"
+                >
+                  Sign in to pair your device
+                </Link>
+              ) : pairingCode ? (
+                <div className={styles.setupPairingCode}>
+                  <code>{pairingCode}</code>
+                  <small>
+                    Expires {pairingExpiresAt
+                      ? new Date(pairingExpiresAt).toLocaleTimeString("en-MY", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "soon"}
+                  </small>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.setupAction}
+                  disabled={pairingWorking}
+                  onClick={() => void createPairing()}
+                >
+                  {pairingWorking ? "Creating…" : "Create pairing code"}
+                </button>
+              )}
+            </div>
           </li>
           <li>
             <span>2</span>
@@ -557,11 +591,16 @@ export function LanternDevicePanel({
               <span>PAIRING CODE</span>
               <strong>{pairingCode}</strong>
               <small>
-                {mode === "sample"
-                  ? "Preview only"
-                  : `Expires ${pairingExpiresAt ? new Date(pairingExpiresAt).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" }) : "soon"}`}
+                {`Expires ${pairingExpiresAt ? new Date(pairingExpiresAt).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" }) : "soon"}`}
               </small>
             </div>
+          ) : mode === "sample" ? (
+            <Link
+              className={styles.cardAction}
+              href="/login?next=%2Fdashboard%3Fview%3Ddevice"
+            >
+              Sign in to pair your device
+            </Link>
           ) : (
             <button
               type="button"
@@ -569,7 +608,7 @@ export function LanternDevicePanel({
               disabled={pairingWorking}
               onClick={() => void createPairing()}
             >
-              {pairingWorking ? "Creating…" : mode === "sample" ? "Preview pairing" : "Create pairing code"}
+              {pairingWorking ? "Creating…" : "Create pairing code"}
             </button>
           )}
         </section>

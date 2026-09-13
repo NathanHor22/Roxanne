@@ -462,6 +462,51 @@
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.setupAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 8px 11px;
+  border: 1px solid #197044;
+  border-radius: 7px;
+  color: #fff;
+  background: #197044;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.setupAction:hover {
+  background: #125b36;
+}
+
+.setupAction:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.setupPairingCode {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.setupPairingCode code {
+  width: fit-content;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 1.5px;
+}
+
+.setupPairingCode small {
+  color: #657a6e;
+  font-size: 10px;
+}
+
 .setupPrivacy {
   margin: 21px 0 0;
   padding-top: 15px;
@@ -516,14 +561,22 @@
 }
 
 .cardAction {
+  display: inline-flex;
   margin-top: 4px;
-  padding: 0;
-  border: 0;
-  color: #2d654f;
-  background: transparent;
+  padding: 7px 10px;
+  border: 1px solid #b9d7c5;
+  border-radius: 7px;
+  color: #245c45;
+  background: #f2f8f4;
   font-size: 12px !important;
   font-weight: 650;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.cardAction:hover {
+  border-color: #77ad8a;
+  background: #e7f3eb;
 }
 
 .cardAction:disabled {
