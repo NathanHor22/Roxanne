@@ -10,9 +10,9 @@ until it has been exercised with real credentials.
 
 - [x] Next.js application and persistent Baileys worker are separate services.
 - [x] Owner-only Google Auth is implemented and fails closed when production
-  credentials are incomplete.
+      credentials are incomplete.
 - [ ] Change the deployed `DEMO_ACCESS_MODE` from `public` to `owner` after the
-  Lantern build and Supabase redirect allowlist are deployed.
+      Lantern build and Supabase redirect allowlist are deployed.
 - [x] WhatsApp pairing and sends are restricted to `601154444038`.
 - [x] Provider secrets stay server-side.
 - [x] External sends require an explicit approved action.
@@ -45,7 +45,7 @@ Reviewer check:
 - [x] Owner/path validation, 25 MB limit, MIME allowlist, and failed-state handling.
 - [x] ElevenLabs Scribe v2 transcription adapter with diarization.
 - [x] Agora device transcription and final-caption ingestion for the first
-  hardware capture slice.
+      hardware capture slice.
 - [x] OpenAI strict structured extraction with the authoritative Malaysia clock.
 - [x] Groq Whisper/Qwen remain available for browser-upload compatibility.
 - [x] Devin produces proposals only; it cannot execute a send.
@@ -79,12 +79,12 @@ Reviewer check:
 - [x] Relay is a dedicated dashboard view with a fictional provider-free sample.
 - [x] OpenAI Responses matching uses strict structured output and `store: false`.
 - [x] Unknown contacts, partial or invented evidence, duplicate pairs, and scores
-  below 70 are rejected after the model response.
+      below 70 are rejected after the model response.
 - [x] Participant emails and recordings are excluded from the OpenAI request.
 - [x] Optional Exa research receives company names only and fails independently.
 - [x] Proposals persist with owner-scoped pending, dismissed, or scheduled state.
 - [x] Calendar execution rechecks the stored pair and exact attendees and is the
-  only path that can mark a live proposal scheduled.
+      only path that can mark a live proposal scheduled.
 - [ ] Apply `006_lantern_relay.sql` and add `OPENAI_API_KEY` to Vercel.
 - [ ] Run Relay against two real event conversations and approve one test invite.
 
@@ -120,22 +120,22 @@ npm.cmd run check
 - [x] Lantern Supabase project created and linked as `cjogfunwcwytvooycjzv`.
 - [x] Local Supabase configuration records the production URL and Auth redirects.
 - [x] Remote migrations `001_initial.sql` and `002_worker_hardening.sql` applied;
-  14 tables, 12 public RLS policies, and the private recording bucket verified.
+      14 tables, 12 public RLS policies, and the private recording bucket verified.
 - [ ] Apply migrations `003_meeting_approvals.sql`,
-  `004_lantern_devices.sql`, `005_lantern_recording_pipeline.sql`, and
-  `006_lantern_relay.sql`.
+      `004_lantern_devices.sql`, `005_lantern_recording_pipeline.sql`, and
+      `006_lantern_relay.sql`.
 - [x] Supabase Google Auth is enabled and email/password signup is disabled.
 - [ ] Add the Supabase and Lantern callback URLs to the Google Cloud OAuth client.
 - [x] Remove Qwen, Groq, Redis/KV, and WhatsApp variables from Vercel; they are
-  outside the active prototype path.
+      outside the active prototype path.
 - [x] Keep only Supabase, OpenAI, Agora, Google Calendar, owner, timezone, and
-  approval variables in Vercel Production.
+      approval variables in Vercel Production.
 - [ ] Verify `OPENAI_API_KEY` with a real capture; add `EXA_API_KEY` only if
-  public research will be demonstrated.
+      public research will be demonstrated.
 - [x] Initial Vercel production build deployed and assigned to
-  `https://roxanne-two.vercel.app`.
+      `https://roxanne-two.vercel.app`.
 - [x] Deploy the Ilmu-free Lantern build and verify the production login page
-  and signed-out dashboard protection.
+      and signed-out dashboard protection.
 - [ ] Verify live Agora/OpenAI readiness from an authenticated dashboard.
 - [ ] Run the complete credential-backed golden path.
 - [ ] Record the Railway URL and final golden-path verification time below.
@@ -156,24 +156,24 @@ These steps require an account decision, secret, or physical confirmation and
 cannot be completed by repository automation alone:
 
 - [x] Confirm Supabase reports Google login enabled and set the production app,
-  Calendar redirect, model, language, and timezone defaults in Vercel.
+      Calendar redirect, model, language, and timezone defaults in Vercel.
 - [ ] Add `https://cjogfunwcwytvooycjzv.supabase.co/auth/v1/callback` and
-  `https://roxanne-two.vercel.app/api/google/callback` to the existing Google
-  Cloud OAuth client's authorized redirect URIs, then complete the one-time
-  Google Calendar consent from Lantern Settings.
+      `https://roxanne-two.vercel.app/api/google/callback` to the existing Google
+      Cloud OAuth client's authorized redirect URIs, then complete the one-time
+      Google Calendar consent from Lantern Settings.
 - [ ] Approve one real Google Calendar invitation during the final golden-path
-  test.
+      test.
 
 ## Explicit MVP scope decisions
 
 - [x] Approved Google Calendar events send the attendee invitation; a separate
-  free-form Gmail message remains outside the first golden path.
+      free-form Gmail message remains outside the first golden path.
 - [x] Browser Agora recording plus device registration and short-lived hardware
-  Agora bootstrap endpoints are implemented.
+      Agora bootstrap endpoints are implemented.
 - [ ] Existing Google Calendar event import and automatic recording matching
-  are deferred; V0.1 includes free/busy input and invitation output.
+      are deferred; V0.1 includes free/busy input and invitation output.
 - [ ] Daily cross-meeting aggregation, Supabase Realtime, and background jobs
-  are deferred beyond the credential-backed golden path.
+      are deferred beyond the credential-backed golden path.
 
 ## Live golden path — final gate
 
@@ -184,4 +184,4 @@ cannot be completed by repository automation alone:
 - [ ] Reload and confirm the meeting, audio, transcript, and follow-ups persist.
 - [ ] Check Google free/busy, approve a slot, and receive the calendar invite.
 - [ ] Verify Settings reports Supabase, OpenAI, Google Calendar, Agora, and
-  any optional integration used in the demo as connected.
+      any optional integration used in the demo as connected.
