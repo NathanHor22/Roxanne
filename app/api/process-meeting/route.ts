@@ -3,14 +3,14 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { MAX_AUDIO_BYTES, normalizeAudioContentType } from "@/lib/audio-upload";
 import { parseLocale } from "@/lib/i18n";
 import { persistProcessedMeeting } from "@/lib/persistence";
 import { transcribeMeetingAudio } from "@/lib/providers/transcription";
 import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { rememberPerson, rememberSession, setProcessingState } from "@/lib/redis";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 import type { Contact, FollowUp, Meeting } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -111,9 +111,9 @@ async function parseDirectRequest(request: Request): Promise<ProcessInput> {
   if (!client) {
     throw new ProcessRequestError("Supabase Storage is not configured.", 503);
   }
-  const userId = await resolveDemoUserId(client, { createIfMissing: false });
+  const userId = await resolveWorkspaceUserId(client);
   if (!userId) {
-    throw new ProcessRequestError("No Lantern owner is available.", 503);
+    throw new ProcessRequestError("No authenticated Lantern user is available.", 503);
   }
 
   // Atomically claim an upload that belongs to this app's owner. Matching both
@@ -246,7 +246,7 @@ async function markFailed(input: ProcessInput | undefined, message: string) {
 }
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const readinessError = requireProductionPersistence(
     Boolean(getServerSupabase()),
@@ -278,7 +278,7 @@ export async function POST(request: Request) {
     const followUps: FollowUp[] = extraction.followUps.map((item) => ({ id: randomUUID(), meetingId: clientReference, contactId: contacts[0]?.id || null, ...item, status: "pending" }));
     const meeting: Meeting = {
       id: input.clientReference,
-      title: contacts[0] ? `${contacts[0].name}${contacts[0].company ? ` · ${contacts[0].company}` : ""}` : input.title,
+      title: contacts[0] ? `${contacts[0].name}${contacts[0].company ? ` Â· ${contacts[0].company}` : ""}` : input.title,
       startAt: input.startAt,
       endAt: input.endAt,
       status: "ready",

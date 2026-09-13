@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Meeting } from "@/lib/types";
 import type { MeetingExtractionResult, TranscriptionResult } from "@/lib/meeting-schema";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export interface PersistMeetingInput {
   clientReference: string;
@@ -75,11 +75,11 @@ export async function persistProcessedMeeting(
     return { persisted: false, warning: "Supabase is not configured; the result is available in this browser only." };
   }
   const userId = input.ownerUserId ||
-    (await resolveDemoUserId(client, { createIfMissing: true }));
+    (await resolveWorkspaceUserId(client));
   if (!userId) {
     if (production) {
       throw new PersistenceConfigurationError(
-        "Supabase persistence could not resolve the production owner. Set DEMO_USER_ID or provision DEMO_USER_EMAIL in Supabase Auth.",
+        "Supabase persistence could not resolve the authenticated Lantern user.",
       );
     }
     return { persisted: false, warning: "No Supabase user is available." };

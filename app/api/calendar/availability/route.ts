@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
-import { env } from "@/lib/env";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import {
   GoogleCalendarProviderError,
   createAuthorizedGoogleOAuthClient,
   getGoogleCalendarAvailability,
   getGoogleOAuthConfig,
 } from "@/lib/providers/google-calendar";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const readinessError = requireProductionPersistence(
     Boolean(getServerSupabase()),
@@ -30,15 +29,18 @@ export async function GET(request: Request) {
     };
     const config = getGoogleOAuthConfig();
     const client = getServerSupabase();
-    let userId = env().DEMO_USER_ID ?? null;
-    if (!config.refreshToken) {
-      if (!client) {
-        throw new GoogleCalendarProviderError(
-          "Google Calendar is not connected.",
-          "not_connected",
-        );
-      }
-      userId = await resolveDemoUserId(client, { createIfMissing: false });
+    if (!client) {
+      throw new GoogleCalendarProviderError(
+        "Google Calendar is not connected.",
+        "not_connected",
+      );
+    }
+    const userId = await resolveWorkspaceUserId(client);
+    if (!userId) {
+      throw new GoogleCalendarProviderError(
+        "Google Calendar is not connected.",
+        "not_connected",
+      );
     }
     const oauthClient = await createAuthorizedGoogleOAuthClient({
       config,

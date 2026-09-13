@@ -3,8 +3,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession } from "@/lib/api-security";
-import { env } from "@/lib/env";
+import { requireAuthenticatedSession } from "@/lib/api-security";
 import {
   GoogleCalendarProviderError,
   buildGoogleCalendarInsert,
@@ -15,7 +14,7 @@ import {
 } from "@/lib/providers/google-calendar";
 import {
   getServerSupabase,
-  resolveDemoUserId,
+  resolveWorkspaceUserId,
 } from "@/lib/supabase/server";
 import {
   loadRelayMatchById,
@@ -109,7 +108,7 @@ async function persistCalendarMeeting(
 }
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   let actionId: string | null = null;
   let ownerUserId: string | null = null;
@@ -131,31 +130,19 @@ export async function POST(request: Request) {
     if ([input.meetingId, input.clientReference, input.followUpId].some((id) => id?.startsWith("sample:"))) {
       return NextResponse.json({ error: "Sample approvals cannot create real invitations." }, { status: 400 });
     }
-    const runtime = env();
     const config = getGoogleOAuthConfig();
 
-    let userId = runtime.DEMO_USER_ID ?? null;
-    if (!config.refreshToken) {
-      if (!client) {
-        throw new GoogleCalendarProviderError(
-          "Google Calendar is not connected.",
-          "not_connected",
-        );
-      }
-      userId = await resolveDemoUserId(client, { createIfMissing: false });
-    } else if (client && !userId) {
-      // Auditing is best-effort for the environment refresh-token path. Calendar
-      // remains usable even when no Supabase demo user has been created yet.
-      try {
-        userId = await resolveDemoUserId(client, { createIfMissing: false });
-      } catch {
-        userId = null;
-      }
-    }
-    if (process.env.NODE_ENV === "production" && (!client || !userId)) {
+    if (!client) {
       throw new GoogleCalendarProviderError(
-        "Supabase action persistence is required in production.",
+        "Supabase action persistence is required.",
         "configuration",
+      );
+    }
+    const userId = await resolveWorkspaceUserId(client);
+    if (!userId) {
+      throw new GoogleCalendarProviderError(
+        "Sign in before using Google Calendar.",
+        "not_connected",
       );
     }
     ownerUserId = userId;

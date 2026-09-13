@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 
 import {
-  requireOwnerSession,
+  requireAuthenticatedSession,
   requireProductionPersistence,
 } from "@/lib/api-security";
 import {
   getServerSupabase,
-  resolveDemoUserId,
+  resolveWorkspaceUserId,
 } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
 
   const client = getServerSupabase();
@@ -30,7 +30,7 @@ export async function GET() {
   }
 
   try {
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) {
       return NextResponse.json(
         { devices: [], source: "supabase" },

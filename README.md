@@ -20,13 +20,14 @@ boundaries, request contracts, data model, and remaining work.
 
 1. Install Node.js 22.x, matching `package.json`.
 2. Run `npm install`.
-3. Run `npm run dev` and open `http://localhost:3000/dashboard?mode=sample`.
+3. Run `npm run dev` and open `http://localhost:3000`.
 
 With no Supabase configuration, local development permits credential-free
 access. The sample workspace uses fictional conversations and browser storage.
 Approvals, dismissals, and checklist changes in sample mode make no provider
 calls and send no invitations. Use **Reset sample** to restore the preview.
-Sample mode does not bypass authentication on an authenticated deployment.
+The public home page always opens this sample. `/dashboard` remains the
+authenticated live workspace.
 
 ## Configure a live workspace
 
@@ -41,6 +42,7 @@ Apply these migrations to the target Supabase project in order:
 4. `supabase/migrations/004_lantern_devices.sql`
 5. `supabase/migrations/005_lantern_recording_pipeline.sql`
 6. `supabase/migrations/006_lantern_relay.sql`
+7. `supabase/migrations/007_multi_user_workspaces.sql`
 
 Migration 003 adds structured schedule details and dismissed approvals. It also
 adds a unique Calendar-action index per follow-up. Reconcile any existing
@@ -54,25 +56,31 @@ Migration 005 adds the Agora session identifiers, staged final captions,
 private device recording linkage, provider retry fields, and completed Lantern
 meeting link used by the first capture pilot.
 
-Migration 006 stores owner-scoped Relay proposals and their pending, dismissed,
+Migration 006 stores user-scoped Relay proposals and their pending, dismissed,
 or scheduled state. Re-running Relay preserves a proposal that was already
 dismissed or scheduled.
 
+Migration 007 removes the original single-account restriction, backfills a
+profile for every existing Supabase Auth user, and gives each account isolated
+row-level policies for conversations, devices, recordings, Relay proposals,
+and provider connections.
+
 The live workspace requires `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Use
-`DEMO_USER_EMAIL` for the owner account; optionally set `DEMO_USER_ID` to an
-existing Supabase Auth user UUID.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Every
+successful Supabase Google sign-in creates its own Lantern profile and private
+workspace.
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` may contain Supabase's modern publishable key.
 `SUPABASE_SERVICE_ROLE_KEY` may contain a modern `sb_secret_...` key; the
 variable keeps its legacy name for compatibility. The elevated key is used
 only by server routes and must never use a `NEXT_PUBLIC_` prefix.
 
-### Owner login
+### Google login
 
-The current app is an owner-scoped demo, not a multiuser SaaS application. Keep
-`DEMO_ACCESS_MODE=owner` for authenticated use. The existing `public` setting
-bypasses owner login and is not a tenant-isolation mechanism.
+Lantern accepts any Google account allowed by the Google Cloud OAuth app. Web
+routes require a valid Supabase session, and server-side data operations resolve
+the user ID from that same session. The public homepage, privacy policy, terms,
+login page, and Supabase callback remain available without signing in.
 
 Enable Google under **Supabase Auth > Providers**, then allow these redirects
 under **Auth > URL Configuration**:
@@ -85,7 +93,7 @@ callback shown on its provider page, normally
 `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback`. The app's
 `/auth/callback` belongs in Supabase's redirect allowlist.
 
-Production owner authentication requires both public Supabase values. Leaving
+Production authentication requires both public Supabase values. Leaving
 both unset disables authentication only in local development; incomplete
 configuration fails closed.
 
@@ -175,6 +183,24 @@ Google Calendar** in the live workspace to connect. Credentials are encrypted
 in `provider_connections`; the Google refresh token is created by this step and
 does not need to be copied into Vercel.
 
+For public access, set the Google Auth Platform audience to **External** and
+the publishing status to **In production**. Configure the public homepage,
+privacy policy, and terms as:
+
+- `https://roxanne-two.vercel.app`
+- `https://roxanne-two.vercel.app/privacy`
+- `https://roxanne-two.vercel.app/terms`
+
+Declare only Lantern's active Calendar scopes:
+
+- `https://www.googleapis.com/auth/calendar.events.owned`
+- `https://www.googleapis.com/auth/calendar.events.freebusy`
+
+Calendar access remains subject to Google's sensitive-scope verification. Use
+a custom domain that you control before submitting brand and data-access
+verification, then update the Vercel, Supabase, and Google redirect URLs to
+that domain.
+
 Review or complete the date, time, duration, and attendee emails, then approve.
 The live action creates the Google event with a unique Google Meet link and
 sends attendee updates. Lantern
@@ -220,7 +246,7 @@ the actual transition rules used by the server: recording starts only after a
 current consent prompt, offline buffering is capped at 30 seconds, and a voice
 confirmation creates a pending dashboard approval without sending anything.
 
-In live mode, an authenticated owner can create a ten-minute pairing code,
+In live mode, an authenticated user can create a ten-minute pairing code,
 view device telemetry, and revoke a paired device. Firmware claims that code
 once, stores the returned secret in device NVS, and then uses the device
 heartbeat API. The secret is returned only during the claim; the database

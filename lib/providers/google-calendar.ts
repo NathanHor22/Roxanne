@@ -15,9 +15,9 @@ import { env } from "../env";
 export const GOOGLE_CONNECTION_PROVIDER = "google";
 export const GOOGLE_TIME_ZONE = "Asia/Kuala_Lumpur";
 export const GOOGLE_CALENDAR_SCOPE =
-  "https://www.googleapis.com/auth/calendar.events";
+  "https://www.googleapis.com/auth/calendar.events.owned";
 export const GOOGLE_CALENDAR_FREEBUSY_SCOPE =
-  "https://www.googleapis.com/auth/calendar.freebusy";
+  "https://www.googleapis.com/auth/calendar.events.freebusy";
 export const GOOGLE_OAUTH_SCOPES = [
   GOOGLE_CALENDAR_SCOPE,
   GOOGLE_CALENDAR_FREEBUSY_SCOPE,
@@ -60,7 +60,6 @@ export interface GoogleOAuthConfig {
   redirectUri: string;
   calendarId: string;
   approvalSecret?: string;
-  refreshToken?: string;
 }
 
 export interface GoogleOAuthState {
@@ -241,7 +240,6 @@ export function getGoogleOAuthConfig(): GoogleOAuthConfig {
     ),
     calendarId: runtime.GOOGLE_CALENDAR_ID.trim() || "primary",
     approvalSecret: runtime.ACTION_APPROVAL_SECRET?.trim() || undefined,
-    refreshToken: runtime.GOOGLE_REFRESH_TOKEN?.trim() || undefined,
   };
 }
 
@@ -537,11 +535,9 @@ export async function createAuthorizedGoogleOAuthClient(options: {
   userId?: string | null;
 } = {}): Promise<OAuth2Client> {
   const config = options.config ?? getGoogleOAuthConfig();
-  let credentials: Credentials | null = config.refreshToken
-    ? { refresh_token: config.refreshToken }
-    : null;
+  let credentials: Credentials | null = null;
 
-  if (!credentials && options.client && options.userId) {
+  if (options.client && options.userId) {
     credentials = await loadPersistedGoogleCredentials(
       options.client,
       options.userId,

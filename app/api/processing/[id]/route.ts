@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireOwnerSession } from "@/lib/api-security";
+import { requireAuthenticatedSession } from "@/lib/api-security";
 import { getProcessingState } from "@/lib/redis";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const { id } = await context.params;
   const state = await getProcessingState(id);

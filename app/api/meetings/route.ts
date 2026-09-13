@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { loadMeetings } from "@/lib/meetings-store";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 import type { Meeting } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ const createMeetingSchema = z.object({
 });
 
 export async function GET() {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const readinessError = requireProductionPersistence(Boolean(getServerSupabase()));
   if (readinessError) return readinessError;
@@ -36,7 +36,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   try {
     const input = createMeetingSchema.parse(await request.json());
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     const readinessError = requireProductionPersistence(Boolean(client));
     if (readinessError) return readinessError;
     if (!client) return NextResponse.json({ meeting, persisted: false });
-    const userId = await resolveDemoUserId(client, { createIfMissing: true });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("No Supabase user is available.");
     if (input.contact) {
       const { error } = await client.from("contacts").insert({ id: contactId, user_id: userId, name: input.contact.name, company: input.contact.company || null, email: input.contact.email || null, phone: input.contact.phone || null });

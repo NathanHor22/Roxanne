@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   authEnforcementMode,
   isLanternDevicePath,
-  isOwnerEmail,
   isPublicAuthPath,
   sanitizeAuthReturnTo,
 } from "../lib/auth-policy";
@@ -40,12 +39,6 @@ test("auth is enabled when both Supabase public values exist", () => {
   );
 });
 
-test("owner email comparison is trimmed and case insensitive", () => {
-  assert.equal(isOwnerEmail(" NathanHor2001@gmail.com ", "nathanhor2001@gmail.com"), true);
-  assert.equal(isOwnerEmail("someone@example.com", "nathanhor2001@gmail.com"), false);
-  assert.equal(isOwnerEmail(undefined, "nathanhor2001@gmail.com"), false);
-});
-
 test("OAuth return path accepts only same-origin relative paths", () => {
   assert.equal(sanitizeAuthReturnTo("/people?view=active#top"), "/people?view=active#top");
   assert.equal(sanitizeAuthReturnTo("https://attacker.invalid"), "/dashboard");
@@ -53,8 +46,11 @@ test("OAuth return path accepts only same-origin relative paths", () => {
   assert.equal(sanitizeAuthReturnTo(undefined), "/dashboard");
 });
 
-test("only login, auth callback and logout are public auth endpoints", () => {
+test("homepage, legal pages, login, auth callback and logout are public", () => {
+  assert.equal(isPublicAuthPath("/"), true);
   assert.equal(isPublicAuthPath("/login"), true);
+  assert.equal(isPublicAuthPath("/privacy"), true);
+  assert.equal(isPublicAuthPath("/terms"), true);
   assert.equal(isPublicAuthPath("/auth/callback"), true);
   assert.equal(isPublicAuthPath("/api/auth/logout"), true);
   assert.equal(isPublicAuthPath("/api/agora/token"), false);

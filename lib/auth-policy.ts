@@ -24,14 +24,6 @@ export function authEnforcementMode({
   return "disabled";
 }
 
-export function isOwnerEmail(
-  actualEmail: string | null | undefined,
-  ownerEmail: string | null | undefined,
-): boolean {
-  if (!actualEmail || !ownerEmail) return false;
-  return actualEmail.trim().toLowerCase() === ownerEmail.trim().toLowerCase();
-}
-
 /** Prevent OAuth callbacks from becoming open redirects. */
 export function sanitizeAuthReturnTo(value: string | null | undefined): string {
   if (!value || !value.startsWith("/") || value.startsWith("//"))
@@ -48,7 +40,10 @@ export function sanitizeAuthReturnTo(value: string | null | undefined): string {
 
 export function isPublicAuthPath(pathname: string): boolean {
   return (
+    pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
     pathname === "/auth/callback" ||
     pathname === "/api/auth/logout"
   );

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { env } from "@/lib/env";
 import {
   exchangeGoogleAuthorizationCode,
@@ -12,7 +12,7 @@ import {
 } from "@/lib/providers/google-calendar";
 import {
   getServerSupabase,
-  resolveDemoUserId,
+  resolveWorkspaceUserId,
 } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ function resultRedirect(
 }
 
 export async function GET(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const readinessError = requireProductionPersistence(
     Boolean(getServerSupabase()),
@@ -65,9 +65,7 @@ export async function GET(request: Request) {
 
     const client = getServerSupabase();
     if (!client) return resultRedirect(request, returnTo, "error");
-    const resolvedUserId = await resolveDemoUserId(client, {
-      createIfMissing: false,
-    });
+    const resolvedUserId = await resolveWorkspaceUserId(client);
     if (!resolvedUserId || resolvedUserId !== state.userId) {
       return resultRedirect(request, returnTo, "error");
     }

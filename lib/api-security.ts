@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { authEnforcementMode, isOwnerEmail } from "@/lib/auth-policy";
+import { authEnforcementMode } from "@/lib/auth-policy";
 
 function noStoreError(message: string, status: number): NextResponse {
   return NextResponse.json(
@@ -17,15 +17,13 @@ function noStoreError(message: string, status: number): NextResponse {
 }
 
 /**
- * Defense-in-depth owner check for privileged Route Handlers.
+ * Defense-in-depth user check for privileged Route Handlers.
  *
  * Middleware remains the first boundary, but service-role routes must not rely
  * on path matching alone. Credential-free access is retained only when both
  * public Supabase values are absent in local development.
  */
-export async function requireOwnerSession(): Promise<NextResponse | null> {
-  if (process.env.DEMO_ACCESS_MODE === "public") return null;
-
+export async function requireAuthenticatedSession(): Promise<NextResponse | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
   const mode = authEnforcementMode({
@@ -44,23 +42,10 @@ export async function requireOwnerSession(): Promise<NextResponse | null> {
 
   // Keep the server-only session helper out of credential-free Node tests; a
   // configured deployment loads it only after the fail-closed mode check.
-  const { createSessionSupabase } = await import("@/lib/supabase/session");
-  const supabase = await createSessionSupabase();
-  if (!supabase) {
-    return noStoreError("Lantern authentication is unavailable.", 503);
-  }
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) {
+  const { getAuthenticatedLanternUser } = await import("@/lib/supabase/session");
+  const user = await getAuthenticatedLanternUser();
+  if (!user) {
     return noStoreError("Authentication required.", 401);
-  }
-
-  const ownerEmail = process.env.DEMO_USER_EMAIL || "nathanhor2001@gmail.com";
-  if (!isOwnerEmail(user.email, ownerEmail)) {
-    await supabase.auth.signOut();
-    return noStoreError("This account is not authorized for Lantern.", 403);
   }
   return null;
 }

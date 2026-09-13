@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { updateRelayMatchStatus } from "@/lib/relay-store";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   try {
     const { id } = await context.params;
@@ -25,9 +25,9 @@ export async function PATCH(
     if (readinessError) return readinessError;
     if (!client)
       return NextResponse.json({ error: "Relay persistence is not configured." }, { status: 503 });
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId)
-      return NextResponse.json({ error: "The Lantern owner is unavailable." }, { status: 503 });
+      return NextResponse.json({ error: "The Lantern workspace is unavailable." }, { status: 503 });
     const match = await updateRelayMatchStatus(client, userId, id, input.status);
     if (!match)
       return NextResponse.json({ error: "Relay proposal not found." }, { status: 404 });

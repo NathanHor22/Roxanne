@@ -6,12 +6,12 @@ import {
   hashLanternSecret,
 } from "@/lib/lantern-device-auth";
 import {
-  requireOwnerSession,
+  requireAuthenticatedSession,
   requireProductionPersistence,
 } from "@/lib/api-security";
 import {
   getServerSupabase,
-  resolveDemoUserId,
+  resolveWorkspaceUserId,
 } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ const requestSchema = z
   .strict();
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         { status: 503, headers: { "cache-control": "no-store" } },
       );
     }
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("The Lantern workspace is unavailable.");
 
     const code = createPairingCode();

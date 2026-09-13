@@ -1,4 +1,4 @@
-import { requireOwnerSession } from "@/lib/api-security";
+import { requireAuthenticatedSession } from "@/lib/api-security";
 import {
   parseWhatsAppStatus,
   requestWhatsAppRelay,
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   try {
     const status = parseWhatsAppStatus(await requestWhatsAppRelay("/status"));

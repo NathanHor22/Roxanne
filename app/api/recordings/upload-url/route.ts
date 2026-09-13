@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import {
   MAX_AUDIO_BYTES,
   normalizeAudioContentType,
   safeAudioExtension,
 } from "@/lib/audio-upload";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ const requestSchema = z.object({
 }).strict();
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   try {
     const input = requestSchema.parse(await request.json());
@@ -38,8 +38,8 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    const userId = await resolveDemoUserId(client, { createIfMissing: true });
-    if (!userId) throw new Error("No Lantern owner is available.");
+    const userId = await resolveWorkspaceUserId(client);
+    if (!userId) throw new Error("No authenticated Lantern user is available.");
 
     const contentType = normalizeAudioContentType(input.fileName, input.contentType);
     if (!contentType) {

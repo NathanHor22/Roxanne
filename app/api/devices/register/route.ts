@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,7 @@ const registerDeviceSchema = z
   .strict();
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   try {
     const input = registerDeviceSchema.parse(await request.json());
     if (!client) throw new Error("Supabase is unavailable.");
-    const userId = await resolveDemoUserId(client, { createIfMissing: true });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("The Lantern workspace is unavailable.");
 
     const now = new Date().toISOString();

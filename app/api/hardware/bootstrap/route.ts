@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { RtcRole, RtcTokenBuilder } from "agora-token";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { env } from "@/lib/env";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,7 @@ const bootstrapSchema = z
   .strict();
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const input = bootstrapSchema.parse(await request.json());
     if (!client) throw new Error("Supabase is unavailable.");
-    const userId = await resolveDemoUserId(client, { createIfMissing: true });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("The Lantern workspace is unavailable.");
 
     const { data: device, error: deviceError } = await client

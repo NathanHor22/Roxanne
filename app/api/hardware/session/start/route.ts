@@ -5,10 +5,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { buildHardwareRtcCredentials, startHardwareVoiceAgent } from "@/lib/agora-conversation";
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { env } from "@/lib/env";
 import { getRedis } from "@/lib/redis";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,7 +19,7 @@ const requestSchema = z.object({
 }).strict();
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(Boolean(client), "Supabase is required for hardware voice sessions.");
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const input = requestSchema.parse(await request.json());
     if (!client) throw new Error("Supabase is unavailable.");
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("The Lantern workspace is unavailable.");
     const { data: device, error } = await client
       .from("devices")

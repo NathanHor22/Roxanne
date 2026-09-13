@@ -38,8 +38,9 @@ flowchart TD
 
 The calendar provides month and agenda views. Conversations and People provide
 other ways to reach the same context. Settings exposes the Google connection
-and sample/live workspace switch. Lantern provides an interactive simulator in
-sample mode and pairing, revocation, and telemetry in live mode.
+and a route into the authenticated workspace. Lantern provides an interactive
+simulator on the public sample and pairing, revocation, and telemetry in live
+mode.
 
 ## Provider and application boundaries
 
@@ -56,7 +57,7 @@ sample mode and pairing, revocation, and telemetry in live mode.
 | Original-audio replay | Conversation brief, `recordingId`, and `recordingUrl` | Plays the private archived recording; transcript-only conversations have no replay audio. |
 | Cross-conversation matching | `lib/providers/openai-relay.ts`, `/api/relay/matches` | Sends a bounded evidence DTO without contact emails to OpenAI Responses, requires strict structured output, and rejects unknown identities, non-exact evidence, duplicate pairs, and scores below 70. |
 | Public company context | `lib/providers/exa.ts` | Optionally searches Exa using company names only; provider failure leaves matching available without public sources. |
-| Relay persistence | `lib/relay-store.ts`, migration 006 | Stores owner-scoped proposal snapshots and preserves dismissed or scheduled state across repeated model runs. |
+| Relay persistence | `lib/relay-store.ts`, migration 006 | Stores user-scoped proposal snapshots and preserves dismissed or scheduled state across repeated model runs. |
 | Relay execution | `/api/actions/calendar` | Revalidates the saved pair, exact attendee emails, source conversation, and explicit approval before Calendar execution marks the proposal scheduled. |
 | Persistence | `lib/persistence.ts`, `lib/meetings-store.ts` | Writes the existing Supabase model and reconstructs the dashboard's conversation/event relationships. |
 | Approval model | `lib/workspace/model.ts` | Derives approvals from schedule follow-ups and validates required scheduling details. |
@@ -372,7 +373,7 @@ state. Automatic retention and chunk assembly are not implemented here.
 
 ## Sample and live adapters
 
-`/dashboard?mode=sample` loads fictional records whose IDs start with `sample:`.
+The public `/` route loads fictional records whose IDs start with `sample:`.
 The preview stores changes under `lantern:sample-workspace:v1` in browser
 storage. Sample approval creates a local calendar entry linked to its sample
 conversation; it does not call OpenAI, Agora, Google, or live mutation endpoints.
@@ -380,11 +381,10 @@ Reset replaces only the sample workspace. Browser-storage failures leave the
 preview usable in memory.
 
 Live mode loads Supabase data and invokes authenticated application APIs.
-Switching modes clears the currently displayed dataset; sample state is not
-merged into live state. The explicit sample URL skips the live-data fetch in
-the workspace hook. App authentication still runs according to deployment
-configuration. The sample preview is not evidence that live providers or a
-wearable have been connected.
+It is available only from `/dashboard` after Google authentication. The public
+sample never performs the live-data fetch, and sample state is not merged into
+live state. The sample preview is not evidence that live providers or a wearable
+have been connected.
 
 ## Setup and remaining work
 

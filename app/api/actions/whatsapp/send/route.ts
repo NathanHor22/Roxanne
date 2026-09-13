@@ -4,9 +4,9 @@ import { type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { env } from "@/lib/env";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -90,7 +90,7 @@ async function markFollowUpCompleted(
 }
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     let databaseMeetingId: string | null = null;
     let databaseFollowUpId: string | null = null;
     if (client) {
-      userId = await resolveDemoUserId(client, { createIfMissing: true });
+      userId = await resolveWorkspaceUserId(client);
       if (userId) {
         databaseMeetingId = await resolveOwnedMeeting(client, userId, input.meetingId);
         const ownedFollowUp = await resolveOwnedFollowUp(client, userId, input.followUpId);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { RtcRole, RtcTokenBuilder } from "agora-token";
 import { z } from "zod";
-import { requireOwnerSession } from "@/lib/api-security";
+import { requireAuthenticatedSession } from "@/lib/api-security";
 import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ const tokenRequestSchema = z.object({
 }).strict();
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   try {
     const { channel, uid } = tokenRequestSchema.parse(await request.json());

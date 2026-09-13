@@ -1,4 +1,4 @@
-import { requireOwnerSession } from "@/lib/api-security";
+import { requireAuthenticatedSession } from "@/lib/api-security";
 import {
   playbackJson,
   recordingIdSchema,
@@ -12,14 +12,14 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const id = recordingIdSchema.safeParse((await context.params).id);
   if (!id.success)
     return playbackJson({ error: "A valid recording ID is required." }, 400);
 
   try {
-    const { getServerSupabase, resolveDemoUserId } = await import(
+    const { getServerSupabase, resolveWorkspaceUserId } = await import(
       "@/lib/supabase/server"
     );
     const client = getServerSupabase();
@@ -28,7 +28,7 @@ export async function GET(
         { error: "Private recording storage is not configured." },
         503,
       );
-    const ownerId = await resolveDemoUserId(client, { createIfMissing: false });
+    const ownerId = await resolveWorkspaceUserId(client);
     if (!ownerId)
       return playbackJson(
         { error: "No original audio is available for this conversation." },

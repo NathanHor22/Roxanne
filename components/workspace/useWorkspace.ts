@@ -16,8 +16,8 @@ import {
   SAMPLE_STORAGE_KEY,
 } from "@/lib/workspace/sample";
 
-export function useWorkspace() {
-  const [mode, setMode] = useState<WorkspaceMode>("live");
+export function useWorkspace(initialMode: WorkspaceMode) {
+  const [mode, setMode] = useState<WorkspaceMode>(initialMode);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,13 +105,12 @@ export function useWorkspace() {
   );
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("mode") === "sample")
-      loadSample();
+    if (initialMode === "sample") loadSample();
     else void loadLive(true);
     return () => {
       generation.current++;
     };
-  }, [loadLive, loadSample]);
+  }, [initialMode, loadLive, loadSample]);
 
   useEffect(() => {
     if (mode !== "live" || loading) return;

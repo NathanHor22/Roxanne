@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { stopHardwareVoiceAgent } from "@/lib/agora-conversation";
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
 import { normalizeAgoraTranscript } from "@/lib/hardware-transcript";
 import { parseLocale } from "@/lib/i18n";
 import { transcriptionResultSchema } from "@/lib/meeting-schema";
 import { persistProcessedMeeting } from "@/lib/persistence";
 import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { getRedis, rememberPerson, rememberSession, setProcessingState } from "@/lib/redis";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 import type { Contact, FollowUp, Meeting } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -32,7 +32,7 @@ interface SessionMetadata {
 }
 
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(Boolean(client), "Supabase is required for hardware processing.");
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 250_000) return NextResponse.json({ error: "Hardware transcript is too large." }, { status: 413 });
     if (!client) throw new Error("Supabase is unavailable.");
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("The Lantern workspace is unavailable.");
     const { data: device } = await client.from("devices").select("id,name").eq("id", input.deviceId).eq("user_id", userId).maybeSingle();
     if (!device) return NextResponse.json({ error: "Unknown hardware device." }, { status: 404 });
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     }));
     const meeting: Meeting = {
       id: clientReference,
-      title: contacts[0] ? `${contacts[0].name}${contacts[0].company ? ` · ${contacts[0].company}` : ""}` : `${device.name} conversation`,
+      title: contacts[0] ? `${contacts[0].name}${contacts[0].company ? ` Â· ${contacts[0].company}` : ""}` : `${device.name} conversation`,
       startAt: startedAt,
       endAt,
       status: "ready",

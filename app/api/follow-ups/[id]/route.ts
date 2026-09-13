@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireOwnerSession, requireProductionPersistence } from "@/lib/api-security";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 import {
   localFollowUpPatchResult,
   parseFollowUpPatch,
@@ -22,7 +22,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   try {
     const params = await context.params;
@@ -41,7 +41,7 @@ export async function PATCH(
       return json(localFollowUpPatchResult(id, status || "pending"));
     }
 
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) {
       return json({ error: "The follow-up could not be found." }, { status: 404 });
     }

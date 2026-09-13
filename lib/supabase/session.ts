@@ -3,6 +3,12 @@ import "server-only";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+export type AuthenticatedLanternUser = {
+  id: string;
+  email: string | null;
+  displayName: string | null;
+};
+
 export function publicSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
@@ -38,4 +44,29 @@ export async function createSessionSupabase() {
       },
     },
   });
+}
+
+/** Returns the Google-backed user represented by the current request cookies. */
+export async function getAuthenticatedLanternUser(): Promise<AuthenticatedLanternUser | null> {
+  const supabase = await createSessionSupabase();
+  if (!supabase) return null;
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) return null;
+
+  const rawName =
+    typeof user.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name
+      : typeof user.user_metadata?.name === "string"
+        ? user.user_metadata.name
+        : "";
+
+  return {
+    id: user.id,
+    email: user.email?.trim().toLowerCase() || null,
+    displayName: rawName.trim() || null,
+  };
 }

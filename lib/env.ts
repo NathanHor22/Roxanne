@@ -28,7 +28,6 @@ const serverEnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: optionalUrl,
-  GOOGLE_REFRESH_TOKEN: z.string().optional(),
   GOOGLE_CALENDAR_ID: z.string().default("primary"),
   WHATSAPP_RELAY_URL: optionalUrl,
   WHATSAPP_RELAY_TOKEN: z.string().optional(),
@@ -48,9 +47,6 @@ const serverEnvSchema = z.object({
   KV_REST_API_TOKEN: z.string().optional(),
   APP_TIMEZONE: z.string().default("Asia/Kuala_Lumpur"),
   ACTION_APPROVAL_SECRET: z.string().optional(),
-  DEMO_USER_EMAIL: z.string().email().default("nathanhor2001@gmail.com"),
-  DEMO_USER_ID: z.preprocess((value) => value === "" ? undefined : value, z.string().uuid().optional()),
-  DEMO_ACCESS_MODE: z.enum(["owner", "public"]).default("owner"),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -73,7 +69,9 @@ export function integrationStatus() {
     supabase: Boolean(value.NEXT_PUBLIC_SUPABASE_URL && value.SUPABASE_SERVICE_ROLE_KEY),
     openai: Boolean(value.OPENAI_API_KEY),
     exa: Boolean(value.EXA_API_KEY),
-    google: Boolean(value.GOOGLE_CLIENT_ID && value.GOOGLE_CLIENT_SECRET && value.GOOGLE_REFRESH_TOKEN),
+    // Calendar is connected per user. /api/integrations changes this to true
+    // only when the signed-in user has a saved provider connection.
+    google: false as boolean,
     agora: Boolean(
       value.NEXT_PUBLIC_AGORA_APP_ID &&
       value.AGORA_APP_CERTIFICATE &&

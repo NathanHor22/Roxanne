@@ -508,11 +508,11 @@ export function LanternDevicePanel({
           </li>
           <li>
             <span>2</span>
-            <div><strong>Join Lantern-XXXX</strong><p>On your phone, use the setup password <code>lanternsetup</code>.</p></div>
+            <div><strong>Join Lantern-XXXX</strong><p>Use a second phone or laptop and the setup password <code>lanternsetup</code>.</p></div>
           </li>
           <li>
             <span>3</span>
-            <div><strong>Open 192.168.4.1</strong><p>Enter your hotspot name, password, and the Lantern pairing code.</p></div>
+            <div><strong>Open 192.168.4.1</strong><p>Enter a 2.4 GHz hotspot name, password, and the Lantern pairing code.</p></div>
           </li>
           <li>
             <span>4</span>
@@ -520,8 +520,9 @@ export function LanternDevicePanel({
           </li>
         </ol>
         <p className={styles.setupPrivacy}>
-          Your Wi-Fi password stays on the device. Agora, OpenAI, Google, and Gmail
-          credentials stay in the Lantern server environment.
+          Keep the target hotspot switched on while you configure from the second
+          device. Your Wi-Fi password stays on the Lantern. Agora, OpenAI, Google,
+          and Gmail credentials stay in the server environment.
         </p>
       </section>
 

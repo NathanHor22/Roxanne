@@ -16,7 +16,6 @@ type LoginPageProps = {
 
 const messages: Record<string, string> = {
   oauth: "Google sign-in did not complete. Please try again.",
-  unauthorized: "That Google account is not authorized for this workspace.",
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -53,7 +52,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <p className={styles.cardKicker}>WELCOME BACK</p>
           <h2 id="login-title">Sign in to your Lantern.</h2>
           <p className={styles.description}>
-            Continue with the Google account assigned to this workspace.
+            Continue with any Google account. Each account receives its own
+            private Lantern workspace.
           </p>
 
           {message ? <p className={styles.notice} role="alert">{message}</p> : null}
@@ -69,7 +69,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           )}
 
           <p className={styles.footnote}>
-            Access is restricted to the account configured for this deployment.
+            Conversations, devices, and Calendar access stay tied to the account
+            you choose.
+          </p>
+          <p className={styles.footnote}>
+            <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link>
           </p>
         </section>
       </div>

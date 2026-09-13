@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   authEnforcementMode,
   isLanternDevicePath,
-  isOwnerEmail,
   isPublicAuthPath,
 } from "@/lib/auth-policy";
 
@@ -35,34 +34,7 @@ function unauthenticatedResponse(
   return copyCookies(refreshedResponse, NextResponse.redirect(loginUrl));
 }
 
-function forbiddenResponse(
-  request: NextRequest,
-  refreshedResponse: NextResponse,
-): NextResponse {
-  if (request.nextUrl.pathname.startsWith("/api/")) {
-    return copyCookies(
-      refreshedResponse,
-      NextResponse.json(
-        { error: "This account is not authorized for Lantern." },
-        { status: 403 },
-      ),
-    );
-  }
-
-  const loginUrl = request.nextUrl.clone();
-  loginUrl.pathname = "/login";
-  loginUrl.search = "?error=unauthorized";
-  return copyCookies(refreshedResponse, NextResponse.redirect(loginUrl));
-}
-
 export async function proxy(request: NextRequest) {
-  if (process.env.DEMO_ACCESS_MODE === "public") {
-    if (request.nextUrl.pathname === "/login") {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-    return NextResponse.next({ request });
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const mode = authEnforcementMode({
@@ -119,14 +91,6 @@ export async function proxy(request: NextRequest) {
     return isPublicPath
       ? response
       : unauthenticatedResponse(request, response);
-  }
-
-  const ownerEmail = process.env.DEMO_USER_EMAIL || "nathanhor2001@gmail.com";
-  if (!isOwnerEmail(user.email, ownerEmail)) {
-    await supabase.auth.signOut();
-    return isPublicPath
-      ? response
-      : forbiddenResponse(request, response);
   }
 
   if (request.nextUrl.pathname === "/login") {

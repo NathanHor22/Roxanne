@@ -12,7 +12,13 @@ const integrations = [
   { id: "google", label: "Google Calendar", icon: CalendarDays },
 ] as const;
 
-export function SettingsView({ status }: { status: Record<string, boolean> }) {
+export function SettingsView({
+  status,
+  accountEmail,
+}: {
+  status: Record<string, boolean>;
+  accountEmail?: string | null;
+}) {
   const { dict } = useLanguage();
 
   return (
@@ -74,7 +80,7 @@ export function SettingsView({ status }: { status: Record<string, boolean> }) {
             <h2>{dict.settings.account}</h2>
             <p>{dict.settings.accountHint}</p>
           </div>
-          <strong>nathanhor2001@gmail.com</strong>
+          <strong>{accountEmail || "Signed-in Google account"}</strong>
         </section>
       </div>
     </section>

@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-  requireOwnerSession,
+  requireAuthenticatedSession,
   requireProductionPersistence,
 } from "@/lib/api-security";
 import {
   getServerSupabase,
-  resolveDemoUserId,
+  resolveWorkspaceUserId,
 } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -19,7 +19,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
@@ -32,7 +32,7 @@ export async function PATCH(
     const { id } = paramsSchema.parse(await context.params);
     requestSchema.parse(await request.json());
     if (!client) throw new Error("Lantern storage is unavailable.");
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("The Lantern workspace is unavailable.");
     const now = new Date().toISOString();
     const { data, error } = await client

@@ -37,6 +37,7 @@ import {
   isConversation,
   missingApprovalDetails,
   type MeetingApproval,
+  type WorkspaceMode,
 } from "@/lib/workspace/model";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { LanternMark } from "@/components/brand/LanternMark";
@@ -68,10 +69,11 @@ export type WorkspaceAccount = {
 
 type WorkspaceProps = {
   account: WorkspaceAccount | null;
+  initialMode: WorkspaceMode;
 };
 
-export function Workspace({ account }: WorkspaceProps) {
-  const workspace = useWorkspace();
+export function Workspace({ account, initialMode }: WorkspaceProps) {
+  const workspace = useWorkspace(initialMode);
   const { meetings, mode, loading, error, notice, working, integrations } =
     workspace;
   const [view, setView] = useState<View>("calendar");
@@ -184,17 +186,10 @@ export function Workspace({ account }: WorkspaceProps) {
     return created;
   };
   const openConversation = (id: string) => setSelectedId(id);
-  const switchMode = () => {
-    setSelectedId(null);
-    setEditing(null);
-    setPersonId(null);
-    mode === "sample" ? void workspace.loadLive() : workspace.loadSample();
-  };
-
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
-        <a href="/dashboard" className={styles.brand} aria-label="Lantern home">
+        <a href="/" className={styles.brand} aria-label="Lantern home">
           <span className={styles.brandMark}>
             <LanternMark />
           </span>
@@ -285,14 +280,20 @@ export function Workspace({ account }: WorkspaceProps) {
           </div>
           <div className={styles.topbarRight}>
             <span className={styles.timezone}>Kuala Lumpur · MYT</span>
-            <button
-              className={styles.modeButton}
-              disabled={Boolean(working)}
-              onClick={switchMode}
-            >
-              {mode === "sample" ? "Sample workspace" : "Live workspace"}
-              <ChevronRight />
-            </button>
+            {mode === "sample" ? (
+              <Link
+                className={styles.modeButton}
+                href={account ? "/dashboard" : "/login?next=/dashboard"}
+              >
+                Open live workspace
+                <ChevronRight />
+              </Link>
+            ) : (
+              <span className={styles.modeButton}>
+                Live workspace
+                <ShieldCheck />
+              </span>
+            )}
             <div className={styles.authControls} aria-label="Account access">
               {account ? (
                 <>
@@ -379,8 +380,8 @@ export function Workspace({ account }: WorkspaceProps) {
             <div className={styles.sampleBanner}>
               <Sparkles />
               <span>
-                You’re exploring sample conversations. Approvals stay in this
-                browser.
+                You&apos;re exploring Lantern&apos;s public sample. Approvals stay in
+                this browser and nothing is sent.
               </span>
               <button
                 disabled={Boolean(working)}
@@ -1140,13 +1141,12 @@ export function Workspace({ account }: WorkspaceProps) {
                         <ArrowUpRight />
                       </a>
                     ) : (
-                      <button
+                      <Link
                         className={styles.secondaryButton}
-                        disabled={Boolean(working)}
-                        onClick={() => void workspace.loadLive()}
+                        href={account ? "/dashboard" : "/login?next=/dashboard"}
                       >
                         Open your live workspace <ArrowRight />
-                      </button>
+                      </Link>
                     )}
                   </section>
                   <section className={styles.settingsCard}>
@@ -1193,16 +1193,18 @@ export function Workspace({ account }: WorkspaceProps) {
                         ? "Explore the full approval and recap flow with sample client conversations."
                         : "Your recordings, recaps, and approvals belong to your personal workspace."}
                     </p>
-                    <button
-                      className={styles.secondaryButton}
-                      onClick={switchMode}
-                      disabled={Boolean(working)}
-                    >
-                      {mode === "sample"
-                        ? "Open live workspace"
-                        : "Explore sample workspace"}
-                      <ArrowRight />
-                    </button>
+                    {mode === "sample" ? (
+                      <Link
+                        className={styles.secondaryButton}
+                        href={account ? "/dashboard" : "/login?next=/dashboard"}
+                      >
+                        Open live workspace <ArrowRight />
+                      </Link>
+                    ) : (
+                      <span className={styles.connectionState}>
+                        <i className={styles.greenDot} /> Live workspace active
+                      </span>
+                    )}
                     {mode === "sample" && (
                       <button
                         className={styles.textButton}
@@ -1291,7 +1293,11 @@ export function Workspace({ account }: WorkspaceProps) {
             <span className={styles.footerBrand}>
               Lantern<span> · Conversation intelligence</span>
             </span>
-            <span>Listen. Understand. Follow through.</span>
+            <span className={styles.footerLinks}>
+              <Link href="/privacy">Privacy</Link>
+              <Link href="/terms">Terms</Link>
+              <span>Listen. Understand. Follow through.</span>
+            </span>
           </footer>
         </div>
       </main>

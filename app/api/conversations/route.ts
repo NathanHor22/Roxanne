@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOwnerSession } from "@/lib/api-security";
-import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
+import { requireAuthenticatedSession } from "@/lib/api-security";
+import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 import { conversationInputSchema } from "@/lib/workspace/model";
 import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { persistProcessedMeeting } from "@/lib/persistence";
@@ -14,7 +14,7 @@ export const maxDuration = 120;
 /** Completed transcript boundary. Future device gateways authenticate separately
  * and normalize Agora segments into this contract. No device auth bypass here. */
 export async function POST(request: Request) {
-  const authError = await requireOwnerSession();
+  const authError = await requireAuthenticatedSession();
   if (authError) return authError;
   const client = getServerSupabase();
   if (!client)
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         { error: "Sample conversations stay in the sample workspace." },
         { status: 400 },
       );
-    const userId = await resolveDemoUserId(client, { createIfMissing: false });
+    const userId = await resolveWorkspaceUserId(client);
     if (!userId)
       return NextResponse.json(
         { error: "Your workspace could not be found." },
