@@ -456,7 +456,23 @@ static esp_err_t start_setup_portal(void) {
   ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
 
   httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
-  ESP_RETURN_ON_ERROR(httpd_start(&s_server, &server_config), TAG, "setup server");
+  // The setup AP accepts at most two clients. Keeping HTTPD's default seven
+  // sessions leaves no spare lwIP descriptors on this build once its three
+  // internal sockets are allocated.
+  server_config.max_open_sockets = 2;
+  server_config.max_uri_handlers = 4;
+  server_config.stack_size = 3072;
+  server_config.lru_purge_enable = true;
+  ESP_LOGI(TAG, "starting setup server; internal_free=%u largest_internal=%u",
+    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+  esp_err_t server_result = httpd_start(&s_server, &server_config);
+  if (server_result != ESP_OK) {
+    s_server = NULL;
+    ESP_LOGE(TAG, "setup server failed: %s (0x%x)",
+      esp_err_to_name(server_result), (unsigned)server_result);
+    return server_result;
+  }
   const httpd_uri_t root = { .uri = "/", .method = HTTP_GET, .handler = setup_page };
   const httpd_uri_t save = { .uri = "/configure", .method = HTTP_POST, .handler = configure };
   const httpd_uri_t audio = { .uri = "/audio.wav", .method = HTTP_GET, .handler = audio_download };
@@ -526,7 +542,9 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
   ESP_ERROR_CHECK(esp_wifi_init(&init));
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event, NULL));
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event, NULL));
-  if (lantern_storage_has_wifi(config)) {
+  bool has_wifi = lantern_storage_has_wifi(config);
+  esp_err_t portal_result = ESP_OK;
+  if (has_wifi) {
     wifi_config_t station = {0};
     size_t ssid_length = strnlen(config->wifi_ssid, sizeof(station.sta.ssid));
     size_t password_length = strnlen(config->wifi_password, sizeof(station.sta.password));
@@ -537,10 +555,16 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &station));
   } else {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    // Reserve the HTTP task before esp_wifi_start consumes the remaining
+    // internal-memory blocks. The listener can bind before the AP comes up.
+    portal_result = start_setup_portal();
   }
   ESP_ERROR_CHECK(esp_wifi_start());
   esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
-  xTaskCreate(connection_task, "lantern_connect", 8192, NULL, 5, NULL);
+  if (portal_result != ESP_OK) return portal_result;
+  if (has_wifi && xTaskCreate(connection_task, "lantern_connect", 4096, NULL, 5, NULL) != pdPASS) {
+    return ESP_ERR_NO_MEM;
+  }
   return ESP_OK;
 }
 
