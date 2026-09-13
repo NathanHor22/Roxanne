@@ -8,6 +8,11 @@ import {
   getServerSupabase,
   resolveWorkspaceUserId,
 } from "@/lib/supabase/server";
+import {
+  isLanternSchemaOutdated,
+  LANTERN_SCHEMA_OUTDATED,
+  lanternSchemaUpgradeMessage,
+} from "@/lib/supabase/lantern-schema";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -43,7 +48,7 @@ export async function GET() {
       .eq("user_id", userId)
       .is("revoked_at", null)
       .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
+    if (error) throw error;
 
     return NextResponse.json(
       { devices: data || [], source: "supabase" },
@@ -51,14 +56,21 @@ export async function GET() {
     );
   } catch (error) {
     console.error("[devices]", error);
+    const schemaOutdated = isLanternSchemaOutdated(error);
     return NextResponse.json(
       {
+        ...(schemaOutdated ? { code: LANTERN_SCHEMA_OUTDATED } : {}),
         error:
-          error instanceof Error
+          schemaOutdated
+            ? lanternSchemaUpgradeMessage
+            : error instanceof Error
             ? error.message
             : "Lantern devices could not be loaded.",
       },
-      { status: 500, headers: { "cache-control": "no-store" } },
+      {
+        status: schemaOutdated ? 503 : 500,
+        headers: { "cache-control": "no-store" },
+      },
     );
   }
 }

@@ -139,4 +139,6 @@ using (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
+notify pgrst, 'reload schema';
+
 commit;

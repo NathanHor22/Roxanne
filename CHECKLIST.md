@@ -9,8 +9,8 @@ until it has been exercised with real credentials.
 ## Phase 1 — Foundation and safety
 
 - [x] Next.js application and persistent Baileys worker are separate services.
-- [x] Owner-only Google Auth is implemented and fails closed when production
-      credentials are incomplete.
+- [x] Google Auth gives every authenticated account an isolated workspace and
+      fails closed when production credentials are incomplete.
 - [ ] Change the deployed `DEMO_ACCESS_MODE` from `public` to `owner` after the
       Lantern build and Supabase redirect allowlist are deployed.
 - [x] WhatsApp pairing and sends are restricted to `601154444038`.
@@ -20,8 +20,8 @@ until it has been exercised with real credentials.
 Reviewer check:
 
 - Open `/dashboard` signed out and confirm Lantern redirects to `/login`.
-- Sign in with the configured owner Google account and confirm the dashboard
-  opens; confirm a different Google account is rejected.
+- Sign in with two Google accounts and confirm each dashboard opens with an
+  isolated workspace.
 - Use **Settings > Access & privacy > Sign out** and confirm the session closes.
 
 ## Phase 2 — Product experience
@@ -122,8 +122,8 @@ npm.cmd run check
 - [x] Remote migrations `001_initial.sql` and `002_worker_hardening.sql` applied;
       14 tables, 12 public RLS policies, and the private recording bucket verified.
 - [ ] Apply migrations `003_meeting_approvals.sql`,
-      `004_lantern_devices.sql`, `005_lantern_recording_pipeline.sql`, and
-      `006_lantern_relay.sql`.
+      `004_lantern_devices.sql`, `005_lantern_recording_pipeline.sql`,
+      `006_lantern_relay.sql`, and `007_multi_user_workspaces.sql`.
 - [x] Supabase Google Auth is enabled and email/password signup is disabled.
 - [ ] Add the Supabase and Lantern callback URLs to the Google Cloud OAuth client.
 - [x] Remove Qwen, Groq, Redis/KV, and WhatsApp variables from Vercel; they are
@@ -145,7 +145,7 @@ Release record:
 - Git branch: `origin/main`
 - Vercel URL: `https://roxanne-two.vercel.app` (live)
 - Supabase project ref: `cjogfunwcwytvooycjzv` (base schema applied;
-  migrations 003 through 006 pending)
+  migrations 003 through 007 pending)
 - Infrastructure verified: 23 August 2026, 14:52 (Asia/Kuala_Lumpur)
 - Registered hardware ID: `561bc32e-df1a-4b00-9f46-ef08cf2df9b9`
 - Golden-path result: pending

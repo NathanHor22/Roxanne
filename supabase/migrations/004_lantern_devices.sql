@@ -361,4 +361,8 @@ grant execute on function public.start_lantern_session(uuid, uuid, uuid, text, t
 grant execute on function public.apply_lantern_transition(uuid, uuid, uuid, bigint, text, bigint, jsonb, uuid, text, timestamptz)
   to service_role;
 
+-- Make newly added device tables, columns, and RPCs visible to PostgREST as
+-- soon as this transaction commits in hosted Supabase.
+notify pgrst, 'reload schema';
+
 commit;

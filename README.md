@@ -65,6 +65,16 @@ profile for every existing Supabase Auth user, and gives each account isolated
 row-level policies for conversations, devices, recordings, Relay proposals,
 and provider connections.
 
+If an existing deployment reports `column devices.model does not exist` or
+cannot find `public.device_pairings` in the schema cache, that database has the
+base schema but not the Lantern device upgrade. In the Supabase dashboard, open
+**SQL Editor**, run migrations 003 through 007 above in numerical order, and
+wait for each query to finish before starting the next one. Migration 004 is
+the pairing boundary; 005 adds the recording pipeline, 006 adds Relay, and 007
+backfills all Google users and replaces the original owner-only policies. The
+migrations explicitly ask PostgREST to reload its schema cache after the device
+and multi-user changes commit.
+
 The live workspace requires `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Every
 successful Supabase Google sign-in creates its own Lantern profile and private

@@ -13,6 +13,11 @@ import {
   getServerSupabase,
   resolveWorkspaceUserId,
 } from "@/lib/supabase/server";
+import {
+  isLanternSchemaOutdated,
+  LANTERN_SCHEMA_OUTDATED,
+  lanternSchemaUpgradeMessage,
+} from "@/lib/supabase/lantern-schema";
 
 export const runtime = "nodejs";
 
@@ -55,7 +60,8 @@ export async function POST(request: Request) {
       })
       .select("id,expires_at")
       .single();
-    if (error || !data) throw new Error(error?.message || "Pairing could not begin.");
+    if (error) throw error;
+    if (!data) throw new Error("Pairing could not begin.");
 
     return NextResponse.json(
       {
@@ -69,17 +75,21 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("[device-pairing]", error);
+    const schemaOutdated = isLanternSchemaOutdated(error);
     return NextResponse.json(
       {
+        ...(schemaOutdated ? { code: LANTERN_SCHEMA_OUTDATED } : {}),
         error:
-          error instanceof z.ZodError
+          schemaOutdated
+            ? lanternSchemaUpgradeMessage
+            : error instanceof z.ZodError
             ? "Lantern pairing details are invalid."
             : error instanceof Error
               ? error.message
               : "Pairing could not begin.",
       },
       {
-        status: error instanceof z.ZodError ? 400 : 500,
+        status: schemaOutdated ? 503 : error instanceof z.ZodError ? 400 : 500,
         headers: { "cache-control": "no-store" },
       },
     );
