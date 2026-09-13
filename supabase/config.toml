@@ -2,7 +2,7 @@ project_id = "roxanne"
 
 [auth]
 enabled = true
-site_url = "https://roxanne-assistant.vercel.app"
+site_url = "https://roxanne-two.vercel.app"
 additional_redirect_urls = [
   "http://localhost:3000/auth/callback",
   "https://roxanne-assistant.vercel.app/auth/callback",

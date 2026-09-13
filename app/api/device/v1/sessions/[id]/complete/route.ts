@@ -10,7 +10,8 @@ import { authenticateLantern, type AuthenticatedLantern } from "@/lib/lantern-de
 import { advanceLantern, lanternMachineSchema, type LanternMachine } from "@/lib/lantern-state";
 import { transcriptionResultSchema } from "@/lib/meeting-schema";
 import { persistProcessedMeeting } from "@/lib/persistence";
-import { extractWithIlmu } from "@/lib/providers/ilmu";
+import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
+import { transcribeWithOpenAI } from "@/lib/providers/openai-transcription";
 import { getServerSupabase } from "@/lib/supabase/server";
 import type { Contact, FollowUp, Meeting } from "@/lib/types";
 
@@ -91,8 +92,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (stored.completion_event_id && stored.completion_event_id !== input.eventId) {
       return response("This session is already being processed.", 409);
     }
-    if (!stored.recording_id || !stored.transcript_segments) {
-      return response("Upload the stopped recording and Agora transcript before processing.", 409);
+    if (!stored.recording_id) {
+      return response("Upload the stopped recording before processing.", 409);
     }
     const { data: recording, error: recordingError } = await client
       .from("recordings")
@@ -120,14 +121,50 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return response(`Lantern cannot process while it is ${initialMachine.state}.`, 409);
     }
 
-    const transcription = transcriptionResultSchema.parse({
-      text: (stored.transcript_segments as { speaker: string; text: string }[])
-        .map((segment) => `${segment.speaker}: ${segment.text}`)
-        .join("\n"),
-      segments: stored.transcript_segments,
-      language: stored.transcript_language || "multilingual",
-      provider: "agora",
-    });
+    const agoraSegments = Array.isArray(stored.transcript_segments)
+      ? stored.transcript_segments
+      : [];
+    const transcription = agoraSegments.length
+      ? transcriptionResultSchema.parse({
+          text: (agoraSegments as { speaker: string; text: string }[])
+            .map((segment) => `${segment.speaker}: ${segment.text}`)
+            .join("\n"),
+          segments: agoraSegments,
+          language: stored.transcript_language || "multilingual",
+          provider: "agora",
+        })
+      : await (async () => {
+          const { data: audio, error: downloadError } = await client.storage
+            .from("recordings")
+            .download(recording.storage_path);
+          if (downloadError || !audio) {
+            throw new Error(
+              `The private Lantern recording could not be read for transcription${
+                downloadError?.message ? `: ${downloadError.message}` : "."
+              }`,
+            );
+          }
+          const result = await transcribeWithOpenAI(audio, {
+            fileName: `${sessionId}.wav`,
+          });
+          const { error: transcriptError } = await client
+            .from("lantern_sessions")
+            .update({
+              transcript_segments: result.segments,
+              transcript_language: result.language,
+              transcript_received_at: new Date().toISOString(),
+              transcript_event_id: randomUUID(),
+              processing_error: null,
+            })
+            .eq("id", sessionId)
+            .eq("device_id", device.id);
+          if (transcriptError) {
+            throw new Error(
+              `Could not save the recovered Lantern transcript: ${transcriptError.message}`,
+            );
+          }
+          return result;
+        })();
     const timezone = stored.conversation_timezone || env().APP_TIMEZONE;
     const startedAt = processingMachine.recordingStartedAt || stored.started_at;
     const clock = conversationClock(startedAt, timezone);
@@ -135,7 +172,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (Date.parse(endedAt) <= Date.parse(clock.startedAt)) {
       endedAt = new Date(Date.parse(clock.startedAt) + 1_000).toISOString();
     }
-    const extraction = await extractWithIlmu(transcription.segments, {
+    const extraction = await extractConversationInsights(transcription.segments, {
       title: `${device.name} conversation`,
       outputLanguage: "English",
       referenceDate: clock.startedAt,
@@ -234,7 +271,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (cause instanceof z.ZodError || cause instanceof SyntaxError) {
       return response("Lantern transcript is invalid.", 400);
     }
-    if (message.startsWith("Ilmu is not configured")) return response(message, 503);
+    if (message.startsWith("OpenAI transcription is not configured")) {
+      return response(message, 503);
+    }
+    if (message.startsWith("OpenAI is not configured")) return response(message, 503);
     return response(message, 502);
   }
 }

@@ -22,7 +22,7 @@ function partsAt(instant: Date, timeZone: string) {
 
 /**
  * Builds an explicit local clock from a server timestamp. The device clock is
- * deliberately not trusted when Ilmu resolves phrases such as "tomorrow".
+ * deliberately not trusted when the extraction model resolves phrases such as "tomorrow".
  */
 export function conversationClock(
   startedAt: string | Date,

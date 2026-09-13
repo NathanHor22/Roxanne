@@ -1169,7 +1169,7 @@ export function translate(
   });
 }
 
-/** Language instruction for Qwen/Devin while keeping structured output stable. */
+/** Language instruction for provider output while keeping structured output stable. */
 export function localeDirective(value: unknown): string {
   const locale = parseLocale(value);
   const languageRule: Record<Locale, string> = {

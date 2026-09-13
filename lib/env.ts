@@ -14,8 +14,13 @@ const serverEnvSchema = z.object({
   QWEN_API_KEY: z.string().optional(),
   QWEN_BASE_URL: optionalUrl,
   QWEN_MODEL: z.string().default("qwen-plus"),
-  ILMU_API_KEY: z.string().optional(),
-  ILMU_MODEL: z.string().default("ilmu-v3.1"),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_TRANSCRIPTION_MODEL: z.string().default("gpt-4o-transcribe-diarize"),
+  OPENAI_EXTRACTION_MODEL: z.string().default("gpt-5.4-mini"),
+  OPENAI_RELAY_MODEL: z.string().default("gpt-5.4-mini"),
+  EXA_API_KEY: z.string().optional(),
+  RELAY_EVENT_NAME: z.string().trim().min(1).max(160).default("AITKL · Agents, Everywhere"),
+  RELAY_EVENT_VENUE: z.string().trim().min(1).max(200).default("WORQ Bangsar"),
   DEVIN_API_KEY: z.string().optional(),
   DEVIN_API_BASE_URL: optionalUrl,
   DEVIN_ORG_ID: z.string().optional(),
@@ -66,21 +71,14 @@ export function integrationStatus() {
   const value = env();
   return {
     supabase: Boolean(value.NEXT_PUBLIC_SUPABASE_URL && value.SUPABASE_SERVICE_ROLE_KEY),
-    elevenlabs: Boolean(value.ELEVENLABS_API_KEY || value.GROQ_API_KEY),
-    qwen: Boolean(value.QWEN_API_KEY),
-    ilmu: Boolean(value.ILMU_API_KEY),
-    devin: Boolean(value.DEVIN_API_KEY),
+    openai: Boolean(value.OPENAI_API_KEY),
+    exa: Boolean(value.EXA_API_KEY),
     google: Boolean(value.GOOGLE_CLIENT_ID && value.GOOGLE_CLIENT_SECRET && value.GOOGLE_REFRESH_TOKEN),
-    whatsapp: Boolean(value.WHATSAPP_RELAY_URL && value.WHATSAPP_RELAY_TOKEN),
     agora: Boolean(
       value.NEXT_PUBLIC_AGORA_APP_ID &&
       value.AGORA_APP_CERTIFICATE &&
       value.AGORA_CUSTOMER_ID &&
       value.AGORA_CUSTOMER_SECRET,
-    ),
-    redis: Boolean(
-      (value.UPSTASH_REDIS_REST_URL && value.UPSTASH_REDIS_REST_TOKEN) ||
-        (value.KV_REST_API_URL && value.KV_REST_API_TOKEN),
     ),
   };
 }

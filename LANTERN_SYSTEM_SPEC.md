@@ -2,7 +2,7 @@
 
 **Version:** 0.2  
 **Date:** 11 September 2026  
-**Status:** First 30-second Agora/Ilmu capture slice implemented; live deployment pending
+**Status:** First 30-second Agora/OpenAI capture slice implemented; live deployment pending
 **Primary user:** An individual business developer capturing client conversations and arranging follow-ups
 
 ## 1. Product contract
@@ -127,7 +127,7 @@ flowchart LR
     H -->|meeting audio transport| C[Capture service]
     C --> A[Private audio archive]
     C --> T[Speech-to-text adapter]
-    T --> I[Ilmu understanding adapter]
+    T --> I[OpenAI understanding adapter]
     I --> R[Lantern meeting record]
     R --> D[Dashboard and replay]
     R --> P[Versioned action proposal]
@@ -155,7 +155,7 @@ flowchart LR
 - Issue short-lived session credentials and enforce state transitions.
 - Archive the original audio independently of transcript generation.
 - Track ordered chunks, acknowledgements, capture offsets and gaps.
-- Normalize final transcript segments and call Ilmu through a provider adapter.
+- Normalize final transcript segments and call OpenAI through a provider adapter.
 - Save summaries, contacts, follow-ups and evidence links.
 - Create immutable versions of proposed external actions.
 - Execute an action only after the required approval and record the provider result.
@@ -322,7 +322,7 @@ If a required field is missing, Lantern asks one bounded question. It does not g
 | --- | --- | --- |
 | Dashboard | Calendar, conversation drawer, people, follow-ups and settings | Device page, live capture state and consolidated approval queue |
 | Audio replay | Private signed playback and timestamp seeking | Hardware audio archive and aligned chunk assembly |
-| Ilmu | Structured extraction from completed transcripts | Real mixed-language evaluation and uncertainty handling |
+| OpenAI | Diarized transcription recovery and structured extraction from completed transcripts | Real mixed-language evaluation and uncertainty handling |
 | Calendar approval | Versioned review and Google event execution path | Voice-created proposal handoff and clearer pending state |
 | Hardware firmware | Flashed bring-up image plus a built 0.2 Agora pilot with the v1 session client, clock sync, WAV and caption upload | Hour-long chunking, reconnect, encrypted storage and signed OTA |
 | Hardware routes | Device-authenticated pairing, heartbeat, session transitions, transcript/audio staging and completion | Operational monitoring and long-session recovery |
@@ -337,7 +337,7 @@ Material current gaps:
 - Session credentials last four hours in the pilot and are not renewed during a long meeting.
 - One wearable microphone produces a neutral `Conversation` speaker label; it cannot prove who spoke.
 - There is no durable chunk acknowledgement, reconnect/resume protocol or explicit gap record.
-- Agora and Ilmu accuracy has not yet been measured with real Malaysian code-switching audio.
+- Agora and OpenAI accuracy has not yet been measured with real Malaysian code-switching audio.
 
 These gaps mean the existing binary is an integration experiment, not yet the Lantern meeting product.
 
@@ -492,15 +492,15 @@ Exit gate:
 - Original audio and timestamped final transcript both survive refresh.
 - Provider disconnects produce a visible incomplete state rather than a fabricated success.
 
-### Phase 6 — Ilmu understanding and status reports
+### Phase 6 — OpenAI understanding and status reports
 
-Pilot status: Quick-mode final captions are sent to Ilmu with the authoritative
+Pilot status: Quick-mode final captions are sent to OpenAI with the authoritative
 Malaysia date/time and persisted as a dashboard brief. Daily spoken status
 reports and a real-language accuracy corpus remain.
 
 Steps:
 
-1. Feed only finalized transcript segments into Ilmu.
+1. Feed only finalized transcript segments into OpenAI.
 2. Extract decisions, commitments, contacts, agreed meetings and source evidence.
 3. Normalize Malaysian dates, timezones and spoken email spelling deterministically.
 4. Generate the daily report from saved records.

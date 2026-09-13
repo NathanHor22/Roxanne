@@ -6,13 +6,15 @@ meetings in a calendar. Open an approved meeting to review the conversation
 that led to it: bullet points, concerns, promises, and preparation tasks. When
 the original recording is available, replay that conversation from its brief.
 
-This phase implements the dashboard, a completed-transcript API, Ilmu
+This phase implements the dashboard, a completed-transcript API, OpenAI
 extraction, explicit Google Calendar actions, and the first Lantern capture
-loop. The ESP32-S3 can open a consented session, publish microphone audio to
-Agora, upload the final captions and original WAV, and ask Ilmu to create the
-dashboard brief. The server supplies the authoritative Malaysia date and time
-when capture starts. See [ARCHITECTURE.md](ARCHITECTURE.md) for the boundaries,
-request contracts, data model, and remaining work.
+loop. It also adds Lantern Relay, a hackathon slice that uses OpenAI to find
+evidence-backed introductions across conversations and holds each one for
+human approval. The ESP32-S3 can open a consented session, publish microphone
+audio to Agora, upload the final captions and original WAV, and ask OpenAI to
+create the dashboard brief. The server supplies the authoritative Malaysia date
+and time when capture starts. See [ARCHITECTURE.md](ARCHITECTURE.md) for the
+boundaries, request contracts, data model, and remaining work.
 
 ## Run locally
 
@@ -38,6 +40,7 @@ Apply these migrations to the target Supabase project in order:
 3. `supabase/migrations/003_meeting_approvals.sql`
 4. `supabase/migrations/004_lantern_devices.sql`
 5. `supabase/migrations/005_lantern_recording_pipeline.sql`
+6. `supabase/migrations/006_lantern_relay.sql`
 
 Migration 003 adds structured schedule details and dismissed approvals. It also
 adds a unique Calendar-action index per follow-up. Reconcile any existing
@@ -51,10 +54,19 @@ Migration 005 adds the Agora session identifiers, staged final captions,
 private device recording linkage, provider retry fields, and completed Lantern
 meeting link used by the first capture pilot.
 
+Migration 006 stores owner-scoped Relay proposals and their pending, dismissed,
+or scheduled state. Re-running Relay preserves a proposal that was already
+dismissed or scheduled.
+
 The live workspace requires `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Use
 `DEMO_USER_EMAIL` for the owner account; optionally set `DEMO_USER_ID` to an
 existing Supabase Auth user UUID.
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` may contain Supabase's modern publishable key.
+`SUPABASE_SERVICE_ROLE_KEY` may contain a modern `sb_secret_...` key; the
+variable keeps its legacy name for compatibility. The elevated key is used
+only by server routes and must never use a `NEXT_PUBLIC_` prefix.
 
 ### Owner login
 
@@ -77,24 +89,52 @@ Production owner authentication requires both public Supabase values. Leaving
 both unset disables authentication only in local development; incomplete
 configuration fails closed.
 
-### Ilmu understanding
+### OpenAI understanding
 
-Set `ILMU_API_KEY` and, optionally, `ILMU_MODEL` (default `ilmu-v3.1`). The adapter
-calls `https://api.ilmu.ai/v1/chat/completions` with a JSON schema and validates
-the result locally. Its schedule extraction requires an agreed meeting and a
+Set `OPENAI_API_KEY` and, optionally, `OPENAI_EXTRACTION_MODEL` (default
+`gpt-5.4-mini`). The adapter calls the OpenAI Responses API with a strict JSON
+schema and validates the result locally. Its schedule extraction requires an agreed meeting and a
 supporting quote found in the supplied transcript. Human review still decides
 whether the details are correct before an invitation is sent.
 
 `POST /api/conversations` accepts a completed, normalized transcript and
-requires Ilmu and workspace storage. It does not call a speech provider or
+requires OpenAI and workspace storage. It does not call a speech provider or
 accept raw audio. The contract and an example are in
 [ARCHITECTURE.md](ARCHITECTURE.md#completed-transcript-api).
 
-Existing recording and legacy hardware processing use Ilmu when its key is
-configured, otherwise the Qwen adapter. A configured Ilmu failure is reported;
-it does not silently switch providers or return sample content. Qwen remains
-configurable through `QWEN_API_KEY`, `QWEN_BASE_URL`, and `QWEN_MODEL` for those
-older paths.
+The configured prototype uses OpenAI for transcription recovery and structured
+meeting extraction. A configured OpenAI failure is reported instead of
+returning sample content. Older provider adapters remain in the source for
+compatibility tests but need no production environment variables.
+
+### Lantern Relay with OpenAI
+
+Set `OPENAI_API_KEY` on the server. `OPENAI_RELAY_MODEL` defaults to
+`gpt-5.4-mini`. Relay calls the OpenAI Responses API with strict structured
+output and `store: false`. It compares up to twelve recent ready conversations,
+accepts at most four proposals, and drops any proposal below a score of 70.
+Each displayed quote must exactly match evidence already saved in Lantern.
+
+```dotenv
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe-diarize
+OPENAI_EXTRACTION_MODEL=gpt-5.4-mini
+OPENAI_RELAY_MODEL=gpt-5.4-mini
+RELAY_EVENT_NAME=AITKL · Agents, Everywhere
+RELAY_EVENT_VENUE=WORQ Bangsar
+```
+
+Contact email addresses remain on the Lantern server and are added only after
+OpenAI returns valid conversation IDs. Exa is optional: set `EXA_API_KEY` to add
+public company context. Its request receives company names, never transcripts,
+contact details, or recordings.
+
+Open **Relay** in the dashboard. Sample mode demonstrates the queue without any
+provider or Calendar call. Live mode requires OpenAI, Supabase, migration 006,
+and at least two ready conversations. Dismissal changes only Lantern state.
+**Approve and send invites** checks that the two attendee emails and source
+conversation still match the reviewed proposal, then creates the Google event
+and marks that proposal scheduled in the same server action.
 
 ### Agora wearable transcription
 
@@ -108,7 +148,7 @@ conversations.
 The browser never receives Agora REST credentials. The backend creates a
 short-lived device RTC token and subscribes the transcription bot only to that
 device UID. Final Agora protobuf captions are staged until the ESP32 uploads
-its local WAV; Ilmu then receives those captions with the server-stamped
+its local WAV; OpenAI then receives those captions with the server-stamped
 `Asia/Kuala_Lumpur` date and time.
 
 ### Google Calendar
@@ -125,14 +165,19 @@ ACTION_APPROVAL_SECRET=your-random-secret-of-at-least-32-UTF8-bytes
 ```
 
 Register `GOOGLE_REDIRECT_URI` in that OAuth client's authorized redirect URIs;
-use the deployed app's `/api/google/callback` for deployment. This Calendar
-connection is separate from Supabase's Google login flow. Open **Settings >
+use `https://roxanne-two.vercel.app/api/google/callback` in production. The
+same Google Cloud web client may also serve Supabase login when its authorized
+redirect URIs include
+`https://cjogfunwcwytvooycjzv.supabase.co/auth/v1/callback`. Supabase Auth must
+allow `https://roxanne-two.vercel.app/auth/callback` as an application redirect.
+The Calendar connection remains a separate consent step. Open **Settings >
 Google Calendar** in the live workspace to connect. Credentials are encrypted
-in `provider_connections`. `GOOGLE_REFRESH_TOKEN` is also supported as an
-environment-configured owner connection.
+in `provider_connections`; the Google refresh token is created by this step and
+does not need to be copied into Vercel.
 
 Review or complete the date, time, duration, and attendee emails, then approve.
-The live action creates the Google event and sends attendee updates. Lantern
+The live action creates the Google event with a unique Google Meet link and
+sends attendee updates. Lantern
 saves the event and its source-conversation relationship through the action
 record. The dashboard currently shows Lantern's stored conversations and
 events, not a two-way mirror of everything in Google Calendar. The existing
@@ -146,12 +191,11 @@ reference, verifies ownership, and downloads the audio server-side. The
 current limit is 25 MiB. Enter the original capture time and duration so
 relative dates can be interpreted against the conversation.
 
-Audio transcription uses `ELEVENLABS_API_KEY` when configured, otherwise
-`GROQ_API_KEY`; understanding then uses the extraction provider described
-above. Browser microphone capture publishes through Agora and records a local
+Audio transcription uses OpenAI. Browser microphone capture publishes through
+Agora and records a local
 audio file for this same upload flow. It requires `NEXT_PUBLIC_AGORA_APP_ID`
 and `AGORA_APP_CERTIFICATE`; it is not the future passive wearable transcript
-transport. Ilmu transcript imports do not require these audio-provider keys.
+transport. Completed transcript imports do not require these audio-provider keys.
 
 ### Replay original conversations
 
@@ -184,19 +228,20 @@ stores its SHA-256 digest. Request examples and the current hardware status are
 in [HARDWARE.md](HARDWARE.md).
 
 The active ESP32-S3 firmware is in `hardware/lantern-firmware`. Version
-`0.2.0-lantern-pilot` builds the first provider-connected path: server-confirmed
-consent and capture time, Agora audio and captions, a private WAV upload, Ilmu
-processing, and dashboard delivery. The pilot deliberately stops at 29 seconds
+`0.2.2-lantern-pilot` builds the first provider-connected path: server-confirmed
+consent and capture time, Agora audio and captions, a private WAV upload, OpenAI
+processing, and dashboard delivery. The WAV is uploaded even when Agora captions
+are unavailable, allowing OpenAI diarized transcription to recover the meeting
+before structured extraction runs. The pilot deliberately stops at 29 seconds
 while we verify the complete loop; hour-long chunked capture, reconnect and
 token renewal are the next reliability phase. Run its
 `setup-agora-sdk.ps1` once before a clean firmware build. The currently flashed
-board remains on the earlier bring-up image until this backend and migration
-are deployed and the provider credentials are configured.
+board has the `0.2.1-lantern-pilot` image; the `0.2.2` WAV-preservation update is
+ready for its next flash. The provider-backed capture path will activate after
+this backend and migration are deployed and the credentials are configured.
 
-Devin and the persistent WhatsApp worker remain legacy follow-up integrations.
-They are not prerequisites for transcript import, recaps, or Calendar
-approval. Their settings remain in `.env.example`; worker setup is documented
-in [worker/README.md](worker/README.md).
+Legacy follow-up and WhatsApp experiments remain in the repository but are not
+part of the Lantern prototype environment or its Calendar approval flow.
 
 ## Checks
 
@@ -208,5 +253,5 @@ npm run build
 
 `npm run check` also checks and builds the persistent worker; install its
 dependencies separately with `npm --prefix worker install` first. Automated
-checks do not establish live Agora delivery, Ilmu accuracy, Google account
+checks do not establish live Agora delivery, OpenAI extraction accuracy, Google account
 connectivity, or hour-long wearable reliability.

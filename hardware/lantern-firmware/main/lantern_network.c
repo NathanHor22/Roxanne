@@ -722,7 +722,7 @@ esp_err_t lantern_network_complete_session(lantern_cloud_session_t *session) {
   response_buffer_t response;
   int status = post_json(path, body, authorization, &response);
   if (status != 201 && status != 200) {
-    provider_error("Ilmu processing", status, &response);
+    provider_error("Meeting processing", status, &response);
     return ESP_FAIL;
   }
   return parse_session_response(response.data, session, NULL) ? ESP_OK : ESP_FAIL;

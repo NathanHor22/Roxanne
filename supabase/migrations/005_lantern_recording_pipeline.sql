@@ -26,7 +26,7 @@ create unique index if not exists lantern_sessions_agora_agent_idx
 comment on column public.lantern_sessions.conversation_timezone is
   'IANA timezone used with the server recording timestamp for relative-date extraction.';
 comment on column public.lantern_sessions.transcript_segments is
-  'Final Agora STT segments staged durably before Ilmu processing.';
+  'Final Agora STT segments staged durably before OpenAI processing.';
 comment on column public.lantern_sessions.recording_id is
   'Private diagnostic WAV for the initial vertical slice; cloud archive replaces this for long sessions.';
 

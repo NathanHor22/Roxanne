@@ -9,7 +9,7 @@ approval creates a Google Calendar event; opening that event in Lantern shows
 the original conversation's bullet recap and preparation tasks. Conversations
 with an archived recording can also replay the original audio.
 
-The intended wearable path is Agora transcription followed by Ilmu
+The intended wearable path is Agora transcription followed by OpenAI
 understanding. This phase implements the completed-transcript boundary, the
 downstream software, and a provider-independent Lantern device core. It does
 not yet implement passive wearable audio transport or production provider
@@ -20,8 +20,13 @@ flowchart TD
     A[Lantern quick meeting state machine] --> B[Device-authenticated gateway]
     B -. future audio and final segments .-> C[POST /api/conversations]
     D[Completed transcript import] --> C
-    C --> E[Ilmu structured extraction]
+    C --> E[OpenAI structured extraction]
     E --> F[Supabase conversation, recap, follow-ups]
+    F --> M[Lantern Relay]
+    M --> N[OpenAI structured matching]
+    O[Exa public company research] --> N
+    N --> P[Owner reviews introduction]
+    P --> I
     F --> G[Calendar dashboard and agreed meeting approvals]
     G --> H[User reviews and approves]
     H --> I[POST /api/actions/calendar]
@@ -44,20 +49,24 @@ sample mode and pairing, revocation, and telemetry in live mode.
 | Device identity | `lib/lantern-device-auth.ts`, migration 004 | Claims an expiring one-time code and validates a revocable per-device secret whose digest is stored server-side. |
 | Device sessions | `/api/device/v1/sessions` and `/api/device/v1/sessions/[id]/events` | Stores versioned, idempotent state transitions and rejects stale events. |
 | Device telemetry | `/api/device/v1/heartbeat`, `/api/devices` | Reports device state, firmware, battery, network, heap, and last error to the owner dashboard. |
-| Completed transcripts | `lib/workspace/model.ts`, `app/api/conversations/route.ts` | Validates finalized, ordered segments and conversation timing; processes synchronously with Ilmu. |
-| Understanding | `lib/providers/ilmu.ts` | Calls Ilmu Chat Completions with strict JSON schema and validates the response and schedule evidence. |
-| Existing capture-provider selection | `lib/providers/meeting-extraction.ts` | Uses Ilmu when configured, otherwise Qwen, for recording and legacy hardware processing. |
-| Audio transcription | `lib/providers/transcription.ts` | Uses ElevenLabs when configured, otherwise Groq; separate from Ilmu understanding. |
+| Completed transcripts | `lib/workspace/model.ts`, `app/api/conversations/route.ts` | Validates finalized, ordered segments and conversation timing; processes synchronously with OpenAI. |
+| Understanding | `lib/providers/openai-extraction.ts` | Calls the OpenAI Responses API with strict JSON schema and validates the response and schedule evidence. |
+| Existing capture-provider selection | `lib/providers/meeting-extraction.ts` | Uses OpenAI when configured, otherwise Qwen, for recording and legacy hardware processing. |
+| Audio transcription | `lib/providers/transcription.ts` | Uses OpenAI diarization when configured, otherwise ElevenLabs or Groq. |
 | Original-audio replay | Conversation brief, `recordingId`, and `recordingUrl` | Plays the private archived recording; transcript-only conversations have no replay audio. |
+| Cross-conversation matching | `lib/providers/openai-relay.ts`, `/api/relay/matches` | Sends a bounded evidence DTO without contact emails to OpenAI Responses, requires strict structured output, and rejects unknown identities, non-exact evidence, duplicate pairs, and scores below 70. |
+| Public company context | `lib/providers/exa.ts` | Optionally searches Exa using company names only; provider failure leaves matching available without public sources. |
+| Relay persistence | `lib/relay-store.ts`, migration 006 | Stores owner-scoped proposal snapshots and preserves dismissed or scheduled state across repeated model runs. |
+| Relay execution | `/api/actions/calendar` | Revalidates the saved pair, exact attendee emails, source conversation, and explicit approval before Calendar execution marks the proposal scheduled. |
 | Persistence | `lib/persistence.ts`, `lib/meetings-store.ts` | Writes the existing Supabase model and reconstructs the dashboard's conversation/event relationships. |
 | Approval model | `lib/workspace/model.ts` | Derives approvals from schedule follow-ups and validates required scheduling details. |
 | Google execution | `app/api/actions/calendar/route.ts`, `lib/providers/google-calendar.ts` | Requires explicit approval, resolves source ownership, records the action, and creates the Calendar event. |
 | Sample preview | `lib/workspace/sample.ts`, `approveSample` | Uses fictional data and local browser state; has no provider-execution dependency. |
 | Dashboard state | `components/workspace/useWorkspace.ts` | Selects sample or live adapters; live state is loaded from `/api/meetings`. |
 
-The completed-transcript endpoint calls Ilmu directly. It never selects Qwen
-or an ASR provider. The older recording-processing paths retain their provider
-selector so existing integrations remain usable. A configured Ilmu error
+The completed-transcript endpoint uses the shared OpenAI-first extraction
+selector and does not invoke an ASR provider. Qwen remains a compatibility
+fallback only when OpenAI is not configured. A configured OpenAI error
 surfaces to the caller instead of silently sending the transcript to another
 provider.
 
@@ -67,6 +76,42 @@ original hardware session routes still start a speaking Agora Conversational
 AI agent, receive its transcript, and extract after completion. Those routes
 are legacy behavior; the passive wearable should later feed normalized final
 segments into the new boundary through authenticated device transport.
+
+## Lantern Relay
+
+Relay is the net-new hackathon agent layer. It treats the event as an essential
+place: conversations captured there become a temporary relationship graph, and
+the agent looks for a stated need in one conversation that a different person
+can concretely help with. The existing wearable, transcript, OpenAI brief, and
+Calendar components are inputs and execution tools; cross-conversation matching
+and the introduction queue are the new core interaction.
+
+`POST /api/relay/matches` accepts only optional event and venue labels from the
+authenticated browser. It reloads the owner's conversations on the server,
+selects up to twelve recent ready records, and constructs a bounded DTO of IDs,
+names, company/role, needs, offers, and transcript or memory evidence. Email
+addresses, audio URLs, recordings, follow-ups, and unrelated meeting fields are
+excluded from the OpenAI request. The request uses the Responses API with
+`store: false` and a strict JSON schema.
+
+OpenAI can return at most four proposals. Lantern then verifies that both
+conversation and contact IDs exist, the parties differ, both evidence strings
+exactly match supplied evidence after whitespace normalization, the pair is
+unique, and the score is at least 70. Provider output cannot create an invite.
+The validated result becomes an owner-scoped `relay_matches` row.
+
+If `EXA_API_KEY` is present, the server sends up to four unique company names to
+Exa and attaches validated HTTP(S) sources for the involved companies. No
+transcript or personal contact detail is part of an Exa request. Exa failure is
+non-fatal because public research supports a match rather than proving what a
+person said.
+
+The final dialog is the authority boundary. A live Calendar request includes
+the Relay proposal ID. The server reloads that owner-scoped proposal and checks
+the exact two emails and source conversation before calling Google. A dismissed
+proposal cannot execute. Successful or idempotently recovered Calendar
+execution marks the proposal scheduled; the browser cannot mark it scheduled
+through the generic Relay status route.
 
 ## Lantern device core
 
@@ -103,12 +148,12 @@ execution continues to require the existing authenticated dashboard approval.
 
 The Lantern dashboard uses the same state machine locally as an executable
 prototype. This validates interaction rules but does not represent connected
-hardware, captured audio, Ilmu accuracy, or provider delivery.
+hardware, captured audio, OpenAI extraction accuracy, or provider delivery.
 
 ## Completed-transcript API
 
 `POST /api/conversations` is an owner-authenticated JSON endpoint. It requires
-Supabase and `ILMU_API_KEY`, and processes a completed conversation within the
+Supabase and `OPENAI_API_KEY`, and processes a completed conversation within the
 request. There is no background job or streamed partial response.
 
 Example request body:
@@ -187,7 +232,7 @@ not a general-purpose conversation editor or a device-authentication bypass.
 
 ## Extraction and review
 
-Ilmu returns the existing `MeetingExtraction` shape: `insight`, `participants`,
+OpenAI returns the existing `MeetingExtraction` shape: `insight`, `participants`,
 and `followUps`. The insight includes compact `keyPoints`, concerns, promises,
 and commitments. A schedule follow-up additionally carries:
 
@@ -202,7 +247,7 @@ schedule: {
 }
 ```
 
-The Ilmu prompt instructs the model to apply later corrections, resolve
+The OpenAI prompt instructs the model to apply later corrections, resolve
 relative dates against the conversation start, and exclude tentative or
 rejected arrangements from schedule follow-ups. Local validation requires
 every returned schedule follow-up to be agreed and have evidence matching a
@@ -256,6 +301,7 @@ conversation database.
 | `follow_ups` | Tasks and schedule approvals; migration 003 adds `schedule_details` JSONB and the `dismissed` status. |
 | `actions` | Approval/execution record; `meeting_id` links the source conversation, `follow_up_id` links the approval, and `external_id` holds the Google event ID. |
 | `provider_connections` | Encrypted Google OAuth credentials for the workspace owner. |
+| `relay_matches` | OpenAI-generated introduction proposals, evidence snapshot, pair hash, model, and approval state; migration 006 scopes every row to its owner. |
 
 Calendar creation saves a separate upcoming meeting with a
 `calendar:<event-id>` client reference. On reload, `loadMeetings()` matches
@@ -277,7 +323,7 @@ text-to-speech recreation. The private Supabase `recordings` bucket holds the
 audio object; `recordings.storage_path` identifies that object, and the related
 `transcripts` row holds its text and timestamps. The source conversation's
 `recordingId` and temporary `recordingUrl` supply playback from its brief or a
-linked Calendar event. Playback does not require another Ilmu or ASR request.
+linked Calendar event. Playback does not require another OpenAI or ASR request.
 
 The dedicated Replay section provides a seekable player, playback speed,
 15-second skips, and timestamped transcript entries that seek within the
@@ -329,7 +375,7 @@ state. Automatic retention and chunk assembly are not implemented here.
 `/dashboard?mode=sample` loads fictional records whose IDs start with `sample:`.
 The preview stores changes under `lantern:sample-workspace:v1` in browser
 storage. Sample approval creates a local calendar entry linked to its sample
-conversation; it does not call Ilmu, Agora, Google, or live mutation endpoints.
+conversation; it does not call OpenAI, Agora, Google, or live mutation endpoints.
 Reset replaces only the sample workspace. Browser-storage failures leave the
 preview usable in memory.
 
@@ -342,14 +388,15 @@ wearable have been connected.
 
 ## Setup and remaining work
 
-Apply migrations 001 through 005 before enabling the Lantern device core. Set
-the Supabase values and owner identity, then the Agora Speech-to-Text and Ilmu
+Apply migrations 001 through 006 before enabling the complete Lantern and Relay
+flow. Set
+the Supabase values and owner identity, then the Agora Speech-to-Text and OpenAI
 credentials. Google execution additionally needs OAuth client configuration,
 a registered `/api/google/callback`, `ACTION_APPROVAL_SECRET`, and a connected
 Google account. [README.md](README.md) contains the setup steps. Browser audio
-uploads also need ElevenLabs or Groq transcription; the ESP32 pilot uses Agora
-captions. Devin and WhatsApp are optional legacy paths outside this approval
-flow.
+uploads and missing Agora captions use OpenAI transcription. Relay uses the
+same `OPENAI_API_KEY`; `EXA_API_KEY` is optional. Legacy provider and messaging
+adapters have no production environment dependency.
 
 The following are deliberately deferred:
 

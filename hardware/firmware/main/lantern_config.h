@@ -2,7 +2,7 @@
 
 #include "secrets.h"
 
-#define LANTERN_API_BASE_URL "https://roxanne-assistant.vercel.app"
+#define LANTERN_API_BASE_URL "https://roxanne-two.vercel.app"
 #define LANTERN_DEVICE_ID "561bc32e-df1a-4b00-9f46-ef08cf2df9b9"
 #define LANTERN_LANGUAGE "en-US"
 #define LANTERN_LOCALE "en"

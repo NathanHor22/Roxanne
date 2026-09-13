@@ -37,6 +37,24 @@ static adc_oneshot_unit_handle_t s_adc;
 static int s_battery_level = 50;
 static TickType_t s_state_entered_at;
 static lantern_cloud_session_t s_cloud_session;
+static unsigned s_last_recording_second = UINT32_MAX;
+
+static void show_recording_progress(void) {
+  unsigned elapsed =
+    (unsigned)((xTaskGetTickCount() - s_state_entered_at) * portTICK_PERIOD_MS / 1000);
+  if (elapsed == s_last_recording_second) return;
+  s_last_recording_second = elapsed;
+  char detail[32];
+  snprintf(
+    detail,
+    sizeof(detail),
+    "%.10s %.5s %02u:%02u",
+    s_cloud_session.local_date,
+    s_cloud_session.local_time,
+    elapsed / 60,
+    elapsed % 60);
+  lantern_display_show(LANTERN_SCREEN_RECORDING, detail);
+}
 
 static void show_error(const char *detail) {
   lantern_audio_set_recording(false);
@@ -160,9 +178,8 @@ static void handle_short_press(void) {
       }
       s_state = LOCAL_RECORDING;
       s_state_entered_at = xTaskGetTickCount();
-      char clock[24];
-      snprintf(clock, sizeof(clock), "%.10s %.5s", s_cloud_session.local_date, s_cloud_session.local_time);
-      lantern_display_show(LANTERN_SCREEN_RECORDING, clock);
+      s_last_recording_second = UINT32_MAX;
+      show_recording_progress();
       lantern_audio_set_recording(true);
       ESP_LOGI(TAG, "Agora recording started at %s %s Malaysia time",
         s_cloud_session.local_date, s_cloud_session.local_time);
@@ -182,17 +199,15 @@ static void handle_short_press(void) {
       }
       vTaskDelay(pdMS_TO_TICKS(400));
       lantern_agora_stop();
-      ESP_LOGI(TAG, "staged %u Agora caption packets", lantern_transcript_packet_count());
-      if (!lantern_transcript_packet_count()) {
-        abort_cloud_session();
-        show_error("NO SPEECH DETECTED");
-        break;
-      }
-      lantern_display_show(LANTERN_SCREEN_CONNECTING, "UPLOADING WORDS");
-      if (lantern_network_upload_transcript(&s_cloud_session) != ESP_OK) {
-        abort_cloud_session();
-        show_error("WORDS UPLOAD FAILED");
-        break;
+      unsigned caption_packets = lantern_transcript_packet_count();
+      ESP_LOGI(TAG, "staged %u Agora caption packets", caption_packets);
+      if (caption_packets) {
+        lantern_display_show(LANTERN_SCREEN_CONNECTING, "UPLOADING WORDS");
+        if (lantern_network_upload_transcript(&s_cloud_session) != ESP_OK) {
+          ESP_LOGW(TAG, "Agora captions unavailable; preserving WAV for server transcription");
+        }
+      } else {
+        ESP_LOGW(TAG, "no Agora captions; preserving WAV for server transcription");
       }
       lantern_display_show(LANTERN_SCREEN_CONNECTING, "UPLOADING AUDIO");
       if (lantern_network_upload_audio(&s_cloud_session) != ESP_OK) {
@@ -200,9 +215,9 @@ static void handle_short_press(void) {
         show_error("AUDIO UPLOAD FAILED");
         break;
       }
-      lantern_display_show(LANTERN_SCREEN_CONNECTING, "ILMU IS READING");
+      lantern_display_show(LANTERN_SCREEN_CONNECTING, "BUILDING BRIEF");
       if (lantern_network_complete_session(&s_cloud_session) != ESP_OK) {
-        show_error("ILMU PROCESS FAILED");
+        show_error("BRIEF PROCESS FAILED");
         break;
       }
       s_state = LOCAL_SAVED;
@@ -224,14 +239,14 @@ static void handle_short_press(void) {
       break;
     case LOCAL_ERROR:
       if (s_cloud_session.session_id[0] && s_cloud_session.completion_event_id[0]) {
-        lantern_display_show(LANTERN_SCREEN_CONNECTING, "RETRYING ILMU");
+        lantern_display_show(LANTERN_SCREEN_CONNECTING, "RETRYING BRIEF");
         if (lantern_network_complete_session(&s_cloud_session) == ESP_OK) {
           s_state = LOCAL_SAVED;
           lantern_display_show(LANTERN_SCREEN_SAVED, "DASHBOARD READY");
           lantern_audio_chime(2);
           memset(&s_cloud_session, 0, sizeof(s_cloud_session));
         } else {
-          show_error("ILMU STILL OFFLINE");
+          show_error("BRIEF STILL OFFLINE");
         }
       } else {
         s_state = LOCAL_READY;
@@ -310,6 +325,7 @@ static void button_task(void *argument) {
       ESP_LOGI(TAG, "30-second vertical-slice limit reached; finalising automatically");
       handle_short_press();
     }
+    if (s_state == LOCAL_RECORDING) show_recording_progress();
     was_pressed = pressed;
     vTaskDelay(pdMS_TO_TICKS(20));
   }

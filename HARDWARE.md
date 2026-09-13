@@ -3,7 +3,7 @@
 Production base URL:
 
 ```text
-https://roxanne-assistant.vercel.app
+https://roxanne-two.vercel.app
 ```
 
 ## Current hardware gate
@@ -26,10 +26,16 @@ the factory partition layout and initializes the ST7789 display, I2S microphone
 and speaker, buttons, battery telemetry, and first-boot `Lantern-XXXX` setup
 network. Version `0.1.1-bringup` also adds a 30-second consent timeout, local WAV
 download, five-second on-device replay, settings reset, and development OTA.
-Version `0.1.2-bringup` removed the startup speaker noise and is the currently
-flashed bench image. Version `0.2.0-lantern-pilot` now builds successfully but has
-not been flashed: its matching backend routes, migration 005, Agora credentials,
-and Ilmu credentials must be live first.
+Version `0.1.2-bringup` removed the startup speaker noise. Version
+`0.2.1-lantern-pilot` corrected the ST7789 RGB565 byte order so the Lantern accent
+renders green and added an elapsed recording timer. It was built and flashed over
+the manual BOOT-button path on 13 September 2026, and every block passed esptool
+hash verification. The board then booted with the corrected green display,
+completing the visual bench check. Version `0.2.2-lantern-pilot` additionally
+preserves and uploads the WAV when Agora captions are missing, allowing the
+backend to recover with OpenAI transcription before OpenAI extraction. Its complete
+capture path also needs migration 005 plus live Agora and OpenAI
+credentials.
 
 The recovery gate is complete. Holding the main/BOOT button on GPIO0 while
 reconnecting enters the ROM downloader. The full 16,777,216-byte flash image is
@@ -62,7 +68,7 @@ before device credentials are treated as hardware-protected.
 The ML307 can become a later cellular fallback after its exact variant and SIM
 behavior are verified.
 
-Google, Ilmu, and other provider credentials stay on Lantern's backend. The
+Google, OpenAI, and other provider credentials stay on Lantern's backend. The
 device receives only its own Lantern credential and, later, short-lived capture
 session credentials. It never stores a Google refresh token or sends a Google
 invitation directly.
@@ -83,7 +89,7 @@ Content-Type: application/json
   "pairingCode": "24G7N-8R5XQ",
   "hardwareId": "esp32s3:<factory-mac>",
   "model": "ZHENGCHEN-1.54-M1307",
-  "firmwareVersion": "0.2.0-lantern-pilot"
+  "firmwareVersion": "0.2.2-lantern-pilot"
 }
 ```
 
@@ -125,7 +131,7 @@ Content-Type: application/json
 
 {
   "eventId": "11111111-1111-4111-8111-111111111111",
-  "firmwareVersion": "0.2.0-lantern-pilot",
+  "firmwareVersion": "0.2.2-lantern-pilot",
   "state": "ready",
   "stateVersion": 0,
   "batteryLevel": 82,
@@ -187,7 +193,7 @@ event UUID returns its stored result.
 After the ESP32 has joined its Agora channel and played the visible and audible
 start cue, it sends `CAPTURE_STARTED`. The backend replaces that event's time
 with its own clock and returns both UTC and `Asia/Kuala_Lumpur` date/time. That
-timestamp becomes the recording origin for Ilmu relative-date interpretation,
+timestamp becomes the recording origin for OpenAI relative-date interpretation,
 the dashboard calendar, the WAV metadata, and transcript seek positions.
 
 The implemented transition types are defined in `lib/lantern-state.ts`. The
@@ -209,9 +215,9 @@ authority that sends a Calendar invitation.
 
 ## Current capture pilot and remaining scale work
 
-The `0.2.0-lantern-pilot` image adds the v1 session client, server-confirmed
+The `0.2.2-lantern-pilot` image adds the v1 session client, server-confirmed
 consent and capture clock, 16 kHz mono publishing to Agora, final caption
-collection, private WAV upload, Ilmu extraction, and automatic dashboard
+collection, private WAV upload, OpenAI extraction, and automatic dashboard
 delivery. It keeps the existing local setup, pairing, heartbeat, display,
 buttons, microphone, speaker and PSRAM diagnostics.
 

@@ -146,6 +146,7 @@ test("approved invitation uses only validated recipients and exactly 30 Malaysia
           data: {
             id: "google-event-123",
             htmlLink: "https://calendar.google.com/event?eid=123",
+            hangoutLink: "https://meet.google.com/abc-defg-hij",
           },
         };
       },
@@ -168,7 +169,16 @@ test("approved invitation uses only validated recipients and exactly 30 Malaysia
   assert.ok(inserted);
   assert.equal(inserted.calendarId, "primary");
   assert.equal(inserted.sendUpdates, "all");
+  assert.equal(inserted.conferenceDataVersion, 1);
   assert.equal(inserted.requestBody.id, "a1b2c3d4e5");
+  assert.equal(
+    inserted.requestBody.conferenceData?.createRequest?.conferenceSolutionKey?.type,
+    "hangoutsMeet",
+  );
+  assert.match(
+    inserted.requestBody.conferenceData?.createRequest?.requestId ?? "",
+    /^[a-f0-9]{64}$/u,
+  );
   assert.deepEqual(inserted.requestBody.start, {
     dateTime: "2026-08-27T10:15:00+08:00",
     timeZone: "Asia/Kuala_Lumpur",
@@ -186,6 +196,7 @@ test("approved invitation uses only validated recipients and exactly 30 Malaysia
     "nathanhor2001@gmail.com",
     "client@example.com",
   ]);
+  assert.equal(result.meetLink, "https://meet.google.com/abc-defg-hij");
 });
 
 test("a deterministic Google event ID recovers an ambiguous already-created retry", async () => {
@@ -212,6 +223,7 @@ test("a deterministic Google event ID recovers an ambiguous already-created retr
   assert.equal(result.id, "abcdef0123456789");
   assert.equal(result.startAt, "2026-08-27T15:30:00+08:00");
   assert.equal(result.htmlLink, null);
+  assert.equal(result.meetLink, null);
 });
 
 test("mocked Google free/busy returns only open 30-minute afternoon slots", async () => {

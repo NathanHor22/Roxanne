@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireOwnerSession } from "@/lib/api-security";
 import { getServerSupabase, resolveDemoUserId } from "@/lib/supabase/server";
 import { conversationInputSchema } from "@/lib/workspace/model";
-import { extractWithIlmu } from "@/lib/providers/ilmu";
+import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { persistProcessedMeeting } from "@/lib/persistence";
 import type { Meeting } from "@/lib/types";
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       throw new Error("The conversation could not be reserved for processing.");
     claimedMeeting = { id: claim.data.id, userId };
     const segments = input.segments;
-    const extraction = await extractWithIlmu(segments, {
+    const extraction = await extractConversationInsights(segments, {
       title: input.title,
       referenceDate: input.startedAt,
       timezone: input.timeZone,

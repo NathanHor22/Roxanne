@@ -17,6 +17,11 @@ import {
   getServerSupabase,
   resolveDemoUserId,
 } from "@/lib/supabase/server";
+import {
+  loadRelayMatchById,
+  updateRelayMatchStatus,
+} from "@/lib/relay-store";
+import { relayCalendarApprovalMatches } from "@/lib/relay";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -155,6 +160,29 @@ export async function POST(request: Request) {
     }
     ownerUserId = userId;
 
+    let relayMatch = null;
+    if (input.relayMatchId) {
+      if (!client || !userId) {
+        return NextResponse.json(
+          { error: "Relay scheduling requires Supabase persistence." },
+          { status: 503 },
+        );
+      }
+      relayMatch = await loadRelayMatchById(client, userId, input.relayMatchId);
+      if (!relayMatch) {
+        return NextResponse.json(
+          { error: "The pending Relay proposal could not be found." },
+          { status: 404 },
+        );
+      }
+      if (!relayCalendarApprovalMatches(relayMatch, input)) {
+        return NextResponse.json(
+          { error: "The invitation does not match the reviewed Relay proposal." },
+          { status: 409 },
+        );
+      }
+    }
+
     const idempotencyKey = internalIdempotencyKey(userId, input);
     const googleEventId = idempotencyKey.slice("calendar:".length);
     let databaseMeetingId: string | null = null;
@@ -249,10 +277,15 @@ export async function POST(request: Request) {
             .eq("user_id", userId);
           if (followUpCompletionError) throw new Error("Could not complete the calendar follow-up.");
         }
+        const scheduledRelayMatch =
+          relayMatch && client && userId
+            ? await updateRelayMatchStatus(client, userId, relayMatch.id, "scheduled")
+            : null;
         return NextResponse.json({
           event: {
             id: existing.external_id,
             htmlLink: null,
+            meetLink: null,
             summary: input.summary,
             startAt: existingEvent.startAt,
             endAt: existingEvent.endAt,
@@ -261,6 +294,7 @@ export async function POST(request: Request) {
           },
           meetingId,
           duplicate: true,
+          ...(scheduledRelayMatch ? { relayMatch: scheduledRelayMatch } : {}),
         });
       }
       if (followUpCompleted) return NextResponse.json({ error: "This meeting approval has already been completed. Refresh your calendar." }, { status: 409 });
@@ -361,8 +395,18 @@ export async function POST(request: Request) {
       }
     }
 
+    const scheduledRelayMatch =
+      relayMatch && client && userId
+        ? await updateRelayMatchStatus(client, userId, relayMatch.id, "scheduled")
+        : null;
+
     return NextResponse.json(
-      { event, meetingId, duplicate: false },
+      {
+        event,
+        meetingId,
+        duplicate: false,
+        ...(scheduledRelayMatch ? { relayMatch: scheduledRelayMatch } : {}),
+      },
       { status: 201 },
     );
   } catch (error) {

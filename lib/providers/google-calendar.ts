@@ -75,6 +75,7 @@ export interface CalendarInsertClient {
     insert(parameters: {
       calendarId: string;
       sendUpdates: "all";
+      conferenceDataVersion: 1;
       requestBody: calendar_v3.Schema$Event;
     }): Promise<{ data: calendar_v3.Schema$Event }>;
   };
@@ -136,6 +137,7 @@ export const googleCalendarEventSchema = z
     meetingId: z.string().trim().min(1).max(120).optional(),
     clientReference: z.string().trim().min(1).max(120).optional(),
     followUpId: z.string().trim().min(1).max(120).optional(),
+    relayMatchId: z.string().uuid().optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -183,6 +185,7 @@ export type ParsedGoogleCalendarEvent = z.output<typeof googleCalendarEventSchem
 export interface CreatedGoogleCalendarEvent {
   id: string;
   htmlLink: string | null;
+  meetLink: string | null;
   summary: string;
   startAt: string;
   endAt: string;
@@ -623,6 +626,9 @@ export function buildGoogleCalendarInsert(
   const description = [parsed.description, conferenceLine]
     .filter(Boolean)
     .join("\n\n") || undefined;
+  const conferenceRequestId = eventId
+    ? createHash("sha256").update(`lantern-meet:${eventId}`).digest("hex")
+    : randomBytes(16).toString("hex");
 
   return {
     parsed,
@@ -631,6 +637,7 @@ export function buildGoogleCalendarInsert(
     parameters: {
       calendarId,
       sendUpdates: "all" as const,
+      conferenceDataVersion: 1 as const,
       requestBody: {
         ...(eventId ? { id: eventId } : {}),
         summary: parsed.summary,
@@ -639,6 +646,12 @@ export function buildGoogleCalendarInsert(
         start: { dateTime: startAt, timeZone: GOOGLE_TIME_ZONE },
         end: { dateTime: endAt, timeZone: GOOGLE_TIME_ZONE },
         attendees: parsed.attendees.map((email) => ({ email })),
+        conferenceData: {
+          createRequest: {
+            requestId: conferenceRequestId,
+            conferenceSolutionKey: { type: "hangoutsMeet" },
+          },
+        },
       } satisfies calendar_v3.Schema$Event,
     },
   };
@@ -794,6 +807,12 @@ export async function createGoogleCalendarEvent(
     return {
       id: response.data.id,
       htmlLink: response.data.htmlLink ?? null,
+      meetLink:
+        response.data.hangoutLink ??
+        response.data.conferenceData?.entryPoints?.find(
+          (entry) => entry.entryPointType === "video",
+        )?.uri ??
+        null,
       summary: insert.parsed.summary,
       startAt: insert.startAt,
       endAt: insert.endAt,
@@ -808,6 +827,7 @@ export async function createGoogleCalendarEvent(
       return {
         id: eventId,
         htmlLink: null,
+        meetLink: null,
         summary: insert.parsed.summary,
         startAt: insert.startAt,
         endAt: insert.endAt,

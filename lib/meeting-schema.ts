@@ -57,7 +57,14 @@ export const transcriptionResultSchema = z
     text: compactText("transcript", 250_000),
     segments: z.array(transcriptSegmentSchema).min(1).max(10_000),
     language: compactText("language", 40),
-    provider: z.enum(["elevenlabs", "groq", "agora", "import", "fallback"]),
+    provider: z.enum([
+      "elevenlabs",
+      "groq",
+      "agora",
+      "openai",
+      "import",
+      "fallback",
+    ]),
     warning: compactText("warning", 500).optional(),
   })
   .strict();
@@ -117,7 +124,7 @@ export const meetingExtractionSchema = z
 
 export const meetingExtractionResultSchema = meetingExtractionSchema
   .extend({
-    provider: z.enum(["qwen", "ilmu", "fallback"]),
+    provider: z.enum(["qwen", "openai", "fallback"]),
     warning: compactText("warning", 500).optional(),
   })
   .strict();
@@ -267,7 +274,7 @@ export const meetingExtractionJsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["type", "description", "dueAt", "draft"],
+        required: ["type", "description", "dueAt", "draft", "schedule"],
         properties: {
           type: {
             type: "string",
@@ -282,6 +289,42 @@ export const meetingExtractionJsonSchema = {
           draft: {
             type: ["string", "null"],
             description: "A compact draft when appropriate, otherwise null",
+          },
+          schedule: {
+            type: ["object", "null"],
+            additionalProperties: false,
+            required: [
+              "agreement",
+              "startAt",
+              "durationMinutes",
+              "attendees",
+              "location",
+              "evidence",
+            ],
+            properties: {
+              agreement: { type: "string", enum: ["agreed", "tentative"] },
+              startAt: {
+                type: ["string", "null"],
+                description:
+                  "RFC3339 with explicit timezone, resolved against conversation time; null if not agreed",
+              },
+              durationMinutes: {
+                type: ["integer", "null"],
+                minimum: 5,
+                maximum: 480,
+              },
+              attendees: {
+                type: "array",
+                maxItems: 20,
+                items: { type: "string" },
+              },
+              location: { type: ["string", "null"] },
+              evidence: {
+                type: ["string", "null"],
+                description:
+                  "Exact contiguous quote from the transcript supporting an agreed meeting",
+              },
+            },
           },
         },
       },

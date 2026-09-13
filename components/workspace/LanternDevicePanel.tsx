@@ -271,9 +271,9 @@ export function LanternDevicePanel({
           </strong>
           {mode === "sample"
             ? "This exercises Lantern’s consent and approval rules. It records no audio and contacts nobody."
-            : integrations.agora && integrations.ilmu
-              ? "A paired Lantern can capture a 30-second conversation, send it through Agora and Ilmu, and add the recording and recap here automatically."
-              : "The capture build is ready. Connect Agora and Ilmu in the server environment before installing it on the Lantern."}
+            : integrations.agora && integrations.openai
+              ? "A paired Lantern can capture a 30-second conversation, send it through Agora and OpenAI, and add the recording and recap here automatically."
+              : "The capture build is ready. Connect Agora and OpenAI in the server environment before installing it on the Lantern."}
         </span>
       </div>
 
@@ -520,7 +520,7 @@ export function LanternDevicePanel({
           </li>
         </ol>
         <p className={styles.setupPrivacy}>
-          Your Wi-Fi password stays on the device. Agora, Ilmu, Google, and Gmail
+          Your Wi-Fi password stays on the device. Agora, OpenAI, Google, and Gmail
           credentials stay in the Lantern server environment.
         </p>
       </section>
@@ -579,7 +579,7 @@ export function LanternDevicePanel({
           <span className={styles.detailPill}>
             {mode === "sample"
               ? "30-second flow preview"
-              : integrations.agora && integrations.ilmu
+              : integrations.agora && integrations.openai
                 ? "Providers ready"
                 : "Provider setup required"}
           </span>

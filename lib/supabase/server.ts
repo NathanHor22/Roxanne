@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 
 let cached: SupabaseClient | null | undefined;
 
-/** Service-role client for server routes only. Returns null when unconfigured. */
+/** Elevated server client for server routes only. Returns null when unconfigured. */
 export function getServerSupabase(): SupabaseClient | null {
   if (cached !== undefined) return cached;
   const runtime = env();

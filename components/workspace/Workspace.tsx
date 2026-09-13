@@ -17,6 +17,7 @@ import {
   LogOut,
   MessageSquare,
   MoreHorizontal,
+  Network,
   Plus,
   Radio,
   RotateCcw,
@@ -47,9 +48,16 @@ import {
 import { ApprovalDialog } from "./ApprovalDialog";
 import { RecordingDialog } from "./RecordingDialog";
 import { LanternDevicePanel } from "./LanternDevicePanel";
+import { RelayPanel } from "./RelayPanel";
 import styles from "./workspace.module.css";
 
-type View = "calendar" | "conversations" | "people" | "device" | "settings";
+type View =
+  | "calendar"
+  | "conversations"
+  | "relay"
+  | "people"
+  | "device"
+  | "settings";
 
 export function Workspace() {
   const workspace = useWorkspace();
@@ -127,7 +135,7 @@ export function Workspace() {
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
     if (
-      ["calendar", "conversations", "people", "device", "settings"].includes(
+      ["calendar", "conversations", "relay", "people", "device", "settings"].includes(
         requested || "",
       )
     )
@@ -187,6 +195,7 @@ export function Workspace() {
             [
               { id: "calendar", label: "Calendar", icon: CalendarDays },
               { id: "conversations", label: "Conversations", icon: Headphones },
+              { id: "relay", label: "Relay", icon: Network },
               { id: "people", label: "People", icon: Users },
               { id: "device", label: "Lantern", icon: Radio },
             ] as const
@@ -273,6 +282,8 @@ export function Workspace() {
               <p className={styles.eyebrow}>
                 {view === "calendar"
                   ? "A LITTLE CONTEXT. A BETTER FOLLOW-UP."
+                  : view === "relay"
+                    ? "THE RIGHT PEOPLE, CONNECTED"
                   : view === "device"
                     ? "YOUR CONVERSATIONS, WITH YOU"
                   : "YOUR BUSINESS MEMORY"}
@@ -282,6 +293,8 @@ export function Workspace() {
                   ? "Your conversations, connected."
                   : view === "conversations"
                     ? "Every conversation matters."
+                    : view === "relay"
+                      ? "See who in the room should meet."
                     : view === "people"
                       ? "Pick up where you left off."
                       : view === "device"
@@ -293,6 +306,8 @@ export function Workspace() {
                   ? "What’s coming up, what you agreed, and everything worth remembering."
                   : view === "conversations"
                     ? "The important details, ready when you need them."
+                    : view === "relay"
+                      ? "OpenAI compares saved conversation evidence while Exa adds current public company context."
                     : view === "people"
                       ? "Conversations and commitments, organised around your clients."
                       : view === "device"
@@ -300,7 +315,7 @@ export function Workspace() {
                       : "Manage your connections and workspace preferences."}
               </p>
             </div>
-            {view !== "settings" && view !== "device" && (
+            {view !== "settings" && view !== "device" && view !== "relay" && (
               <button
                 className={styles.secondaryButton}
                 onClick={() =>
@@ -967,6 +982,15 @@ export function Workspace() {
                   )}
                 </section>
               )}
+              {view === "relay" && (
+                <RelayPanel
+                  meetings={meetings}
+                  mode={mode}
+                  integrations={integrations}
+                  onOpenConversation={openConversation}
+                  onNotice={workspace.setNotice}
+                />
+              )}
               {view === "people" && (
                 <section>
                   <label className={`${styles.search} ${styles.peopleSearch}`}>
@@ -1143,6 +1167,38 @@ export function Workspace() {
                         Reset sample conversations
                       </button>
                     )}
+                  </section>
+                  <section className={styles.settingsCard}>
+                    <span className={styles.settingsIcon}>
+                      <Network />
+                    </span>
+                    <h2>Lantern Relay</h2>
+                    <p>
+                      OpenAI reasons across saved conversations. Exa adds only
+                      public company context to support each introduction.
+                    </p>
+                    <span className={styles.connectionState}>
+                      <i
+                        className={
+                          mode === "live" && integrations.openai
+                            ? styles.greenDot
+                            : styles.neutralDot
+                        }
+                      />
+                      {mode === "sample"
+                        ? "Sample matching"
+                        : integrations.openai
+                          ? integrations.exa
+                            ? "OpenAI and Exa connected"
+                            : "OpenAI connected · Exa optional"
+                          : "OpenAI API key required"}
+                    </span>
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={() => navigate("relay")}
+                    >
+                      Open Relay <ArrowRight />
+                    </button>
                   </section>
                   <section className={styles.settingsCard}>
                     <span className={styles.settingsIcon}>

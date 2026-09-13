@@ -10,6 +10,7 @@ import {
   transcribeAudio,
 } from "../lib/providers/elevenlabs";
 import { transcribeWithGroq } from "../lib/providers/groq-transcription";
+import { transcribeWithOpenAI } from "../lib/providers/openai-transcription";
 import {
   FALLBACK_EXTRACTION_WARNING,
   FALLBACK_TRANSCRIPTION_WARNING,
@@ -256,6 +257,73 @@ test("Groq Whisper sends multipart audio and maps verbose segments", async () =>
       text: "James wants a pilot.",
       startSeconds: 0,
       endSeconds: 1.4,
+    },
+  ]);
+});
+
+test("OpenAI fallback sends WAV audio and preserves diarized speakers", async () => {
+  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    assert.equal(String(input), "https://api.openai.com/v1/audio/transcriptions");
+    assert.equal((init?.headers as Record<string, string>).authorization, "Bearer openai-key");
+    assert.ok(init?.body instanceof FormData);
+    assert.equal(init.body.get("model"), "gpt-4o-transcribe-diarize");
+    assert.equal(init.body.get("response_format"), "diarized_json");
+    assert.equal(init.body.get("chunking_strategy"), "auto");
+    assert.ok(init.body.get("file") instanceof Blob);
+    return new Response(
+      JSON.stringify({
+        task: "transcribe",
+        duration: 4.2,
+        text: "Jumpa esok pukul satu. Boleh, confirm.",
+        segments: [
+          {
+            type: "transcript.text.segment",
+            id: "seg_001",
+            start: 0,
+            end: 2.1,
+            text: "Jumpa esok pukul satu.",
+            speaker: "A",
+          },
+          {
+            type: "transcript.text.segment",
+            id: "seg_002",
+            start: 2.2,
+            end: 4.2,
+            text: "Boleh, confirm.",
+            speaker: "B",
+          },
+        ],
+      }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  const result = await transcribeWithOpenAI(
+    new Blob(["wav-audio"], { type: "audio/wav" }),
+    {
+      apiKey: "openai-key",
+      modelId: "gpt-4o-transcribe-diarize",
+      fileName: "lantern.wav",
+      fetchImpl,
+    },
+  );
+
+  assert.equal(result.provider, "openai");
+  assert.equal(result.language, "multilingual");
+  assert.deepEqual(result.segments, [
+    {
+      id: "seg_001",
+      speaker: "Speaker A",
+      text: "Jumpa esok pukul satu.",
+      startSeconds: 0,
+      endSeconds: 2.1,
+    },
+    {
+      id: "seg_002",
+      speaker: "Speaker B",
+      text: "Boleh, confirm.",
+      startSeconds: 2.2,
+      endSeconds: 4.2,
     },
   ]);
 });

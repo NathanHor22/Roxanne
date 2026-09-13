@@ -155,6 +155,9 @@ esp_err_t lantern_display_init(void) {
   esp_lcd_panel_dev_config_t panel_config = {
     .reset_gpio_num = LANTERN_DISPLAY_RESET_GPIO,
     .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+    // The framebuffer contains native ESP32 little-endian RGB565 words. Without
+    // this RAMCTRL setting, the ST7789 interprets Lantern green as purple.
+    .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
     .bits_per_pixel = 16,
   };
   ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7789(panel_io, &panel_config, &s_panel), TAG, "panel failed");

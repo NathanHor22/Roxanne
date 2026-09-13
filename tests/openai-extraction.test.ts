@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { MeetingExtraction } from "../lib/meeting-schema";
-import { extractWithIlmu } from "../lib/providers/ilmu";
+import { extractWithOpenAI } from "../lib/providers/openai-extraction";
 import type { TranscriptSegment } from "../lib/types";
 
 const transcript: TranscriptSegment[] = [
@@ -15,7 +15,7 @@ const context = {
   referenceDate: "2026-09-06T10:00:00+08:00",
   timezone: "Asia/Kuala_Lumpur",
 };
-const options = { apiKey: "test-only-ilmu-key", model: "test-ilmu-model" };
+const options = { apiKey: "test-only-openai-key", model: "test-openai-model" };
 
 function extractionFixture(): MeetingExtraction {
   return {
@@ -52,63 +52,68 @@ function extractionFixture(): MeetingExtraction {
   };
 }
 
-function modelResponse(content: unknown, finishReason = "stop") {
+function modelResponse(content: unknown) {
   return Response.json({
-    choices: [{
-      finish_reason: finishReason,
-      message: { content: typeof content === "string" ? content : JSON.stringify(content) },
+    output: [{
+      type: "message",
+      content: [{
+        type: "output_text",
+        text: typeof content === "string" ? content : JSON.stringify(content),
+      }],
     }],
   });
 }
 
-test("Ilmu sends the supplied conversation time and unknown speakers with a strict schedule schema", async () => {
+test("OpenAI receives the conversation clock and a strict schedule schema", async () => {
   let calls = 0;
   const fetchImpl: typeof fetch = async (url, init) => {
     calls += 1;
-    assert.equal(url, "https://api.ilmu.ai/v1/chat/completions");
+    assert.equal(url, "https://api.openai.com/v1/responses");
     assert.equal(init?.method, "POST");
-    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer test-only-ilmu-key");
+    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer test-only-openai-key");
     assert.ok(init?.signal);
     const request = JSON.parse(String(init?.body));
-    assert.equal(request.model, "test-ilmu-model");
-    assert.equal(request.response_format.type, "json_schema");
-    assert.equal(request.response_format.json_schema.strict, true);
-    const followUpSchema = request.response_format.json_schema.schema.properties.followUps.items;
+    assert.equal(request.model, "test-openai-model");
+    assert.equal(request.store, false);
+    assert.equal(request.text.format.type, "json_schema");
+    assert.equal(request.text.format.strict, true);
+    const followUpSchema = request.text.format.schema.properties.followUps.items;
     assert.equal(followUpSchema.additionalProperties, false);
     assert.ok(followUpSchema.required.includes("schedule"));
     assert.equal(followUpSchema.properties.schedule.additionalProperties, false);
     assert.ok(followUpSchema.properties.schedule.required.includes("evidence"));
-    assert.match(request.messages[0].content, /untrusted data/u);
-    assert.match(request.messages[0].content, /later corrections/u);
-    assert.deepEqual(JSON.parse(request.messages[1].content), { context, transcript });
+    assert.match(request.instructions, /Malaysian code-switching/u);
+    assert.match(request.instructions, /untrusted data/u);
+    assert.match(request.instructions, /later corrections/u);
+    assert.match(request.instructions, /natural, concise English/u);
+    assert.deepEqual(JSON.parse(request.input), { context, transcript });
     return modelResponse(extractionFixture());
   };
 
-  const result = await extractWithIlmu(transcript, context, { ...options, fetchImpl });
+  const result = await extractWithOpenAI(transcript, context, { ...options, fetchImpl });
   assert.equal(calls, 1);
-  assert.deepEqual(result, { ...extractionFixture(), provider: "ilmu" });
+  assert.deepEqual(result, { ...extractionFixture(), provider: "openai" });
 });
 
-test("missing Ilmu credentials fail without a request or sample extraction", async () => {
+test("missing OpenAI credentials fail before a request", async () => {
   let calls = 0;
   const fetchImpl: typeof fetch = async () => {
     calls += 1;
     return modelResponse(extractionFixture());
   };
   await assert.rejects(
-    () => extractWithIlmu(transcript, context, { apiKey: null, fetchImpl }),
-    /Ilmu is not configured/u,
+    () => extractWithOpenAI(transcript, context, { apiKey: null, fetchImpl }),
+    /OpenAI is not configured/u,
   );
   assert.equal(calls, 0);
 });
 
-test("provider errors, malformed output, and truncation fail without a fallback recap", async () => {
+test("provider errors and malformed output fail without a fabricated recap", async () => {
   const responses = [
     () => new Response("Unavailable", { status: 503 }),
     () => modelResponse("not JSON"),
     () => modelResponse({ insight: {} }),
-    () => modelResponse(extractionFixture(), "length"),
-    () => Response.json({ choices: [] }),
+    () => Response.json({ output: [] }),
     () => { throw new Error("Network disconnected"); },
   ];
   for (const response of responses) {
@@ -118,13 +123,13 @@ test("provider errors, malformed output, and truncation fail without a fallback 
       return response();
     };
     await assert.rejects(
-      () => extractWithIlmu(transcript, context, { ...options, fetchImpl }),
+      () => extractWithOpenAI(transcript, context, { ...options, fetchImpl }),
     );
     assert.equal(calls, 1);
   }
 });
 
-test("a schedule needs an agreed state and a quote actually present in the supplied transcript", async () => {
+test("a schedule needs an agreed state and evidence present in the transcript", async () => {
   for (const patch of [
     { evidence: "Let's meet Monday at nine. Confirmed." },
     { evidence: null },
@@ -134,7 +139,7 @@ test("a schedule needs an agreed state and a quote actually present in the suppl
     const fixture = extractionFixture();
     fixture.followUps[0]!.schedule = { ...fixture.followUps[0]!.schedule!, ...patch };
     await assert.rejects(
-      () => extractWithIlmu(transcript, context, {
+      () => extractWithOpenAI(transcript, context, {
         ...options,
         fetchImpl: async () => modelResponse(fixture),
       }),
@@ -144,7 +149,7 @@ test("a schedule needs an agreed state and a quote actually present in the suppl
   const missingSchedule = extractionFixture();
   delete missingSchedule.followUps[0]!.schedule;
   await assert.rejects(
-    () => extractWithIlmu(transcript, context, {
+    () => extractWithOpenAI(transcript, context, {
       ...options,
       fetchImpl: async () => modelResponse(missingSchedule),
     }),
@@ -152,25 +157,25 @@ test("a schedule needs an agreed state and a quote actually present in the suppl
   );
 });
 
-test("a verified agreement can retain missing details for review without inventing recipients or duration", async () => {
+test("a verified agreement may keep missing details for owner review", async () => {
   const fixture = extractionFixture();
   fixture.followUps[0]!.schedule!.attendees = [];
   fixture.followUps[0]!.schedule!.durationMinutes = null;
   fixture.followUps[0]!.schedule!.startAt = null;
-  const result = await extractWithIlmu(transcript, context, {
+  const result = await extractWithOpenAI(transcript, context, {
     ...options,
     fetchImpl: async () => modelResponse(fixture),
   });
   assert.deepEqual(result.followUps[0]?.schedule, fixture.followUps[0]?.schedule);
 });
 
-test("an ordinary follow-up may have no schedule and creates no meeting approval", async () => {
+test("an ordinary follow-up may have no schedule", async () => {
   const fixture = extractionFixture();
   fixture.followUps = [{
     type: "send_file", description: "Send the pilot quotation",
     dueAt: null, draft: null, schedule: null,
   }];
-  const result = await extractWithIlmu(transcript, context, {
+  const result = await extractWithOpenAI(transcript, context, {
     ...options,
     fetchImpl: async () => modelResponse(fixture),
   });
