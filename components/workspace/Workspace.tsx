@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -14,6 +15,7 @@ import {
   LayoutGrid,
   List,
   LoaderCircle,
+  LogIn,
   LogOut,
   MessageSquare,
   MoreHorizontal,
@@ -59,7 +61,16 @@ type View =
   | "device"
   | "settings";
 
-export function Workspace() {
+export type WorkspaceAccount = {
+  email: string;
+  displayName: string | null;
+};
+
+type WorkspaceProps = {
+  account: WorkspaceAccount | null;
+};
+
+export function Workspace({ account }: WorkspaceProps) {
   const workspace = useWorkspace();
   const { meetings, mode, loading, error, notice, working, integrations } =
     workspace;
@@ -131,6 +142,13 @@ export function Workspace() {
         .toLowerCase()
         .includes(normalizedSearch),
   );
+  const accountName =
+    account?.displayName || account?.email.split("@")[0] || "Google account";
+  const accountInitials = account
+    ? initials(accountName).toUpperCase() ||
+      account.email[0]?.toUpperCase() ||
+      "ME"
+    : "?";
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
@@ -238,21 +256,22 @@ export function Workspace() {
             <Settings2 />
             <span>Settings</span>
           </button>
-          <div className={styles.account}>
+          <div
+            className={`${styles.account} ${account ? "" : styles.accountSignedOut}`}
+          >
             <span className={styles.accountAvatar}>
-              {mode === "sample" ? "S" : "ME"}
+              {accountInitials}
             </span>
             <div>
-              <strong>
-                {mode === "sample" ? "Sample workspace" : "Personal workspace"}
-              </strong>
-              <small>
-                {mode === "sample"
-                  ? "Saved in this browser"
-                  : "Your private business memory"}
+              <span className={styles.accountState}>
+                <i /> {account ? "Signed in" : "Signed out"}
+              </span>
+              <strong>{accountName}</strong>
+              <small title={account?.email}>
+                {account?.email || "Google account required"}
               </small>
             </div>
-            <ShieldCheck />
+            {account ? <ShieldCheck /> : <LogIn />}
           </div>
         </div>
       </aside>
@@ -274,6 +293,33 @@ export function Workspace() {
               {mode === "sample" ? "Sample workspace" : "Live workspace"}
               <ChevronRight />
             </button>
+            <div className={styles.authControls} aria-label="Account access">
+              {account ? (
+                <>
+                  <span className={styles.topbarIdentity} title={account.email}>
+                    <i />
+                    <span>Signed in</span>
+                    <small>{account.email}</small>
+                  </span>
+                  <form action="/api/auth/logout" method="post">
+                    <button className={styles.signOutButton} type="submit">
+                      <LogOut />
+                      <span>Sign out</span>
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <Link
+                  aria-label="Sign in with Google"
+                  className={styles.signInButton}
+                  href="/login?next=/dashboard"
+                >
+                  <LogIn />
+                  <span className={styles.signInFull}>Sign in with Google</span>
+                  <span className={styles.signInShort}>Sign in</span>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
         <div className={styles.content}>
@@ -1210,14 +1256,32 @@ export function Workspace() {
                       stay inside your private Lantern workspace.
                     </p>
                     <span className={styles.connectionState}>
-                      <i className={styles.greenDot} />
-                      Owner access only
+                      <i
+                        className={
+                          account ? styles.greenDot : styles.neutralDot
+                        }
+                      />
+                      {account
+                        ? `Signed in as ${account.email}`
+                        : "You are signed out"}
                     </span>
-                    <form action="/api/auth/logout" method="post">
-                      <button className={styles.secondaryButton} type="submit">
-                        Sign out <LogOut />
-                      </button>
-                    </form>
+                    {account ? (
+                      <form action="/api/auth/logout" method="post">
+                        <button className={styles.signOutButton} type="submit">
+                          <LogOut /> Sign out
+                        </button>
+                      </form>
+                    ) : (
+                      <Link
+                        aria-label="Sign in with Google"
+                        className={styles.signInButton}
+                        href="/login?next=/dashboard"
+                      >
+                        <LogIn />
+                        <span className={styles.signInFull}>Sign in with Google</span>
+                        <span className={styles.signInShort}>Sign in</span>
+                      </Link>
+                    )}
                   </section>
                 </div>
               )}

@@ -213,13 +213,43 @@
   gap: 2px;
   min-width: 0;
 }
+.accountState {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9de8b8;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.accountState i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #51f891;
+  box-shadow: 0 0 9px #42f385;
+}
+.accountSignedOut .accountState {
+  color: #d5c7a1;
+}
+.accountSignedOut .accountState i {
+  background: #d6af55;
+  box-shadow: none;
+}
 .account strong {
   font-size: 12px;
   font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .account small {
   font-size: 12px;
   color: #9bb3a5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .account > svg {
   margin-left: auto;
@@ -283,6 +313,85 @@
   padding: 6px 10px;
   font-size: 12px !important;
   color: #52645b;
+}
+.authControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 11px;
+  border-left: 1px solid var(--w-line);
+}
+.authControls form,
+.settingsCard form {
+  margin: 0;
+}
+.topbarIdentity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #315c43;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.topbarIdentity i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #18a65b;
+  box-shadow: 0 0 0 3px #daf4e4;
+}
+.topbarIdentity small {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--w-muted);
+  font-size: 11px;
+  font-weight: 450;
+  text-overflow: ellipsis;
+}
+.signInButton,
+.signOutButton {
+  min-height: 35px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px !important;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.signInButton {
+  border: 1px solid #087a43;
+  background: #087a43;
+  color: #fff;
+  box-shadow: 0 6px 16px #087a4324;
+}
+.signInButton:hover {
+  border-color: #056637;
+  background: #056637;
+}
+.signOutButton {
+  border: 1px solid #e1c9c5;
+  background: #fff;
+  color: #813d35;
+}
+.signOutButton:hover {
+  border-color: #cfa69f;
+  background: #fff6f4;
+}
+.signInButton svg,
+.signOutButton svg {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+.signInShort {
+  display: none;
 }
 .content {
   max-width: 1640px;
@@ -1826,6 +1935,9 @@
   .topbar {
     padding-inline: 23px;
   }
+  .topbarIdentity small {
+    display: none;
+  }
   .calendarLayout {
     grid-template-columns: minmax(0, 1fr) 267px;
     gap: 17px;
@@ -2072,6 +2184,9 @@
   .timezone {
     display: none;
   }
+  .topbarIdentity span {
+    display: none;
+  }
   .summaryBar > div > span:last-child {
     gap: 3px;
   }
@@ -2138,6 +2253,24 @@
   .topbar > div {
     font-size: 12px;
     gap: 7px;
+  }
+  .authControls {
+    gap: 5px;
+    padding-left: 6px;
+  }
+  .topbarIdentity {
+    display: none;
+  }
+  .signInButton,
+  .signOutButton {
+    min-height: 34px;
+    padding: 7px 9px;
+  }
+  .signInFull {
+    display: none;
+  }
+  .signInShort {
+    display: inline;
   }
   .modeButton {
     font-size: 12px !important;
