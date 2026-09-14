@@ -8,6 +8,13 @@ import {
 
 const OPENAI_TRANSCRIPTION_URL = "https://api.openai.com/v1/audio/transcriptions";
 const DEFAULT_TIMEOUT_MS = 120_000;
+const DIARIZATION_MODEL = "gpt-4o-transcribe-diarize";
+const TRANSCRIPTION_FALLBACK_MODELS = [
+  "gpt-transcribe",
+  "gpt-4o-transcribe",
+  "gpt-4o-mini-transcribe",
+  "whisper-1",
+] as const;
 
 const openAIResponseSchema = z
   .object({
@@ -55,6 +62,19 @@ function readProviderErrorCode(body: string) {
   }
 }
 
+function createTranscriptionForm(audio: Blob, fileName: string, model: string) {
+  const form = new FormData();
+  form.append("file", audio, fileName || "lantern.wav");
+  form.append("model", model);
+  if (model === DIARIZATION_MODEL) {
+    form.append("response_format", "diarized_json");
+    form.append("chunking_strategy", "auto");
+  } else {
+    form.append("response_format", "json");
+  }
+  return form;
+}
+
 export async function transcribeWithOpenAI(
   audio: Blob,
   options: {
@@ -92,44 +112,53 @@ export async function transcribeWithOpenAI(
   const fileName = (options.fileName || "lantern.wav")
     .replace(/[\r\n"\\/]/gu, "_")
     .slice(0, 180);
-  const form = new FormData();
-  form.append("file", audio, fileName || "lantern.wav");
-  form.append(
-    "model",
-    options.modelId?.trim() || runtime.OPENAI_TRANSCRIPTION_MODEL,
-  );
-  form.append("response_format", "diarized_json");
-  form.append("chunking_strategy", "auto");
+  const requestedModel =
+    options.modelId?.trim() || runtime.OPENAI_TRANSCRIPTION_MODEL;
+  const models = [
+    requestedModel,
+    ...TRANSCRIPTION_FALLBACK_MODELS.filter((model) => model !== requestedModel),
+  ];
 
-  let response: Response;
+  let body = "";
   try {
-    response = await (options.fetchImpl ?? fetch)(OPENAI_TRANSCRIPTION_URL, {
-      method: "POST",
-      headers: { authorization: `Bearer ${apiKey}` },
-      body: form,
-      signal: controller.signal,
-    });
-  } catch (error) {
-    throw new OpenAITranscriptionProviderError(
-      controller.signal.aborted
-        ? `OpenAI transcription timed out after ${timeoutMs}ms.`
-        : "Could not reach OpenAI transcription.",
-      { cause: error },
-    );
+    for (const [index, model] of models.entries()) {
+      let response: Response;
+      try {
+        response = await (options.fetchImpl ?? fetch)(OPENAI_TRANSCRIPTION_URL, {
+          method: "POST",
+          headers: { authorization: `Bearer ${apiKey}` },
+          body: createTranscriptionForm(audio, fileName, model),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        throw new OpenAITranscriptionProviderError(
+          controller.signal.aborted
+            ? `OpenAI transcription timed out after ${timeoutMs}ms.`
+            : "Could not reach OpenAI transcription.",
+          { cause: error },
+        );
+      }
+
+      body = await response.text();
+      if (response.ok) break;
+
+      const providerCode = readProviderErrorCode(body);
+      const canTryAnotherModel =
+        index < models.length - 1 &&
+        response.status === 403 &&
+        providerCode === "model_not_found";
+      if (canTryAnotherModel) continue;
+
+      throw new OpenAITranscriptionProviderError(
+        `OpenAI transcription failed with HTTP ${response.status}${
+          providerCode ? ` (${providerCode})` : ""
+        }.`,
+        { status: response.status, providerCode },
+      );
+    }
   } finally {
     clearTimeout(timer);
     options.signal?.removeEventListener("abort", abortFromCaller);
-  }
-
-  const body = await response.text();
-  if (!response.ok) {
-    const providerCode = readProviderErrorCode(body);
-    throw new OpenAITranscriptionProviderError(
-      `OpenAI transcription failed with HTTP ${response.status}${
-        providerCode ? ` (${providerCode})` : ""
-      }.`,
-      { status: response.status, providerCode },
-    );
   }
 
   let decoded: unknown;

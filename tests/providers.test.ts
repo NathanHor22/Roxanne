@@ -363,6 +363,41 @@ test("OpenAI fallback reports a safe provider error code", async () => {
   );
 });
 
+test("OpenAI fallback uses standard transcription when diarization is unavailable", async () => {
+  const requests: FormData[] = [];
+  const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    assert.ok(init?.body instanceof FormData);
+    requests.push(init.body);
+    if (requests.length === 1) {
+      return new Response(
+        JSON.stringify({
+          error: { type: "invalid_request_error", code: "model_not_found" },
+        }),
+        { status: 403 },
+      );
+    }
+    return new Response(JSON.stringify({ text: "Jumpa esok pukul satu." }), {
+      status: 200,
+    });
+  }) as typeof fetch;
+
+  const result = await transcribeWithOpenAI(new Blob(["audio"]), {
+    apiKey: "openai-key",
+    modelId: "gpt-4o-transcribe-diarize",
+    fetchImpl,
+  });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0]?.get("model"), "gpt-4o-transcribe-diarize");
+  assert.equal(requests[0]?.get("response_format"), "diarized_json");
+  assert.equal(requests[1]?.get("model"), "gpt-transcribe");
+  assert.equal(requests[1]?.get("response_format"), "json");
+  assert.equal(requests[1]?.has("chunking_strategy"), false);
+  assert.deepEqual(result.segments, [
+    { speaker: "Conversation", text: "Jumpa esok pukul satu." },
+  ]);
+});
+
 test("credential-free extraction uses deterministic transcript-derived rules", () => {
   const transcript = [
     {

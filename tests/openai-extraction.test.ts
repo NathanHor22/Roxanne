@@ -129,6 +129,29 @@ test("provider errors and malformed output fail without a fabricated recap", asy
   }
 });
 
+test("model access errors fall back to an available extraction model", async () => {
+  const models: string[] = [];
+  const fetchImpl: typeof fetch = async (_url, init) => {
+    const request = JSON.parse(String(init?.body));
+    models.push(request.model);
+    if (models.length === 1) {
+      return Response.json(
+        { error: { type: "invalid_request_error", code: "model_not_found" } },
+        { status: 403 },
+      );
+    }
+    return modelResponse(extractionFixture());
+  };
+
+  const result = await extractWithOpenAI(transcript, context, {
+    ...options,
+    fetchImpl,
+  });
+
+  assert.deepEqual(models, ["test-openai-model", "gpt-5-mini"]);
+  assert.equal(result.provider, "openai");
+});
+
 test("a schedule needs an agreed state and evidence present in the transcript", async () => {
   for (const patch of [
     { evidence: "Let's meet Monday at nine. Confirmed." },
