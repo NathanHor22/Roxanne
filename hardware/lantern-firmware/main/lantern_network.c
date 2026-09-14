@@ -42,6 +42,13 @@ typedef struct {
   size_t length;
 } response_buffer_t;
 
+static response_buffer_t *response_buffer_create(void) {
+  response_buffer_t *response = heap_caps_calloc(
+    1, sizeof(response_buffer_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!response) ESP_LOGE(TAG, "could not allocate HTTP response buffer in PSRAM");
+  return response;
+}
+
 static void notify(void) {
   if (s_callback) s_callback(&s_status);
 }
@@ -219,22 +226,25 @@ static esp_err_t claim_device(void) {
     "\"model\":\"%s\",\"firmwareVersion\":\"%s\"}",
     s_config->pairing_code, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
     LANTERN_MODEL, LANTERN_FIRMWARE_VERSION);
-  response_buffer_t response;
-  int status = post_json("/api/device/v1/claim", body, NULL, &response);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) return ESP_ERR_NO_MEM;
+  int status = post_json("/api/device/v1/claim", body, NULL, response);
   if (status != 201) {
     char message[96];
     snprintf(message, sizeof(message), "Pairing failed HTTP %d", status);
     set_error(message);
-    ESP_LOGW(TAG, "claim response: %.256s", response.data);
+    ESP_LOGW(TAG, "claim response: %.256s", response->data);
+    free(response);
     return ESP_FAIL;
   }
-  cJSON *root = cJSON_Parse(response.data);
+  cJSON *root = cJSON_Parse(response->data);
   cJSON *device = root ? cJSON_GetObjectItemCaseSensitive(root, "device") : NULL;
   cJSON *credential = root ? cJSON_GetObjectItemCaseSensitive(root, "credential") : NULL;
   cJSON *id = device ? cJSON_GetObjectItemCaseSensitive(device, "id") : NULL;
   cJSON *secret = credential ? cJSON_GetObjectItemCaseSensitive(credential, "secret") : NULL;
   if (!cJSON_IsString(id) || !cJSON_IsString(secret)) {
     cJSON_Delete(root);
+    free(response);
     set_error("Pairing response was invalid");
     return ESP_FAIL;
   }
@@ -242,6 +252,7 @@ static esp_err_t claim_device(void) {
   snprintf(s_config->device_secret, sizeof(s_config->device_secret), "%s", secret->valuestring);
   esp_err_t save = lantern_storage_save_device(s_config->device_id, s_config->device_secret);
   cJSON_Delete(root);
+  free(response);
   if (save != ESP_OK) {
     set_error("Could not save device credential");
     return save;
@@ -562,7 +573,7 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
   ESP_ERROR_CHECK(esp_wifi_start());
   esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
   if (portal_result != ESP_OK) return portal_result;
-  if (has_wifi && xTaskCreate(connection_task, "lantern_connect", 4096, NULL, 5, NULL) != pdPASS) {
+  if (has_wifi && xTaskCreate(connection_task, "lantern_connect", 8192, NULL, 5, NULL) != pdPASS) {
     return ESP_ERR_NO_MEM;
   }
   return ESP_OK;
@@ -585,13 +596,39 @@ esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_versi
     "\"freeHeapBytes\":%u,\"lastError\":null}",
     event_id, LANTERN_FIRMWARE_VERSION, state, state_version, battery_level,
     (unsigned)esp_get_free_heap_size());
-  response_buffer_t response;
-  int status = post_json("/api/device/v1/heartbeat", body, authorization, &response);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) return ESP_ERR_NO_MEM;
+  int status = post_json("/api/device/v1/heartbeat", body, authorization, response);
   if (status != 200) {
-    ESP_LOGW(TAG, "heartbeat HTTP %d: %.192s", status, response.data);
+    ESP_LOGW(TAG, "heartbeat HTTP %d: %.192s", status, response->data);
+    free(response);
     return ESP_FAIL;
   }
+  free(response);
   ESP_LOGI(TAG, "heartbeat acknowledged");
+  return ESP_OK;
+}
+
+esp_err_t lantern_network_restart_session(void) {
+  if (!s_config || !s_status.wifi_connected || !lantern_storage_is_paired(s_config)) {
+    return ESP_ERR_INVALID_STATE;
+  }
+  char event_id[37];
+  uuid_v4(event_id);
+  char body[64];
+  snprintf(body, sizeof(body), "{\"eventId\":\"%s\"}", event_id);
+  char authorization[140];
+  device_authorization(authorization);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) return ESP_ERR_NO_MEM;
+  int status = post_json("/api/device/v1/restart", body, authorization, response);
+  if (status != 200) {
+    provider_error("Session restart", status, response);
+    free(response);
+    return ESP_FAIL;
+  }
+  free(response);
+  ESP_LOGI(TAG, "server session reset acknowledged");
   return ESP_OK;
 }
 
@@ -606,13 +643,17 @@ esp_err_t lantern_network_begin_quick(lantern_cloud_session_t *session) {
   snprintf(body, sizeof(body), "{\"eventId\":\"%s\",\"mode\":\"quick\"}", event_id);
   char authorization[140];
   device_authorization(authorization);
-  response_buffer_t response;
-  int status = post_json("/api/device/v1/sessions", body, authorization, &response);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) return ESP_ERR_NO_MEM;
+  int status = post_json("/api/device/v1/sessions", body, authorization, response);
   if (status != 201 && status != 200) {
-    provider_error("Session start", status, &response);
+    provider_error("Session start", status, response);
+    free(response);
     return ESP_FAIL;
   }
-  if (!parse_session_response(response.data, session, NULL) || !session->prompt_id[0]) {
+  bool valid = parse_session_response(response->data, session, NULL) && session->prompt_id[0];
+  free(response);
+  if (!valid) {
     set_error("Session response was invalid");
     return ESP_FAIL;
   }
@@ -634,14 +675,21 @@ static esp_err_t send_session_event(lantern_cloud_session_t *session, const char
     event_id, session->version, event_json);
   char authorization[140];
   device_authorization(authorization);
-  response_buffer_t response;
-  int status = post_json(path, body, authorization, &response);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) {
+    free(body);
+    return ESP_ERR_NO_MEM;
+  }
+  int status = post_json(path, body, authorization, response);
   free(body);
   if (status != 200) {
-    provider_error("Session event", status, &response);
+    provider_error("Session event", status, response);
+    free(response);
     return ESP_FAIL;
   }
-  if (!parse_session_response(response.data, session, transport)) {
+  bool valid = parse_session_response(response->data, session, transport);
+  free(response);
+  if (!valid) {
     set_error("Session event response was invalid");
     return ESP_FAIL;
   }
@@ -686,13 +734,16 @@ esp_err_t lantern_network_upload_transcript(const lantern_cloud_session_t *sessi
   snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/transcript", session->session_id);
   device_authorization(authorization);
   uuid_v4(event_id);
-  response_buffer_t response;
+  response_buffer_t *response = response_buffer_create();
+  if (!response) return ESP_ERR_NO_MEM;
   int status = post_binary(path, "application/x-lantern-agora-caption-batch",
-    lantern_transcript_data(), lantern_transcript_size(), authorization, event_id, &response);
+    lantern_transcript_data(), lantern_transcript_size(), authorization, event_id, response);
   if (status != 201 && status != 200) {
-    provider_error("Transcript upload", status, &response);
+    provider_error("Transcript upload", status, response);
+    free(response);
     return ESP_FAIL;
   }
+  free(response);
   return ESP_OK;
 }
 
@@ -726,13 +777,19 @@ esp_err_t lantern_network_upload_audio(const lantern_cloud_session_t *session) {
   snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/audio", session->session_id);
   device_authorization(authorization);
   uuid_v4(event_id);
-  response_buffer_t response;
-  int status = post_binary(path, "audio/wav", wav, wav_size, authorization, event_id, &response);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) {
+    free(wav);
+    return ESP_ERR_NO_MEM;
+  }
+  int status = post_binary(path, "audio/wav", wav, wav_size, authorization, event_id, response);
   free(wav);
   if (status != 201 && status != 200) {
-    provider_error("Audio upload", status, &response);
+    provider_error("Audio upload", status, response);
+    free(response);
     return ESP_FAIL;
   }
+  free(response);
   return ESP_OK;
 }
 
@@ -743,11 +800,15 @@ esp_err_t lantern_network_complete_session(lantern_cloud_session_t *session) {
   snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/complete", session->session_id);
   snprintf(body, sizeof(body), "{\"eventId\":\"%s\"}", session->completion_event_id);
   device_authorization(authorization);
-  response_buffer_t response;
-  int status = post_json(path, body, authorization, &response);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) return ESP_ERR_NO_MEM;
+  int status = post_json(path, body, authorization, response);
   if (status != 201 && status != 200) {
-    provider_error("Meeting processing", status, &response);
+    provider_error("Meeting processing", status, response);
+    free(response);
     return ESP_FAIL;
   }
-  return parse_session_response(response.data, session, NULL) ? ESP_OK : ESP_FAIL;
+  bool valid = parse_session_response(response->data, session, NULL);
+  free(response);
+  return valid ? ESP_OK : ESP_FAIL;
 }

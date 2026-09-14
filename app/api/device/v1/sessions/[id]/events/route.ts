@@ -118,10 +118,19 @@ export async function POST(
     const next = advanceLantern(current, event);
     let transport: AgoraLanternTransport | undefined;
     let startedAgentId: string | undefined;
+    let providerWarning: string | undefined;
     if (event.type === "RECORDING_CONSENT" && event.accepted) {
       transport = buildAgoraLanternTransport(id, device.id);
-      const started = await startAgoraLanternTranscription(id, transport);
-      startedAgentId = started.agentId;
+      try {
+        const started = await startAgoraLanternTranscription(id, transport);
+        startedAgentId = started.agentId;
+      } catch (cause) {
+        providerWarning =
+          cause instanceof Error
+            ? cause.message
+            : "Agora Speech-to-Text could not start; the WAV fallback will be used.";
+        console.warn("[lantern-agora-stt-fallback]", providerWarning);
+      }
     }
     const endedAt = next.sessionId === null ? serverTime : null;
     const { data: transitionRows, error: updateError } = await client.rpc(
@@ -158,26 +167,27 @@ export async function POST(
       transition.stored_machine || next,
     );
 
-    if (transport && startedAgentId) {
+    if (transport) {
       const { error: providerError } = await client
         .from("lantern_sessions")
         .update({
           agora_channel_name: transport.channel,
           agora_publisher_uid: transport.publisherUid,
           agora_stt_bot_uid: transport.sttBotUid,
-          agora_stt_agent_id: startedAgentId,
+          agora_stt_agent_id: startedAgentId || null,
           agora_token_expires_at: transport.expiresAt,
-          processing_error: null,
+          processing_error: providerWarning || null,
         })
         .eq("id", id)
         .eq("device_id", device.id);
       if (providerError) {
-        await stopAgoraLanternTranscription(startedAgentId).catch(() => undefined);
+        if (startedAgentId) {
+          await stopAgoraLanternTranscription(startedAgentId).catch(() => undefined);
+        }
         throw new Error(providerError.message);
       }
     }
 
-    let providerWarning: string | undefined;
     if (event.type === "STOP") {
       const { error: endStampError } = await client
         .from("lantern_sessions")

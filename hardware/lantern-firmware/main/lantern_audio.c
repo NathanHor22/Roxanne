@@ -133,7 +133,9 @@ esp_err_t lantern_audio_init(void) {
 
   s_retry_buffer = heap_caps_malloc(RETRY_BUFFER_SAMPLES * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (!s_retry_buffer) return ESP_ERR_NO_MEM;
-  xTaskCreatePinnedToCore(microphone_task, "lantern_mic", 4096, NULL, 6, NULL, 1);
+  // Agora's synchronous PCM encode/send path runs inside this callback task
+  // and needs substantially more stack than the I2S capture loop alone.
+  xTaskCreatePinnedToCore(microphone_task, "lantern_mic", 12288, NULL, 6, NULL, 1);
   ESP_LOGI(TAG, "I2S microphone and speaker ready; 30-second PSRAM buffer allocated");
   return ESP_OK;
 }

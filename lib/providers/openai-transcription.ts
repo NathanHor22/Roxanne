@@ -30,11 +30,28 @@ const openAIResponseSchema = z
 
 export class OpenAITranscriptionProviderError extends Error {
   readonly status?: number;
+  readonly providerCode?: string;
 
-  constructor(message: string, options?: { status?: number; cause?: unknown }) {
+  constructor(
+    message: string,
+    options?: { status?: number; providerCode?: string; cause?: unknown },
+  ) {
     super(message, { cause: options?.cause });
     this.name = "OpenAITranscriptionProviderError";
     this.status = options?.status;
+    this.providerCode = options?.providerCode;
+  }
+}
+
+function readProviderErrorCode(body: string) {
+  try {
+    const decoded = JSON.parse(body) as { error?: { code?: unknown; type?: unknown } };
+    const candidate = decoded.error?.code ?? decoded.error?.type;
+    if (typeof candidate !== "string") return undefined;
+    const safeCode = candidate.trim().slice(0, 80);
+    return /^[a-zA-Z0-9._-]+$/u.test(safeCode) ? safeCode : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -106,9 +123,12 @@ export async function transcribeWithOpenAI(
 
   const body = await response.text();
   if (!response.ok) {
+    const providerCode = readProviderErrorCode(body);
     throw new OpenAITranscriptionProviderError(
-      `OpenAI transcription failed with HTTP ${response.status}.`,
-      { status: response.status },
+      `OpenAI transcription failed with HTTP ${response.status}${
+        providerCode ? ` (${providerCode})` : ""
+      }.`,
+      { status: response.status, providerCode },
     );
   }
 

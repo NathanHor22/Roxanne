@@ -23,7 +23,22 @@
 static const char *TAG = "lantern_display";
 static esp_lcd_panel_handle_t s_panel;
 static uint16_t *s_pixels;
+static uint16_t *s_transfer_pixels;
 static SemaphoreHandle_t s_lock;
+static SemaphoreHandle_t s_transfer_done;
+
+#define TRANSFER_ROWS 16
+
+static bool transfer_finished(esp_lcd_panel_io_handle_t panel_io,
+                              esp_lcd_panel_io_event_data_t *event,
+                              void *context) {
+  (void)panel_io;
+  (void)event;
+  (void)context;
+  BaseType_t task_woken = pdFALSE;
+  xSemaphoreGiveFromISR(s_transfer_done, &task_woken);
+  return task_woken == pdTRUE;
+}
 
 static uint16_t rgb565(uint8_t red, uint8_t green, uint8_t blue) {
   return (uint16_t)(((red & 0xf8) << 8) | ((green & 0xfc) << 3) | (blue >> 3));
@@ -143,7 +158,8 @@ esp_err_t lantern_display_init(void) {
     .dc_gpio_num = LANTERN_DISPLAY_DC_GPIO,
     .spi_mode = 3,
     .pclk_hz = 40 * 1000 * 1000,
-    .trans_queue_depth = 4,
+    .trans_queue_depth = 1,
+    .on_color_trans_done = transfer_finished,
     .lcd_cmd_bits = 8,
     .lcd_param_bits = 8,
   };
@@ -177,8 +193,13 @@ esp_err_t lantern_display_init(void) {
       MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
   }
   if (!s_pixels) return ESP_ERR_NO_MEM;
+  s_transfer_pixels = heap_caps_malloc(
+    LANTERN_DISPLAY_WIDTH * TRANSFER_ROWS * sizeof(uint16_t),
+    MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+  if (!s_transfer_pixels) return ESP_ERR_NO_MEM;
   s_lock = xSemaphoreCreateMutex();
-  if (!s_lock) return ESP_ERR_NO_MEM;
+  s_transfer_done = xSemaphoreCreateBinary();
+  if (!s_lock || !s_transfer_done) return ESP_ERR_NO_MEM;
   gpio_set_level(LANTERN_DISPLAY_BACKLIGHT_GPIO, 1);
   lantern_display_show(LANTERN_SCREEN_BOOTING, "HARDWARE CHECK");
   ESP_LOGI(TAG, "ST7789 ready at 240x240");
@@ -221,8 +242,24 @@ void lantern_display_show(lantern_screen_t screen, const char *detail) {
   centered_text(162, status, 2, accent);
   if (detail && detail[0]) centered_text(202, detail, 1, white);
 
-  esp_err_t result = esp_lcd_panel_draw_bitmap(
-    s_panel, 0, 0, LANTERN_DISPLAY_WIDTH, LANTERN_DISPLAY_HEIGHT, s_pixels);
-  if (result != ESP_OK) ESP_LOGE(TAG, "draw failed: %s", esp_err_to_name(result));
+  while (xSemaphoreTake(s_transfer_done, 0) == pdTRUE) {}
+  for (int y = 0; y < LANTERN_DISPLAY_HEIGHT; y += TRANSFER_ROWS) {
+    int rows = LANTERN_DISPLAY_HEIGHT - y;
+    if (rows > TRANSFER_ROWS) rows = TRANSFER_ROWS;
+    memcpy(
+      s_transfer_pixels,
+      s_pixels + y * LANTERN_DISPLAY_WIDTH,
+      (size_t)rows * LANTERN_DISPLAY_WIDTH * sizeof(uint16_t));
+    esp_err_t result = esp_lcd_panel_draw_bitmap(
+      s_panel, 0, y, LANTERN_DISPLAY_WIDTH, y + rows, s_transfer_pixels);
+    if (result != ESP_OK) {
+      ESP_LOGE(TAG, "draw failed: %s", esp_err_to_name(result));
+      break;
+    }
+    if (xSemaphoreTake(s_transfer_done, pdMS_TO_TICKS(1000)) != pdTRUE) {
+      ESP_LOGE(TAG, "draw timed out");
+      break;
+    }
+  }
   xSemaphoreGive(s_lock);
 }

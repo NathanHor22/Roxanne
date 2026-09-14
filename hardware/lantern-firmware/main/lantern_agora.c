@@ -13,6 +13,8 @@
 #include "lantern_transcript.h"
 
 #define AGORA_JOINED_BIT BIT0
+#define AGORA_PCM_SAMPLE_RATE 8000
+#define AGORA_PCM_FRAME_SAMPLES 160
 
 static const char *TAG = "lantern_agora";
 static EventGroupHandle_t s_events;
@@ -51,9 +53,21 @@ static void on_stream_message(connection_id_t connection, uint32_t uid, int stre
 static void send_microphone_frame(const int16_t *samples, size_t count) {
   if (!samples || !count || s_connection == CONNECTION_ID_INVALID ||
       !(xEventGroupGetBits(s_events) & AGORA_JOINED_BIT)) return;
+  // This ESP32-S3 build of Agora IoT SDK includes the G.711u encoder. Its
+  // built-in Opus encoder is absent and aborts during channel setup. Keep the
+  // local WAV at 16 kHz, then downsample each 20 ms microphone frame to the
+  // 8 kHz PCM input required by G.711u before publishing it to Agora.
+  if (count != AGORA_PCM_FRAME_SAMPLES * 2) {
+    ESP_LOGW(TAG, "unexpected microphone frame: %u samples", (unsigned)count);
+    return;
+  }
+  int16_t downsampled[AGORA_PCM_FRAME_SAMPLES];
+  for (size_t index = 0; index < AGORA_PCM_FRAME_SAMPLES; ++index) {
+    downsampled[index] = samples[index * 2];
+  }
   audio_frame_info_t frame = { .data_type = AUDIO_DATA_TYPE_PCM };
   int result = agora_rtc_send_audio_data(
-    s_connection, samples, count * sizeof(samples[0]), &frame);
+    s_connection, downsampled, sizeof(downsampled), &frame);
   if (result < 0 && result != -ERR_NOT_IN_CHANNEL) {
     ESP_LOGW(TAG, "audio send failed: %s", agora_rtc_err_2_str(result));
   }
@@ -109,8 +123,8 @@ esp_err_t lantern_agora_start(const lantern_agora_transport_t *transport) {
   rtc_channel_options_t options = {0};
   options.auto_subscribe_audio = false;
   options.auto_subscribe_video = false;
-  options.audio_codec_opt.audio_codec_type = AUDIO_CODEC_TYPE_OPUS;
-  options.audio_codec_opt.pcm_sample_rate = LANTERN_MIC_SAMPLE_RATE;
+  options.audio_codec_opt.audio_codec_type = AUDIO_CODEC_TYPE_G711U;
+  options.audio_codec_opt.pcm_sample_rate = AGORA_PCM_SAMPLE_RATE;
   options.audio_codec_opt.pcm_channel_num = 1;
   options.audio_codec_opt.pcm_duration = 20;
   xEventGroupClearBits(s_events, AGORA_JOINED_BIT);

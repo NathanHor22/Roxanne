@@ -38,6 +38,8 @@ static int s_battery_level = 50;
 static TickType_t s_state_entered_at;
 static lantern_cloud_session_t s_cloud_session;
 static unsigned s_last_recording_second = UINT32_MAX;
+static volatile bool s_network_update_pending;
+static bool s_pair_announcement_shown;
 
 static void show_recording_progress(void) {
   unsigned elapsed =
@@ -124,13 +126,10 @@ static void show_ready(void) {
 static void network_changed(const lantern_network_status_t *status) {
   ESP_LOGI(TAG, "network wifi=%d portal=%d paired=%d ip=%s", status->wifi_connected,
     status->setup_portal_active, status->paired, status->ip_address);
-  if (s_state != LOCAL_READY) return;
-  if (status->paired) {
-    lantern_display_show(LANTERN_SCREEN_PAIRED, "DASHBOARD ONLINE");
-    lantern_audio_chime(2);
-    vTaskDelay(pdMS_TO_TICKS(700));
-  }
-  show_ready();
+  // ESP-IDF invokes this callback on the small sys_evt task. Defer display,
+  // audio, and delays to Lantern's telemetry task so Wi-Fi events never block
+  // or overflow the system event loop.
+  s_network_update_pending = true;
 }
 
 static void handle_short_press(void) {
@@ -144,7 +143,7 @@ static void handle_short_press(void) {
       }
       lantern_display_show(LANTERN_SCREEN_CONNECTING, "OPENING SESSION");
       if (lantern_network_begin_quick(&s_cloud_session) != ESP_OK) {
-        show_error("SESSION START FAILED");
+        show_error("HOLD TO RESTART");
         break;
       }
       s_state = LOCAL_AWAITING_CONSENT;
@@ -262,6 +261,22 @@ static void handle_long_press(void) {
     handle_short_press();
     return;
   }
+  if (s_state == LOCAL_ERROR) {
+    lantern_display_show(LANTERN_SCREEN_CONNECTING, "RESTARTING SESSION");
+    if (lantern_network_restart_session() != ESP_OK) {
+      show_error("RESTART FAILED");
+      return;
+    }
+    memset(&s_cloud_session, 0, sizeof(s_cloud_session));
+    s_state = LOCAL_READY;
+    s_state_entered_at = xTaskGetTickCount();
+    lantern_display_show(LANTERN_SCREEN_PAIRED, "SESSION RESET");
+    lantern_audio_chime(1);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    show_ready();
+    ESP_LOGI(TAG, "explicit server session restart completed");
+    return;
+  }
   s_state = LOCAL_STATUS;
   s_state_entered_at = xTaskGetTickCount();
   lantern_display_show(LANTERN_SCREEN_STATUS, "OATH MODE READY");
@@ -335,6 +350,21 @@ static void telemetry_task(void *argument) {
   (void)argument;
   unsigned seconds = 0;
   while (true) {
+    if (s_network_update_pending) {
+      s_network_update_pending = false;
+      lantern_network_status_t network;
+      lantern_network_get_status(&network);
+      if (!network.paired) s_pair_announcement_shown = false;
+      if (s_state == LOCAL_READY) {
+        if (network.wifi_connected && network.paired && !s_pair_announcement_shown) {
+          s_pair_announcement_shown = true;
+          lantern_display_show(LANTERN_SCREEN_PAIRED, "DASHBOARD ONLINE");
+          lantern_audio_chime(2);
+          vTaskDelay(pdMS_TO_TICKS(700));
+        }
+        show_ready();
+      }
+    }
     int raw = 0;
     if (adc_oneshot_read(s_adc, ADC_CHANNEL_7, &raw) == ESP_OK) s_battery_level = battery_from_adc(raw);
     if (++seconds % 5 == 0) {
@@ -359,8 +389,10 @@ void app_main(void) {
   ESP_ERROR_CHECK(lantern_display_init());
   ESP_ERROR_CHECK(lantern_audio_init());
   ESP_ERROR_CHECK(lantern_transcript_init());
-  xTaskCreate(button_task, "lantern_buttons", 4096, NULL, 5, NULL);
-  xTaskCreate(telemetry_task, "lantern_health", 4096, NULL, 3, NULL);
+  // HTTPS and Agora calls have deep library call chains even though their bulk
+  // buffers live in PSRAM. Keep enough internal task stack for both paths.
+  xTaskCreate(button_task, "lantern_buttons", 8192, NULL, 5, NULL);
+  xTaskCreate(telemetry_task, "lantern_health", 8192, NULL, 3, NULL);
   ESP_ERROR_CHECK(lantern_network_start(&s_config, network_changed));
   show_ready();
   ESP_LOGI(TAG, "bring-up complete; short press=quick, long press=status");

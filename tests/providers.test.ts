@@ -10,7 +10,10 @@ import {
   transcribeAudio,
 } from "../lib/providers/elevenlabs";
 import { transcribeWithGroq } from "../lib/providers/groq-transcription";
-import { transcribeWithOpenAI } from "../lib/providers/openai-transcription";
+import {
+  OpenAITranscriptionProviderError,
+  transcribeWithOpenAI,
+} from "../lib/providers/openai-transcription";
 import {
   FALLBACK_EXTRACTION_WARNING,
   FALLBACK_TRANSCRIPTION_WARNING,
@@ -326,6 +329,38 @@ test("OpenAI fallback sends WAV audio and preserves diarized speakers", async ()
       endSeconds: 4.2,
     },
   ]);
+});
+
+test("OpenAI fallback reports a safe provider error code", async () => {
+  const fetchImpl = (async () =>
+    new Response(
+      JSON.stringify({
+        error: {
+          message: "Sensitive provider detail must not be surfaced.",
+          type: "invalid_request_error",
+          code: "model_not_found",
+        },
+      }),
+      { status: 403 },
+    )) as typeof fetch;
+
+  await assert.rejects(
+    transcribeWithOpenAI(new Blob(["audio"]), {
+      apiKey: "openai-key",
+      fetchImpl,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof OpenAITranscriptionProviderError);
+      assert.equal(error.status, 403);
+      assert.equal(error.providerCode, "model_not_found");
+      assert.equal(
+        error.message,
+        "OpenAI transcription failed with HTTP 403 (model_not_found).",
+      );
+      assert.ok(!error.message.includes("Sensitive provider detail"));
+      return true;
+    },
+  );
 });
 
 test("credential-free extraction uses deterministic transcript-derived rules", () => {
