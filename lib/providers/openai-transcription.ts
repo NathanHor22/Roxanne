@@ -18,7 +18,9 @@ const TRANSCRIPTION_FALLBACK_MODELS = [
 
 const openAIResponseSchema = z
   .object({
-    text: z.string().trim().min(1),
+    // Diarized responses can contain valid segment text while leaving the
+    // aggregate text field empty. Rebuild it from segments below.
+    text: z.string().default(""),
     segments: z
       .array(
         z
@@ -187,7 +189,14 @@ export async function transcribeWithOpenAI(
       startSeconds: segment.start,
       endSeconds: segment.end,
     }));
-  const text = parsed.data.text.trim();
+  const text =
+    parsed.data.text.trim() ||
+    segments.map((segment) => segment.text).join(" ").trim();
+  if (!text) {
+    throw new OpenAITranscriptionProviderError(
+      "OpenAI did not detect speech in this recording.",
+    );
+  }
 
   return transcriptionResultSchema.parse({
     text,

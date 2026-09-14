@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "cJSON.h"
 #include "esp_check.h"
@@ -41,6 +42,15 @@ typedef struct {
   char data[RESPONSE_CAPACITY];
   size_t length;
 } response_buffer_t;
+
+typedef struct {
+  response_buffer_t response;
+  bool content_is_pcm;
+  bool playback_started;
+  bool playback_failed;
+  size_t audio_bytes;
+  char command[32];
+} audio_response_t;
 
 static response_buffer_t *response_buffer_create(void) {
   response_buffer_t *response = heap_caps_calloc(
@@ -82,6 +92,45 @@ static esp_err_t http_event(esp_http_client_event_t *event) {
     memcpy(response->data + response->length, event->data, copy);
     response->length += copy;
     response->data[response->length] = '\0';
+  }
+  return ESP_OK;
+}
+
+static esp_err_t audio_http_event(esp_http_client_event_t *event) {
+  audio_response_t *audio = event->user_data;
+  if (!audio) return ESP_OK;
+  if (event->event_id == HTTP_EVENT_ON_HEADER && event->header_key && event->header_value &&
+      strcasecmp(event->header_key, "content-type") == 0) {
+    audio->content_is_pcm = strncasecmp(event->header_value, "audio/pcm", 9) == 0;
+    return ESP_OK;
+  }
+  if (event->event_id == HTTP_EVENT_ON_HEADER && event->header_key && event->header_value &&
+      strcasecmp(event->header_key, "x-lantern-command") == 0) {
+    snprintf(audio->command, sizeof(audio->command), "%s", event->header_value);
+    return ESP_OK;
+  }
+  if (event->event_id != HTTP_EVENT_ON_DATA || !event->data || event->data_len <= 0) return ESP_OK;
+  if (audio->content_is_pcm) {
+    if (!audio->playback_started) {
+      if (lantern_audio_pcm_begin() != ESP_OK) {
+        audio->playback_failed = true;
+        return ESP_FAIL;
+      }
+      audio->playback_started = true;
+    }
+    if (lantern_audio_pcm_write(event->data, (size_t)event->data_len) != ESP_OK) {
+      audio->playback_failed = true;
+      return ESP_FAIL;
+    }
+    audio->audio_bytes += (size_t)event->data_len;
+    return ESP_OK;
+  }
+  size_t remaining = sizeof(audio->response.data) - audio->response.length - 1;
+  size_t copy = (size_t)event->data_len < remaining ? (size_t)event->data_len : remaining;
+  if (copy) {
+    memcpy(audio->response.data + audio->response.length, event->data, copy);
+    audio->response.length += copy;
+    audio->response.data[audio->response.length] = '\0';
   }
   return ESP_OK;
 }
@@ -606,6 +655,136 @@ esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_versi
   }
   free(response);
   ESP_LOGI(TAG, "heartbeat acknowledged");
+  return ESP_OK;
+}
+
+esp_err_t lantern_network_play_briefing(const char *kind, int battery_level) {
+  if (!kind || !s_config || !s_status.wifi_connected || !lantern_storage_is_paired(s_config)) {
+    return ESP_ERR_INVALID_STATE;
+  }
+  char url[256];
+  snprintf(url, sizeof(url), "%s/api/device/v1/briefing", LANTERN_API_BASE_URL);
+  audio_response_t *audio = heap_caps_calloc(
+    1, sizeof(audio_response_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!audio) return ESP_ERR_NO_MEM;
+  esp_http_client_config_t config = {
+    .url = url,
+    .event_handler = audio_http_event,
+    .user_data = audio,
+    .timeout_ms = 60000,
+    .crt_bundle_attach = esp_crt_bundle_attach,
+    .buffer_size = 4096,
+  };
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (!client) {
+    free(audio);
+    return ESP_FAIL;
+  }
+  char authorization[140];
+  device_authorization(authorization);
+  char body[96];
+  snprintf(body, sizeof(body), "{\"kind\":\"%s\",\"batteryLevel\":%d}", kind, battery_level);
+  esp_http_client_set_method(client, HTTP_METHOD_POST);
+  esp_http_client_set_header(client, "Content-Type", "application/json");
+  esp_http_client_set_header(client, "Authorization", authorization);
+  esp_http_client_set_post_field(client, body, (int)strlen(body));
+  esp_err_t result = esp_http_client_perform(client);
+  int status = result == ESP_OK ? esp_http_client_get_status_code(client) : -1;
+  if (audio->playback_started) lantern_audio_pcm_end();
+  bool success = result == ESP_OK && status == 200 && audio->content_is_pcm &&
+    audio->audio_bytes > 0 && !audio->playback_failed;
+  if (!success) {
+    ESP_LOGW(TAG, "briefing %s failed HTTP %d: %.192s", kind, status, audio->response.data);
+  } else {
+    ESP_LOGI(TAG, "briefing %s played %u PCM bytes", kind, (unsigned)audio->audio_bytes);
+  }
+  esp_http_client_cleanup(client);
+  free(audio);
+  return success ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t lantern_network_run_voice_command(const char *context, int battery_level,
+                                            char *intent, size_t intent_capacity) {
+  if (!context || !intent || !intent_capacity || !s_config || !s_status.wifi_connected ||
+      !lantern_storage_is_paired(s_config)) {
+    return ESP_ERR_INVALID_ARG;
+  }
+  intent[0] = '\0';
+  size_t samples = lantern_audio_buffered_samples();
+  if (!samples) return ESP_ERR_INVALID_STATE;
+  size_t data_bytes = samples * sizeof(int16_t);
+  size_t wav_size = 44 + data_bytes;
+  uint8_t *wav = heap_caps_malloc(wav_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!wav) return ESP_ERR_NO_MEM;
+  memset(wav, 0, 44);
+  memcpy(wav, "RIFF", 4);
+  wav_u32(wav + 4, 36 + (uint32_t)data_bytes);
+  memcpy(wav + 8, "WAVEfmt ", 8);
+  wav_u32(wav + 16, 16);
+  wav_u16(wav + 20, 1);
+  wav_u16(wav + 22, 1);
+  wav_u32(wav + 24, LANTERN_MIC_SAMPLE_RATE);
+  wav_u32(wav + 28, LANTERN_MIC_SAMPLE_RATE * 2);
+  wav_u16(wav + 32, 2);
+  wav_u16(wav + 34, 16);
+  memcpy(wav + 36, "data", 4);
+  wav_u32(wav + 40, (uint32_t)data_bytes);
+  size_t copied = lantern_audio_copy_samples((int16_t *)(wav + 44), 0, samples);
+  if (copied != samples) {
+    free(wav);
+    return ESP_FAIL;
+  }
+
+  char url[256], authorization[140], battery[8];
+  snprintf(url, sizeof(url), "%s/api/device/v1/command", LANTERN_API_BASE_URL);
+  device_authorization(authorization);
+  snprintf(battery, sizeof(battery), "%d", battery_level);
+  audio_response_t *audio = heap_caps_calloc(
+    1, sizeof(audio_response_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!audio) {
+    free(wav);
+    return ESP_ERR_NO_MEM;
+  }
+  esp_http_client_config_t config = {
+    .url = url,
+    .event_handler = audio_http_event,
+    .user_data = audio,
+    .timeout_ms = 120000,
+    .crt_bundle_attach = esp_crt_bundle_attach,
+    .buffer_size_tx = 4096,
+  };
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (!client) {
+    free(audio);
+    free(wav);
+    return ESP_FAIL;
+  }
+  esp_http_client_set_method(client, HTTP_METHOD_POST);
+  esp_http_client_set_header(client, "Content-Type", "audio/wav");
+  esp_http_client_set_header(client, "Authorization", authorization);
+  esp_http_client_set_header(client, "X-Lantern-Command-Context", context);
+  esp_http_client_set_header(client, "X-Lantern-Battery-Level", battery);
+  esp_http_client_set_post_field(client, (const char *)wav, (int)wav_size);
+  esp_err_t result = esp_http_client_perform(client);
+  int status = result == ESP_OK ? esp_http_client_get_status_code(client) : -1;
+  if (audio->playback_started) lantern_audio_pcm_end();
+  esp_http_client_cleanup(client);
+  free(wav);
+  if (result != ESP_OK || status != 200 || !audio->content_is_pcm ||
+      !audio->audio_bytes || audio->playback_failed || !audio->command[0]) {
+    if (!audio->content_is_pcm && audio->response.length) {
+      ESP_LOGW(TAG, "voice command HTTP %d: %.192s", status, audio->response.data);
+    } else {
+      ESP_LOGW(TAG, "voice command failed result=%s HTTP %d bytes=%u command=%s",
+        esp_err_to_name(result), status, (unsigned)audio->audio_bytes,
+        audio->command[0] ? audio->command : "missing");
+    }
+    free(audio);
+    return ESP_FAIL;
+  }
+  snprintf(intent, intent_capacity, "%s", audio->command);
+  ESP_LOGI(TAG, "voice command %s played %u PCM bytes", intent, (unsigned)audio->audio_bytes);
+  free(audio);
   return ESP_OK;
 }
 

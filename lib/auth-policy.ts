@@ -53,6 +53,8 @@ export function isPublicAuthPath(pathname: string): boolean {
 export function isLanternDevicePath(pathname: string): boolean {
   return (
     pathname === "/api/device/v1/claim" ||
+    pathname === "/api/device/v1/briefing" ||
+    pathname === "/api/device/v1/command" ||
     pathname === "/api/device/v1/heartbeat" ||
     pathname === "/api/device/v1/restart" ||
     pathname === "/api/device/v1/sessions" ||

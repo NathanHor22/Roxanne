@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "esp_err.h"
@@ -38,6 +39,9 @@ typedef struct {
 esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callback_t callback);
 void lantern_network_get_status(lantern_network_status_t *status);
 esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_version, int battery_level);
+esp_err_t lantern_network_play_briefing(const char *kind, int battery_level);
+esp_err_t lantern_network_run_voice_command(const char *context, int battery_level,
+                                            char *intent, size_t intent_capacity);
 esp_err_t lantern_network_restart_session(void);
 esp_err_t lantern_network_begin_quick(lantern_cloud_session_t *session);
 esp_err_t lantern_network_confirm_consent(

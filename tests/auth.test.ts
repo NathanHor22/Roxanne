@@ -59,6 +59,8 @@ test("homepage, legal pages, login, auth callback and logout are public", () => 
 
 test("only explicit Lantern routes bypass browser cookies for device authentication", () => {
   assert.equal(isLanternDevicePath("/api/device/v1/claim"), true);
+  assert.equal(isLanternDevicePath("/api/device/v1/briefing"), true);
+  assert.equal(isLanternDevicePath("/api/device/v1/command"), true);
   assert.equal(isLanternDevicePath("/api/device/v1/heartbeat"), true);
   assert.equal(isLanternDevicePath("/api/device/v1/restart"), true);
   assert.equal(isLanternDevicePath("/api/device/v1/sessions"), true);
@@ -77,6 +79,8 @@ test("only explicit Lantern routes bypass browser cookies for device authenticat
     );
   }
   assert.equal(isLanternDevicePath("/api/device/v1/admin"), false);
+  assert.equal(isLanternDevicePath("/api/device/v1/briefing/extra"), false);
+  assert.equal(isLanternDevicePath("/api/device/v1/command/extra"), false);
   assert.equal(isLanternDevicePath("/api/devices/pairing"), false);
   assert.equal(
     isLanternDevicePath(

@@ -25,9 +25,13 @@ static int16_t *s_retry_buffer;
 static size_t s_write_index;
 static size_t s_sample_count;
 static volatile bool s_recording;
+static volatile bool s_streaming;
 static volatile uint32_t s_level;
 static lantern_audio_frame_callback_t s_frame_callback;
 static SemaphoreHandle_t s_speaker_lock;
+static bool s_pcm_playing;
+static bool s_pcm_has_pending_byte;
+static uint8_t s_pcm_pending_byte;
 
 static esp_err_t speaker_start_silent(void) {
   int32_t silence[AUDIO_WRITE_SAMPLES] = {0};
@@ -83,7 +87,7 @@ static void microphone_task(void *argument) {
     }
     s_level = samples ? (uint32_t)(absolute_total / samples) : 0;
     lantern_audio_frame_callback_t callback = s_frame_callback;
-    if (s_recording && callback && samples) callback(converted, samples);
+    if (s_streaming && callback && samples) callback(converted, samples);
   }
 }
 
@@ -164,6 +168,71 @@ void lantern_audio_chime(unsigned count) {
   xSemaphoreGive(s_speaker_lock);
 }
 
+esp_err_t lantern_audio_pcm_begin(void) {
+  if (!s_speaker || !s_speaker_lock || s_pcm_playing) return ESP_ERR_INVALID_STATE;
+  if (xSemaphoreTake(s_speaker_lock, pdMS_TO_TICKS(1000)) != pdTRUE) return ESP_ERR_TIMEOUT;
+  esp_err_t result = speaker_start_silent();
+  if (result != ESP_OK) {
+    xSemaphoreGive(s_speaker_lock);
+    return result;
+  }
+  s_pcm_playing = true;
+  s_pcm_has_pending_byte = false;
+  ESP_LOGI(TAG, "24 kHz PCM playback started");
+  return ESP_OK;
+}
+
+esp_err_t lantern_audio_pcm_write(const void *data, size_t length) {
+  if (!s_pcm_playing || !data || !length) return length ? ESP_ERR_INVALID_STATE : ESP_OK;
+  const uint8_t *bytes = data;
+  int32_t output[AUDIO_WRITE_SAMPLES];
+  size_t output_count = 0;
+  size_t offset = 0;
+  while (offset < length || s_pcm_has_pending_byte) {
+    uint8_t low;
+    uint8_t high;
+    if (s_pcm_has_pending_byte) {
+      if (offset >= length) break;
+      low = s_pcm_pending_byte;
+      high = bytes[offset++];
+      s_pcm_has_pending_byte = false;
+    } else {
+      if (offset + 1 >= length) {
+        s_pcm_pending_byte = bytes[offset];
+        s_pcm_has_pending_byte = true;
+        break;
+      }
+      low = bytes[offset++];
+      high = bytes[offset++];
+    }
+    int16_t sample = (int16_t)((uint16_t)low | ((uint16_t)high << 8));
+    output[output_count++] = (int32_t)sample * 32768;
+    if (output_count == AUDIO_WRITE_SAMPLES) {
+      size_t bytes_written = 0;
+      esp_err_t result = i2s_channel_write(
+        s_speaker, output, sizeof(output), &bytes_written, pdMS_TO_TICKS(500));
+      if (result != ESP_OK || bytes_written != sizeof(output)) return ESP_FAIL;
+      output_count = 0;
+    }
+  }
+  if (output_count) {
+    size_t bytes_written = 0;
+    esp_err_t result = i2s_channel_write(
+      s_speaker, output, output_count * sizeof(output[0]), &bytes_written, pdMS_TO_TICKS(500));
+    if (result != ESP_OK || bytes_written != output_count * sizeof(output[0])) return ESP_FAIL;
+  }
+  return ESP_OK;
+}
+
+void lantern_audio_pcm_end(void) {
+  if (!s_pcm_playing) return;
+  speaker_stop_silent();
+  s_pcm_playing = false;
+  s_pcm_has_pending_byte = false;
+  xSemaphoreGive(s_speaker_lock);
+  ESP_LOGI(TAG, "PCM playback finished");
+}
+
 void lantern_audio_set_recording(bool recording) {
   if (recording && !s_recording) {
     s_write_index = 0;
@@ -171,6 +240,11 @@ void lantern_audio_set_recording(bool recording) {
   }
   s_recording = recording;
   ESP_LOGI(TAG, "recording=%s buffered=%u", recording ? "true" : "false", (unsigned)s_sample_count);
+}
+
+void lantern_audio_set_streaming(bool streaming) {
+  s_streaming = streaming;
+  ESP_LOGI(TAG, "Agora microphone stream=%s", streaming ? "true" : "false");
 }
 
 void lantern_audio_set_frame_callback(lantern_audio_frame_callback_t callback) {

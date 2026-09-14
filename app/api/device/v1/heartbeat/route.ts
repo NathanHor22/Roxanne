@@ -53,13 +53,6 @@ export async function POST(request: Request) {
     ) {
       return response("Device credential is invalid or revoked.", 403);
     }
-    if (
-      input.stateVersion !== Number(device.state_version || 0) ||
-      input.state !== device.device_state
-    ) {
-      return response("Device state is stale. Refresh before retrying.", 409);
-    }
-
     const serverTime = new Date().toISOString();
     const { data: updated, error: updateError } = await client
       .from("devices")
@@ -74,17 +67,23 @@ export async function POST(request: Request) {
         updated_at: serverTime,
       })
       .eq("id", device.id)
-      .eq("state_version", device.state_version)
       .is("revoked_at", null)
-      .select("id,state_version")
+      .select("id,device_state,state_version")
       .maybeSingle();
     if (updateError) throw new Error(updateError.message);
-    if (!updated) return response("Device state changed. Refresh before retrying.", 409);
+    if (!updated) return response("Device credential is invalid or revoked.", 403);
+
+    const authoritativeState = lanternStateSchema.parse(updated.device_state);
+    const authoritativeVersion = Number(updated.state_version || 0);
 
     return NextResponse.json(
       {
         acknowledgedEventId: input.eventId,
-        stateVersion: updated.state_version,
+        state: authoritativeState,
+        stateVersion: authoritativeVersion,
+        synchronized:
+          input.state === authoritativeState &&
+          input.stateVersion === authoritativeVersion,
         serverTime,
         limits: { retryBufferSeconds: 30, heartbeatSeconds: 15 },
       },

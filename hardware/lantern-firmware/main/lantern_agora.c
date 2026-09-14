@@ -21,6 +21,142 @@ static EventGroupHandle_t s_events;
 static connection_id_t s_connection = CONNECTION_ID_INVALID;
 static bool s_initialized;
 static uint32_t s_stt_bot_uid;
+static uint32_t s_sent_frames;
+static volatile bool s_stop_command_requested;
+static char s_command_window[384];
+
+static bool protobuf_varint(const uint8_t *data, size_t length, size_t *cursor,
+                            uint64_t *value) {
+  if (!data || !cursor || !value) return false;
+  *value = 0;
+  unsigned shift = 0;
+  while (*cursor < length && shift <= 63) {
+    uint8_t byte = data[(*cursor)++];
+    *value |= (uint64_t)(byte & 0x7f) << shift;
+    if (!(byte & 0x80)) return true;
+    shift += 7;
+  }
+  return false;
+}
+
+static bool protobuf_delimited(const uint8_t *data, size_t length, size_t *cursor,
+                               const uint8_t **value, size_t *value_length) {
+  uint64_t encoded_length = 0;
+  if (!protobuf_varint(data, length, cursor, &encoded_length) ||
+      encoded_length > SIZE_MAX || *cursor + (size_t)encoded_length > length) {
+    return false;
+  }
+  *value = data + *cursor;
+  *value_length = (size_t)encoded_length;
+  *cursor += *value_length;
+  return true;
+}
+
+static bool protobuf_skip(const uint8_t *data, size_t length, size_t *cursor,
+                          unsigned wire_type) {
+  uint64_t ignored = 0;
+  const uint8_t *bytes = NULL;
+  size_t byte_length = 0;
+  if (wire_type == 0) return protobuf_varint(data, length, cursor, &ignored);
+  if (wire_type == 1 && *cursor + 8 <= length) {
+    *cursor += 8;
+    return true;
+  }
+  if (wire_type == 2) {
+    return protobuf_delimited(data, length, cursor, &bytes, &byte_length);
+  }
+  if (wire_type == 5 && *cursor + 4 <= length) {
+    *cursor += 4;
+    return true;
+  }
+  return false;
+}
+
+static bool decode_final_word(const uint8_t *data, size_t length,
+                              char *text, size_t capacity) {
+  size_t cursor = 0;
+  bool is_final = false;
+  text[0] = '\0';
+  while (cursor < length) {
+    uint64_t tag = 0;
+    if (!protobuf_varint(data, length, &cursor, &tag)) return false;
+    unsigned field = (unsigned)(tag >> 3);
+    unsigned wire_type = (unsigned)(tag & 7);
+    if (field == 1 && wire_type == 2) {
+      const uint8_t *value = NULL;
+      size_t value_length = 0;
+      if (!protobuf_delimited(data, length, &cursor, &value, &value_length)) return false;
+      size_t copy = value_length < capacity - 1 ? value_length : capacity - 1;
+      memcpy(text, value, copy);
+      text[copy] = '\0';
+    } else if (field == 4 && wire_type == 0) {
+      uint64_t value = 0;
+      if (!protobuf_varint(data, length, &cursor, &value)) return false;
+      is_final = value != 0;
+    } else if (!protobuf_skip(data, length, &cursor, wire_type)) {
+      return false;
+    }
+  }
+  return is_final && text[0];
+}
+
+static void append_command_words(const char *words) {
+  if (!words || !words[0]) return;
+  char normalized[160];
+  size_t count = 0;
+  for (const unsigned char *cursor = (const unsigned char *)words;
+       *cursor && count < sizeof(normalized) - 1; ++cursor) {
+    unsigned char value = *cursor;
+    normalized[count++] = value >= 'A' && value <= 'Z' ? (char)(value + ('a' - 'A')) : (char)value;
+  }
+  normalized[count] = '\0';
+  size_t current = strlen(s_command_window);
+  size_t incoming = strlen(normalized);
+  size_t needed = incoming + (current ? 1 : 0);
+  if (needed >= sizeof(s_command_window)) {
+    memcpy(s_command_window, normalized + incoming - (sizeof(s_command_window) - 1),
+      sizeof(s_command_window) - 1);
+    s_command_window[sizeof(s_command_window) - 1] = '\0';
+  } else {
+    if (current + needed >= sizeof(s_command_window)) {
+      size_t remove = current + needed - sizeof(s_command_window) + 1;
+      memmove(s_command_window, s_command_window + remove, current - remove + 1);
+      current -= remove;
+    }
+    if (current) s_command_window[current++] = ' ';
+    memcpy(s_command_window + current, normalized, incoming + 1);
+  }
+  if (strstr(s_command_window, "ring stop") ||
+      strstr(s_command_window, "lantern stop") ||
+      strstr(s_command_window, "ring we're done") ||
+      strstr(s_command_window, "ring we are done") ||
+      strstr(s_command_window, "ring meeting done") ||
+      strstr(s_command_window, "ring habis") ||
+      strstr(s_command_window, "lantern habis")) {
+    s_stop_command_requested = true;
+    ESP_LOGI(TAG, "voice stop command recognised from Agora captions");
+  }
+}
+
+static void inspect_command_packet(const char *packet, size_t length) {
+  const uint8_t *data = (const uint8_t *)packet;
+  size_t cursor = 0;
+  while (cursor < length) {
+    uint64_t tag = 0;
+    if (!protobuf_varint(data, length, &cursor, &tag)) return;
+    unsigned field = (unsigned)(tag >> 3);
+    unsigned wire_type = (unsigned)(tag & 7);
+    if (field == 10 && wire_type == 2) {
+      const uint8_t *word = NULL;
+      size_t word_length = 0;
+      if (!protobuf_delimited(data, length, &cursor, &word, &word_length)) return;
+      char text[160];
+      if (decode_final_word(word, word_length, text, sizeof(text))) append_command_words(text);
+    } else if (!protobuf_skip(data, length, &cursor, wire_type)) {
+      return;
+    }
+  }
+}
 
 static void on_join_success(connection_id_t connection, uint32_t uid, int elapsed) {
   (void)connection;
@@ -34,6 +170,18 @@ static void on_connection_lost(connection_id_t connection) {
   xEventGroupClearBits(s_events, AGORA_JOINED_BIT);
 }
 
+static void on_user_joined(connection_id_t connection, uint32_t uid, int elapsed) {
+  (void)connection;
+  ESP_LOGI(TAG, "remote Agora user %lu joined in %d ms%s", (unsigned long)uid, elapsed,
+    uid == s_stt_bot_uid ? " (STT bot)" : "");
+}
+
+static void on_user_offline(connection_id_t connection, uint32_t uid, int reason) {
+  (void)connection;
+  ESP_LOGI(TAG, "remote Agora user %lu left (reason %d)%s", (unsigned long)uid, reason,
+    uid == s_stt_bot_uid ? " (STT bot)" : "");
+}
+
 static void on_error(connection_id_t connection, int code, const char *message) {
   (void)connection;
   ESP_LOGE(TAG, "Agora error %d: %s", code, message ? message : "unknown");
@@ -44,10 +192,22 @@ static void on_stream_message(connection_id_t connection, uint32_t uid, int stre
   (void)connection;
   (void)stream_id;
   (void)sent_ts;
-  if (uid != s_stt_bot_uid || !data || !length) return;
+  if (!data || !length) return;
+  // Each Lantern session uses a random, token-protected RTC channel containing
+  // only the wearable and its STT bot. Accept the remote data stream even if an
+  // embedded SDK reports a remapped bot UID, while retaining the mismatch in
+  // diagnostics.
+  if (uid != s_stt_bot_uid) {
+    ESP_LOGW(TAG, "caption packet came from unexpected Agora uid %lu (expected %lu)",
+      (unsigned long)uid, (unsigned long)s_stt_bot_uid);
+  }
   if (!lantern_transcript_append(data, length)) {
     ESP_LOGW(TAG, "could not stage %u-byte STT packet", (unsigned)length);
+  } else {
+    ESP_LOGI(TAG, "staged Agora caption packet %u (%u bytes)",
+      lantern_transcript_packet_count(), (unsigned)length);
   }
+  inspect_command_packet(data, length);
 }
 
 static void send_microphone_frame(const int16_t *samples, size_t count) {
@@ -70,10 +230,13 @@ static void send_microphone_frame(const int16_t *samples, size_t count) {
     s_connection, downsampled, sizeof(downsampled), &frame);
   if (result < 0 && result != -ERR_NOT_IN_CHANNEL) {
     ESP_LOGW(TAG, "audio send failed: %s", agora_rtc_err_2_str(result));
+  } else if (result == 0 && ++s_sent_frames % 250 == 0) {
+    ESP_LOGI(TAG, "published %lu Agora microphone frames", (unsigned long)s_sent_frames);
   }
 }
 
 static void cleanup(void) {
+  lantern_audio_set_streaming(false);
   lantern_audio_set_frame_callback(NULL);
   if (s_connection != CONNECTION_ID_INVALID) {
     agora_rtc_leave_channel(s_connection);
@@ -97,10 +260,15 @@ esp_err_t lantern_agora_start(const lantern_agora_transport_t *transport) {
   if (!s_events) return ESP_ERR_NO_MEM;
   lantern_transcript_reset();
   s_stt_bot_uid = transport->stt_bot_uid;
+  s_sent_frames = 0;
+  s_stop_command_requested = false;
+  s_command_window[0] = '\0';
 
   agora_rtc_event_handler_t handlers = {0};
   handlers.on_join_channel_success = on_join_success;
   handlers.on_connection_lost = on_connection_lost;
+  handlers.on_user_joined = on_user_joined;
+  handlers.on_user_offline = on_user_offline;
   handlers.on_error = on_error;
   handlers.on_stream_message = on_stream_message;
   rtc_service_option_t service = {0};
@@ -151,4 +319,10 @@ void lantern_agora_stop(void) { cleanup(); }
 
 bool lantern_agora_is_connected(void) {
   return s_events && (xEventGroupGetBits(s_events) & AGORA_JOINED_BIT);
+}
+
+bool lantern_agora_take_stop_command(void) {
+  bool requested = s_stop_command_requested;
+  s_stop_command_requested = false;
+  return requested;
 }

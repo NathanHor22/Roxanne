@@ -331,6 +331,28 @@ test("OpenAI fallback sends WAV audio and preserves diarized speakers", async ()
   ]);
 });
 
+test("OpenAI fallback rebuilds empty aggregate text from diarized segments", async () => {
+  const fetchImpl = (async () =>
+    new Response(
+      JSON.stringify({
+        text: "",
+        segments: [
+          { start: 0, end: 1.2, text: "Meeting confirmed.", speaker: "A" },
+          { start: 1.3, end: 2.4, text: "Tuesday at one.", speaker: "B" },
+        ],
+      }),
+      { status: 200 },
+    )) as typeof fetch;
+
+  const result = await transcribeWithOpenAI(new Blob(["audio"]), {
+    apiKey: "openai-key",
+    fetchImpl,
+  });
+
+  assert.equal(result.text, "Meeting confirmed. Tuesday at one.");
+  assert.equal(result.segments.length, 2);
+});
+
 test("OpenAI fallback reports a safe provider error code", async () => {
   const fetchImpl = (async () =>
     new Response(

@@ -8,7 +8,10 @@ import { conversationClock } from "@/lib/conversation-clock";
 import { env } from "@/lib/env";
 import { authenticateLantern, type AuthenticatedLantern } from "@/lib/lantern-device-auth";
 import { advanceLantern, lanternMachineSchema, type LanternMachine } from "@/lib/lantern-state";
-import { transcriptionResultSchema } from "@/lib/meeting-schema";
+import {
+  transcriptionResultSchema,
+  type TranscriptionResult,
+} from "@/lib/meeting-schema";
 import { persistProcessedMeeting } from "@/lib/persistence";
 import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { transcribeWithOpenAI } from "@/lib/providers/openai-transcription";
@@ -124,7 +127,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const agoraSegments = Array.isArray(stored.transcript_segments)
       ? stored.transcript_segments
       : [];
-    const transcription = agoraSegments.length
+    const agoraTranscription = agoraSegments.length
       ? transcriptionResultSchema.parse({
           text: (agoraSegments as { speaker: string; text: string }[])
             .map((segment) => `${segment.speaker}: ${segment.text}`)
@@ -133,38 +136,52 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           language: stored.transcript_language || "multilingual",
           provider: "agora",
         })
-      : await (async () => {
-          const { data: audio, error: downloadError } = await client.storage
-            .from("recordings")
-            .download(recording.storage_path);
-          if (downloadError || !audio) {
-            throw new Error(
-              `The private Lantern recording could not be read for transcription${
-                downloadError?.message ? `: ${downloadError.message}` : "."
-              }`,
-            );
-          }
-          const result = await transcribeWithOpenAI(audio, {
-            fileName: `${sessionId}.wav`,
-          });
-          const { error: transcriptError } = await client
-            .from("lantern_sessions")
-            .update({
-              transcript_segments: result.segments,
-              transcript_language: result.language,
-              transcript_received_at: new Date().toISOString(),
-              transcript_event_id: randomUUID(),
-              processing_error: null,
-            })
-            .eq("id", sessionId)
-            .eq("device_id", device.id);
-          if (transcriptError) {
-            throw new Error(
-              `Could not save the recovered Lantern transcript: ${transcriptError.message}`,
-            );
-          }
-          return result;
-        })();
+      : null;
+    // Agora remains Lantern's live caption and spoken-command channel. The
+    // archived WAV gets one final OpenAI diarization pass so the saved replay
+    // can distinguish speakers. If that pass is unavailable, preserve the
+    // meeting with Agora's already-received transcript.
+    let transcription: TranscriptionResult;
+    try {
+      const { data: audio, error: downloadError } = await client.storage
+        .from("recordings")
+        .download(recording.storage_path);
+      if (downloadError || !audio) {
+        throw new Error(
+          `The private Lantern recording could not be read for transcription${
+            downloadError?.message ? `: ${downloadError.message}` : "."
+          }`,
+        );
+      }
+      transcription = await transcribeWithOpenAI(audio, {
+        fileName: `${sessionId}.wav`,
+      });
+      const { error: transcriptError } = await client
+        .from("lantern_sessions")
+        .update({
+          transcript_segments: transcription.segments,
+          transcript_language: transcription.language,
+          transcript_received_at: new Date().toISOString(),
+          transcript_event_id: randomUUID(),
+          processing_error: null,
+        })
+        .eq("id", sessionId)
+        .eq("device_id", device.id);
+      if (transcriptError) {
+        throw new Error(
+          `Could not save the final Lantern transcript: ${transcriptError.message}`,
+        );
+      }
+    } catch (transcriptionError) {
+      if (!agoraTranscription) throw transcriptionError;
+      console.warn(
+        "[lantern-session-complete] final diarization unavailable; using Agora transcript",
+      );
+      transcription = {
+        ...agoraTranscription,
+        warning: "Final speaker separation was unavailable; this brief uses the live Agora transcript.",
+      };
+    }
     const timezone = stored.conversation_timezone || env().APP_TIMEZONE;
     const startedAt = processingMachine.recordingStartedAt || stored.started_at;
     const clock = conversationClock(startedAt, timezone);

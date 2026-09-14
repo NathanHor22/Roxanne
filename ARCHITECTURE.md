@@ -48,6 +48,7 @@ mode.
 | --- | --- | --- |
 | Lantern state machine | `lib/lantern-state.ts` | Enforces consent, recording, pause/reconnect, status-report, and pending-approval transitions without provider calls. |
 | Device identity | `lib/lantern-device-auth.ts`, migration 004 | Claims an expiring one-time code and validates a revocable per-device secret whose digest is stored server-side. |
+| Device voice commands | `/api/device/v1/command`, firmware 0.2.8 | Transcribes bounded push-to-talk commands with OpenAI, accepts Malaysian command variants, speaks the response, and keeps invitation execution in the dashboard. |
 | Device sessions | `/api/device/v1/sessions` and `/api/device/v1/sessions/[id]/events` | Stores versioned, idempotent state transitions and rejects stale events. |
 | Device telemetry | `/api/device/v1/heartbeat`, `/api/devices` | Reports device state, firmware, battery, network, heap, and last error to the owner dashboard. |
 | Completed transcripts | `lib/workspace/model.ts`, `app/api/conversations/route.ts` | Validates finalized, ordered segments and conversation timing; processes synchronously with OpenAI. |
@@ -125,7 +126,7 @@ Subsequent requests use:
 Authorization: Device <device-uuid>.<device-secret>
 ```
 
-`proxy.ts` permits only the four device protocol paths to reach their own
+`proxy.ts` permits only the explicit device protocol paths to reach their own
 authentication layer. The claim route is protected by a short-lived one-time
 code. Heartbeats and session routes validate the device credential and reject
 revoked devices. Owner routes continue to use the normal workspace login.
