@@ -152,32 +152,41 @@ test("model access errors fall back to an available extraction model", async () 
   assert.equal(result.provider, "openai");
 });
 
-test("a schedule needs an agreed state and evidence present in the transcript", async () => {
+test("an unverified schedule is omitted without discarding the meeting recap", async () => {
   for (const patch of [
     { evidence: "Let's meet Monday at nine. Confirmed." },
     { evidence: null },
     { agreement: "tentative" as const },
-    { evidence: "Maybe Friday afternoon? Actually Thursday at one works." },
   ]) {
     const fixture = extractionFixture();
     fixture.followUps[0]!.schedule = { ...fixture.followUps[0]!.schedule!, ...patch };
-    await assert.rejects(
-      () => extractWithOpenAI(transcript, context, {
-        ...options,
-        fetchImpl: async () => modelResponse(fixture),
-      }),
-      /could not be verified against the transcript/u,
-    );
+    const result = await extractWithOpenAI(transcript, context, {
+      ...options,
+      fetchImpl: async () => modelResponse(fixture),
+    });
+    assert.deepEqual(result.followUps, []);
+    assert.match(result.warning || "", /unverified calendar follow-up/u);
   }
   const missingSchedule = extractionFixture();
   delete missingSchedule.followUps[0]!.schedule;
-  await assert.rejects(
-    () => extractWithOpenAI(transcript, context, {
-      ...options,
-      fetchImpl: async () => modelResponse(missingSchedule),
-    }),
-    /could not be verified against the transcript/u,
-  );
+  const result = await extractWithOpenAI(transcript, context, {
+    ...options,
+    fetchImpl: async () => modelResponse(missingSchedule),
+  });
+  assert.deepEqual(result.followUps, []);
+  assert.ok(result.insight.keyPoints.length > 0);
+});
+
+test("schedule evidence tolerates punctuation, case, and transcript segment breaks", async () => {
+  const fixture = extractionFixture();
+  fixture.followUps[0]!.schedule!.evidence =
+    "maybe friday afternoon ACTUALLY thursday at one works";
+  const result = await extractWithOpenAI(transcript, context, {
+    ...options,
+    fetchImpl: async () => modelResponse(fixture),
+  });
+  assert.equal(result.followUps[0]?.type, "schedule");
+  assert.equal(result.warning, undefined);
 });
 
 test("a verified agreement may keep missing details for owner review", async () => {
@@ -190,6 +199,24 @@ test("a verified agreement may keep missing details for owner review", async () 
     fetchImpl: async () => modelResponse(fixture),
   });
   assert.deepEqual(result.followUps[0]?.schedule, fixture.followUps[0]?.schedule);
+});
+
+test("invalid extracted emails do not discard an otherwise valid meeting recap", async () => {
+  const fixture = JSON.parse(JSON.stringify(extractionFixture()));
+  fixture.participants[0].email = "chung at example dot com";
+  fixture.followUps[0].schedule.attendees = [
+    "chung at example dot com",
+    "owner@example.com",
+  ];
+
+  const result = await extractWithOpenAI(transcript, context, {
+    ...options,
+    fetchImpl: async () => modelResponse(fixture),
+  });
+
+  assert.equal(result.participants[0]?.email, null);
+  assert.deepEqual(result.followUps[0]?.schedule?.attendees, ["owner@example.com"]);
+  assert.equal(result.followUps[0]?.type, "schedule");
 });
 
 test("an ordinary follow-up may have no schedule", async () => {
