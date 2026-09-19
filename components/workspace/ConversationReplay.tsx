@@ -56,6 +56,14 @@ export function ConversationReplay({
   const request = useRef<AbortController | null>(null);
   const activeLine = useRef<HTMLElement>(null);
   const transcript = conversation.transcript || [];
+  const speakerTones = useMemo(() => {
+    const tones = new Map<string, number>();
+    for (const segment of transcript) {
+      const speaker = segment.speaker.trim();
+      if (speaker && !tones.has(speaker)) tones.set(speaker, tones.size + 1);
+    }
+    return tones;
+  }, [transcript]);
   const activeIndex = ready ? activeTranscriptIndex(transcript, position) : -1;
   const normalizedSearch = search.trim().toLowerCase();
   const visibleSegments = useMemo(
@@ -348,7 +356,7 @@ export function ConversationReplay({
           <h3>Follow the conversation</h3>
           <p>
             {source.url
-              ? "Select a timestamp to listen from that point."
+              ? `${speakerTones.size} speaker${speakerTones.size === 1 ? "" : "s"} detected · Select a timestamp to listen from that point.`
               : "The original transcript, in the words captured."}
           </p>
         </div>
@@ -390,6 +398,7 @@ export function ConversationReplay({
               key={segment.id || index}
               ref={active ? activeLine : undefined}
               className={active ? styles.activeLine : undefined}
+              data-speaker-tone={Math.min(speakerTones.get(segment.speaker.trim()) || 1, 4)}
               aria-current={active ? "true" : undefined}
             >
               <header>

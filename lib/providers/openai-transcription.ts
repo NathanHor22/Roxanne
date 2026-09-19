@@ -15,6 +15,7 @@ const TRANSCRIPTION_FALLBACK_MODELS = [
   "gpt-4o-mini-transcribe",
   "whisper-1",
 ] as const;
+const SAME_SPEAKER_MERGE_GAP_SECONDS = 1.25;
 
 const openAIResponseSchema = z
   .object({
@@ -82,6 +83,49 @@ function createTranscriptionForm(
     if (guidance) form.append("prompt", guidance);
   }
   return form;
+}
+
+function numberAndGroupSpeakers(
+  segments: Array<{
+    id?: string;
+    speaker: string;
+    text: string;
+    startSeconds: number;
+    endSeconds: number;
+  }>,
+) {
+  const speakerNumbers = new Map<string, number>();
+  const grouped: typeof segments = [];
+
+  for (const segment of segments) {
+    const providerSpeaker = segment.speaker.trim().toLocaleLowerCase();
+    let speakerNumber = speakerNumbers.get(providerSpeaker);
+    if (!speakerNumber) {
+      speakerNumber = speakerNumbers.size + 1;
+      speakerNumbers.set(providerSpeaker, speakerNumber);
+    }
+    const numbered = {
+      ...segment,
+      speaker: `Speaker ${speakerNumber}`,
+    };
+    const previous = grouped.at(-1);
+    const gap = previous
+      ? numbered.startSeconds - previous.endSeconds
+      : Number.POSITIVE_INFINITY;
+    if (
+      previous &&
+      previous.speaker === numbered.speaker &&
+      gap >= 0 &&
+      gap <= SAME_SPEAKER_MERGE_GAP_SECONDS
+    ) {
+      previous.text = `${previous.text} ${numbered.text}`.trim();
+      previous.endSeconds = Math.max(previous.endSeconds, numbered.endSeconds);
+      continue;
+    }
+    grouped.push(numbered);
+  }
+
+  return grouped;
 }
 
 export async function transcribeWithOpenAI(
@@ -183,15 +227,17 @@ export async function transcribeWithOpenAI(
         );
       }
 
-      const segments = (parsed.data.segments ?? [])
-        .filter((segment) => segment.text.trim())
-        .map((segment) => ({
-          ...(segment.id ? { id: segment.id } : {}),
-          speaker: `Speaker ${segment.speaker}`,
-          text: segment.text.trim(),
-          startSeconds: segment.start,
-          endSeconds: segment.end,
-        }));
+      const segments = numberAndGroupSpeakers(
+        (parsed.data.segments ?? [])
+          .filter((segment) => segment.text.trim())
+          .map((segment) => ({
+            ...(segment.id ? { id: segment.id } : {}),
+            speaker: segment.speaker,
+            text: segment.text.trim(),
+            startSeconds: segment.start,
+            endSeconds: segment.end,
+          })),
+      );
       const text =
         parsed.data.text.trim() ||
         segments.map((segment) => segment.text).join(" ").trim();

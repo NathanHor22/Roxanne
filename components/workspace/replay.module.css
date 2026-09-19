@@ -239,9 +239,24 @@
   scroll-margin: 22px;
   border-radius: 5px;
 }
+.transcript article[data-speaker-tone="1"] {
+  background: #f4f9f0;
+  border-left-color: #4f7f45;
+}
+.transcript article[data-speaker-tone="2"] {
+  background: #fff9ea;
+  border-left-color: #b88728;
+}
+.transcript article[data-speaker-tone="3"] {
+  background: #eef7f7;
+  border-left-color: #3e7a7a;
+}
+.transcript article[data-speaker-tone="4"] {
+  background: #f5f1f8;
+  border-left-color: #775d89;
+}
 .transcript article.activeLine {
-  background: #f0f6e9;
-  border-left-color: #678954;
+  box-shadow: inset 0 0 0 1px #87a679;
 }
 .transcript article header {
   display: flex;

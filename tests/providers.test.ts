@@ -316,17 +316,52 @@ test("OpenAI fallback sends WAV audio and preserves diarized speakers", async ()
   assert.deepEqual(result.segments, [
     {
       id: "seg_001",
-      speaker: "Speaker A",
+      speaker: "Speaker 1",
       text: "Jumpa esok pukul satu.",
       startSeconds: 0,
       endSeconds: 2.1,
     },
     {
       id: "seg_002",
-      speaker: "Speaker B",
+      speaker: "Speaker 2",
       text: "Boleh, confirm.",
       startSeconds: 2.2,
       endSeconds: 4.2,
+    },
+  ]);
+});
+
+test("OpenAI numbers speakers by first appearance and groups a continuous turn", async () => {
+  const result = await transcribeWithOpenAI(new Blob(["audio"]), {
+    apiKey: "openai-key",
+    fetchImpl: (async () =>
+      new Response(
+        JSON.stringify({
+          text: "First sentence. Same turn. Reply.",
+          segments: [
+            { id: "a1", start: 0, end: 1, text: "First sentence.", speaker: "A" },
+            { id: "a2", start: 1.4, end: 2.5, text: "Same turn.", speaker: "A" },
+            { id: "b1", start: 2.7, end: 3.8, text: "Reply.", speaker: "B" },
+          ],
+        }),
+        { status: 200 },
+      )) as typeof fetch,
+  });
+
+  assert.deepEqual(result.segments, [
+    {
+      id: "a1",
+      speaker: "Speaker 1",
+      text: "First sentence. Same turn.",
+      startSeconds: 0,
+      endSeconds: 2.5,
+    },
+    {
+      id: "b1",
+      speaker: "Speaker 2",
+      text: "Reply.",
+      startSeconds: 2.7,
+      endSeconds: 3.8,
     },
   ]);
 });
