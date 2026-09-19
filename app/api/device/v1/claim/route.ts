@@ -19,6 +19,10 @@ const requestSchema = z
     hardwareId: z.string().trim().min(8).max(120),
     model: z.string().trim().min(1).max(100),
     firmwareVersion: z.string().trim().min(1).max(80),
+    credentialSecret: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{40,80}$/u)
+      .optional(),
   })
   .strict();
 
@@ -27,6 +31,43 @@ type ClaimedLantern = {
   owner_id: string;
   device_name: string;
 };
+
+async function findRepeatedClaim(
+  client: SupabaseClient,
+  input: z.infer<typeof requestSchema>,
+  codeHash: string,
+  credentialHash: string,
+): Promise<ClaimedLantern | null> {
+  if (!input.credentialSecret) return null;
+
+  const now = new Date().toISOString();
+  const { data: pairing, error: pairingError } = await client
+    .from("device_pairings")
+    .select("user_id,device_name,claimed_device_id")
+    .eq("code_hash", codeHash)
+    .not("claimed_at", "is", null)
+    .gt("expires_at", now)
+    .maybeSingle();
+  if (pairingError) throw new Error(pairingError.message);
+  if (!pairing?.claimed_device_id) return null;
+
+  const { data: device, error: deviceError } = await client
+    .from("devices")
+    .select("id,user_id,name")
+    .eq("id", pairing.claimed_device_id)
+    .eq("hardware_id", input.hardwareId)
+    .eq("credential_hash", credentialHash)
+    .is("revoked_at", null)
+    .maybeSingle();
+  if (deviceError) throw new Error(deviceError.message);
+  if (!device || device.user_id !== pairing.user_id) return null;
+
+  return {
+    device_id: device.id,
+    owner_id: device.user_id,
+    device_name: device.name || pairing.device_name,
+  };
+}
 
 async function claimWithQualifiedQueries(
   client: SupabaseClient,
@@ -156,7 +197,10 @@ export async function POST(request: Request) {
     const input = requestSchema.parse(await request.json());
     const code = normalizePairingCode(input.pairingCode);
     const deviceId = randomUUID();
-    const deviceSecret = createDeviceSecret();
+    // New firmware persists this secret before making the request. That makes
+    // pairing safe to retry if Wi-Fi drops after the server claims the code but
+    // before the ESP32 receives the response. Older firmware remains supported.
+    const deviceSecret = input.credentialSecret || createDeviceSecret();
     const codeHash = hashLanternSecret(code);
     const credentialHash = hashLanternSecret(deviceSecret);
     const { data, error } = await client.rpc("claim_lantern_pairing", {
@@ -167,7 +211,7 @@ export async function POST(request: Request) {
       p_firmware_version: input.firmwareVersion,
       p_credential_hash: credentialHash,
     });
-    const claimed = error
+    const firstClaim = error
       ? /column reference ["']device_id["'] is ambiguous/i.test(error.message)
         ? await claimWithQualifiedQueries(
             client,
@@ -182,6 +226,9 @@ export async function POST(request: Request) {
       : Array.isArray(data)
         ? data[0]
         : data;
+    const claimed =
+      firstClaim ||
+      (await findRepeatedClaim(client, input, codeHash, credentialHash));
     if (!claimed?.device_id) {
       return NextResponse.json(
         { error: "The pairing code is invalid or has expired." },

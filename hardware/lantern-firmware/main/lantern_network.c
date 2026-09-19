@@ -379,31 +379,52 @@ static bool normalize_pairing_code(char *code) {
   return true;
 }
 
+static esp_err_t ensure_pending_device_secret(void) {
+  if (s_config->device_secret[0]) return ESP_OK;
+
+  uint8_t random[32];
+  esp_fill_random(random, sizeof(random));
+  for (size_t index = 0; index < sizeof(random); ++index) {
+    snprintf(
+      s_config->device_secret + (index * 2),
+      sizeof(s_config->device_secret) - (index * 2),
+      "%02x",
+      random[index]);
+  }
+  esp_err_t result = lantern_storage_save_pending_secret(s_config->device_secret);
+  if (result != ESP_OK) s_config->device_secret[0] = '\0';
+  return result;
+}
+
 static esp_err_t claim_device(void) {
   if (!s_config || !s_config->pairing_code[0] || lantern_storage_is_paired(s_config)) return ESP_OK;
   if (!normalize_pairing_code(s_config->pairing_code)) {
     set_error("Pair code must have 10 characters");
     return ESP_ERR_INVALID_ARG;
   }
+  esp_err_t pending = ensure_pending_device_secret();
+  if (pending != ESP_OK) {
+    set_error("Could not prepare device credential");
+    return pending;
+  }
   uint8_t mac[6];
   ESP_ERROR_CHECK(esp_read_mac(mac, ESP_MAC_WIFI_STA));
-  char body[384];
+  char body[512];
   snprintf(body, sizeof(body),
     "{\"pairingCode\":\"%s\",\"hardwareId\":\"esp32s3:%02x%02x%02x%02x%02x%02x\","
-    "\"model\":\"%s\",\"firmwareVersion\":\"%s\"}",
+    "\"model\":\"%s\",\"firmwareVersion\":\"%s\",\"credentialSecret\":\"%s\"}",
     s_config->pairing_code, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-    LANTERN_MODEL, LANTERN_FIRMWARE_VERSION);
+    LANTERN_MODEL, LANTERN_FIRMWARE_VERSION, s_config->device_secret);
   response_buffer_t *response = response_buffer_create();
   if (!response) return ESP_ERR_NO_MEM;
   int status = post_json("/api/device/v1/claim", body, NULL, response);
+  ESP_LOGI(TAG, "pairing claim returned HTTP %d (%u response bytes)",
+    status, (unsigned)response->length);
   if (status != 201) {
     if (status == 404 || status == 410) {
-      esp_err_t clear = lantern_storage_clear_pairing_code(s_config);
-      if (clear == ESP_OK) {
-        set_error("Pairing code expired; create a new code");
-      } else {
-        set_error("Could not clear expired pairing code");
-      }
+      // Preserve the code and pending credential. The user can submit a new
+      // code in the setup portal, while a reboot can safely retry this claim.
+      set_error("Pairing code expired; create a new code");
       ESP_LOGW(TAG, "claim response: %.256s", response->data);
       free(response);
       return ESP_FAIL;
@@ -435,6 +456,7 @@ static esp_err_t claim_device(void) {
     set_error("Could not save device credential");
     return save;
   }
+  s_config->pairing_code[0] = '\0';
   s_status.paired = true;
   s_status.last_error[0] = '\0';
   stop_setup_portal();

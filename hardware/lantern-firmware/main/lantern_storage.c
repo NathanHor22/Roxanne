@@ -58,6 +58,18 @@ esp_err_t lantern_storage_save_wifi(const char *ssid, const char *password, cons
   return result;
 }
 
+esp_err_t lantern_storage_save_pending_secret(const char *device_secret) {
+  if (!device_secret || strlen(device_secret) < 40 || strlen(device_secret) > 80) {
+    return ESP_ERR_INVALID_ARG;
+  }
+  nvs_handle_t handle;
+  ESP_RETURN_ON_ERROR(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &handle), "storage", "open");
+  esp_err_t result = nvs_set_str(handle, "dev_secret", device_secret);
+  if (result == ESP_OK) result = nvs_commit(handle);
+  nvs_close(handle);
+  return result;
+}
+
 esp_err_t lantern_storage_save_device(const char *device_id, const char *device_secret) {
   if (!device_id || !device_secret) return ESP_ERR_INVALID_ARG;
   nvs_handle_t handle;
