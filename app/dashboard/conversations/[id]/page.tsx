@@ -11,7 +11,7 @@ export default async function ConversationPage({
   return (
     <WorkspaceRoute
       mode="live"
-      view="conversations"
+      view="calendar"
       conversationId={id}
     />
   );

@@ -51,13 +51,11 @@ import {
 import { ApprovalDialog } from "./ApprovalDialog";
 import { RecordingDialog } from "./RecordingDialog";
 import { LanternDevicePanel } from "./LanternDevicePanel";
-import { ConversationDetail } from "./ConversationDetail";
 import styles from "./workspace.module.css";
 
 export type WorkspaceView =
   | "overview"
   | "calendar"
-  | "conversations"
   | "people"
   | "device"
   | "settings";
@@ -76,7 +74,6 @@ type WorkspaceProps = {
 
 const viewPath: Record<WorkspaceView, string> = {
   overview: "/dashboard",
-  conversations: "/dashboard/conversations",
   calendar: "/dashboard/calendar",
   people: "/dashboard/people",
   device: "/dashboard/lantern",
@@ -85,7 +82,6 @@ const viewPath: Record<WorkspaceView, string> = {
 
 const viewLabel: Record<WorkspaceView, string> = {
   overview: "Overview",
-  conversations: "Conversations",
   calendar: "Calendar",
   people: "People",
   device: "Lantern",
@@ -122,10 +118,6 @@ export function Workspace({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<MeetingApproval | null>(null);
   const [search, setSearch] = useState("");
-  const [conversationFilter, setConversationFilter] = useState<
-    "all" | "follow-up" | "ready" | "processing"
-  >("all");
-  const [personId, setPersonId] = useState<string | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<"pending" | "dismissed">(
     "pending",
   );
@@ -171,9 +163,6 @@ export function Workspace({
   );
   const selectedMeeting =
     meetings.find((meeting) => meeting.id === selectedId) || null;
-  const detailConversation = initialConversationId
-    ? conversations.find((meeting) => meeting.id === initialConversationId) || null
-    : null;
   const grid = getMonthGrid(visibleMonth, { today });
   const monthLabel = new Intl.DateTimeFormat("en-MY", {
     month: "long",
@@ -181,22 +170,6 @@ export function Workspace({
     timeZone: "UTC",
   }).format(new Date(`${visibleMonth}-15T12:00:00Z`));
   const normalizedSearch = search.trim().toLowerCase();
-  const visibleConversations = conversations.filter(
-    (conversation) =>
-      (!personId ||
-        conversation.contacts.some((contact) => contact.id === personId)) &&
-      (conversationFilter === "all" ||
-        (conversationFilter === "follow-up" &&
-          (conversation.followUps || []).some(
-            (followUp) =>
-              followUp.status !== "completed" &&
-              followUp.status !== "dismissed",
-          )) ||
-        conversation.status === conversationFilter) &&
-      `${conversation.title} ${conversation.contacts.map((contact) => `${contact.name} ${contact.company}`).join(" ")} ${conversation.insight?.keyPoints.join(" ")}`
-        .toLowerCase()
-        .includes(normalizedSearch),
-  );
   const accountName =
     account?.displayName || account?.email.split("@")[0] || "Google account";
   const accountInitials = account
@@ -208,22 +181,26 @@ export function Workspace({
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const requested = searchParams.get("view");
-    const requestedPerson = searchParams.get("person");
     if (
-      ["overview", "calendar", "conversations", "people", "device", "settings"].includes(
+      ["overview", "calendar", "people", "device", "settings"].includes(
         requested || "",
       )
     )
       setView(requested as WorkspaceView);
-    if (initialView === "conversations" && requestedPerson)
-      setPersonId(requestedPerson);
   }, [initialView]);
+
+  useEffect(() => {
+    if (
+      initialConversationId &&
+      meetings.some((meeting) => meeting.id === initialConversationId)
+    ) {
+      setSelectedId(initialConversationId);
+    }
+  }, [initialConversationId, meetings]);
 
   const navigate = (next: WorkspaceView) => {
     setView(next);
     setSearch("");
-    setConversationFilter("all");
-    setPersonId(null);
     if (mode === "live") {
       router.push(viewPath[next]);
       return;
@@ -248,12 +225,7 @@ export function Workspace({
     return created;
   };
   const openConversation = (id: string) => {
-    const meeting = meetings.find((entry) => entry.id === id);
-    if (mode === "live" && meeting && isConversation(meeting)) {
-      router.push(`/dashboard/conversations/${encodeURIComponent(id)}`);
-      return;
-    }
-    setSelectedId(id);
+    if (meetings.some((meeting) => meeting.id === id)) setSelectedId(id);
   };
   return (
     <div className={styles.shell}>
@@ -276,7 +248,6 @@ export function Workspace({
           {(
             [
               { id: "overview", label: "Overview", icon: Home },
-              { id: "conversations", label: "Conversations", icon: Headphones },
               { id: "calendar", label: "Calendar", icon: CalendarDays },
               { id: "people", label: "People", icon: Users },
               { id: "device", label: "Lantern", icon: Radio },
@@ -297,9 +268,6 @@ export function Workspace({
             >
               <Icon />
               <span>{label}</span>
-              {id === "conversations" && conversations.length > 0 && (
-                <small>{conversations.length}</small>
-              )}
             </Link>
           ))}
         </nav>
@@ -412,8 +380,6 @@ export function Workspace({
               <p className={styles.eyebrow}>
                 {view === "overview"
                   ? "TODAY IN LANTERN"
-                  : view === "conversations" && initialConversationId
-                    ? "CONVERSATION REVIEW"
                   : view === "calendar"
                   ? "A LITTLE CONTEXT. A BETTER FOLLOW-UP."
                   : view === "device"
@@ -425,13 +391,9 @@ export function Workspace({
                   ? mode === "sample"
                     ? "A clear view of every follow-up."
                     : `Welcome back, ${accountName.split(" ")[0]}.`
-                  : view === "conversations" && initialConversationId
-                    ? "Replay, verify, follow through."
                   : view === "calendar"
                   ? "Your conversations, connected."
-                  : view === "conversations"
-                    ? "Every conversation matters."
-                    : view === "people"
+                  : view === "people"
                       ? "Pick up where you left off."
                       : view === "device"
                         ? "Meet Lantern."
@@ -440,20 +402,16 @@ export function Workspace({
               <p>
                 {view === "overview"
                   ? "Review what needs you, then get back to your clients."
-                  : view === "conversations" && initialConversationId
-                    ? "Use the original recording as your reference and correct anything that needs your judgment."
                   : view === "calendar"
                   ? "What’s coming up, what you agreed, and everything worth remembering."
-                  : view === "conversations"
-                    ? "The important details, ready when you need them."
-                    : view === "people"
+                  : view === "people"
                       ? "Conversations and commitments, organised around your clients."
                       : view === "device"
                         ? "Pair your recorder, check its health, and manage its connection."
                       : "Manage your account, calendar connection, language, and privacy."}
               </p>
             </div>
-            {view !== "settings" && view !== "device" && !initialConversationId && (
+            {view !== "settings" && view !== "device" && (
               <button
                 className={styles.secondaryButton}
                 onClick={() =>
@@ -487,7 +445,7 @@ export function Workspace({
               </button>
             </div>
           )}
-          {error && !initialConversationId && (
+          {error && (
             <div className={styles.errorBanner} role="alert">
               <span>{error}</span>
               <button
@@ -522,7 +480,7 @@ export function Workspace({
                       </span>
                       <ArrowUpRight />
                     </button>
-                    <button onClick={() => navigate("conversations")}>
+                    <button onClick={() => navigate("calendar")}>
                       <span className={`${styles.statIcon} ${styles.blue}`}>
                         <Headphones />
                       </span>
@@ -702,54 +660,6 @@ export function Workspace({
                     </aside>
                   </div>
 
-                  <section className={styles.latestPanel}>
-                    <header className={styles.sectionHeader}>
-                      <div>
-                        <span className={styles.eyebrow}>RECENT CONVERSATIONS</span>
-                        <h2>Pick up where you left off</h2>
-                      </div>
-                      <button
-                        className={styles.textButton}
-                        onClick={() => navigate("conversations")}
-                      >
-                        View all <ArrowRight />
-                      </button>
-                    </header>
-                    <div className={styles.latestList}>
-                      {conversations.slice(0, 5).map((conversation) => (
-                        <button
-                          key={conversation.id}
-                          className={styles.latestRow}
-                          onClick={() => openConversation(conversation.id)}
-                        >
-                          <span className={styles.avatar}>
-                            {initials(conversation.contacts[0]?.name || conversation.title)}
-                          </span>
-                          <span className={styles.latestIdentity}>
-                            <strong>{conversation.contacts[0]?.name || conversation.title}</strong>
-                            <small>{conversation.contacts[0]?.company || "Conversation"}</small>
-                          </span>
-                          <span className={styles.latestSummary}>
-                            {conversation.insight?.wants || conversation.title}
-                          </span>
-                          <time dateTime={conversation.startAt}>
-                            {dateLabel(conversation.startAt)}
-                          </time>
-                          <span className={styles.statusPill}>
-                            {conversation.status === "ready" ? "Ready" : conversation.status}
-                          </span>
-                          <ArrowUpRight />
-                        </button>
-                      ))}
-                      {!conversations.length && (
-                        <div className={styles.emptyInline}>
-                          <Headphones />
-                          <h3>Your first conversation will appear here.</h3>
-                          <p>Record with Lantern or add an audio file to begin.</p>
-                        </div>
-                      )}
-                    </div>
-                  </section>
                 </div>
               )}
               {view === "calendar" && (
@@ -944,19 +854,6 @@ export function Workspace({
                           )}
                         </div>
                       )}
-                      <footer className={styles.calendarLegend}>
-                        <span>
-                          <i className={styles.greenDot} />
-                          Scheduled meeting
-                        </span>
-                        <span>
-                          <i className={styles.blueDot} />
-                          Captured conversation
-                        </span>
-                        <span className={styles.legendHint}>
-                          Select an entry to see the context
-                        </span>
-                      </footer>
                     </section>
                     <aside
                       className={styles.approvalRail}
@@ -1169,144 +1066,6 @@ export function Workspace({
                 </>
               )}
 
-              {view === "conversations" && initialConversationId && (
-                detailConversation ? (
-                  <ConversationDetail
-                    conversation={detailConversation}
-                    mode={mode}
-                    working={working}
-                    error={error}
-                    onBack={() => router.push(viewPath.conversations)}
-                    onTask={(id, completed) =>
-                      void workspace.patchFollowUp(id, {
-                        status: completed ? "completed" : "pending",
-                      })
-                    }
-                    onEditApproval={setEditing}
-                    onApprove={(approval) => void approve(approval)}
-                    onUpdateContact={workspace.patchContact}
-                  />
-                ) : (
-                  <section className={styles.collection}>
-                    <div className={styles.emptyInline}>
-                      <Headphones />
-                      <h3>Conversation not found</h3>
-                      <p>It may have been removed or may belong to another workspace.</p>
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={() => router.push(viewPath.conversations)}
-                      >
-                        Back to conversations
-                      </button>
-                    </div>
-                  </section>
-                )
-              )}
-
-              {view === "conversations" && !initialConversationId && (
-                <section className={styles.collection}>
-                  <div className={styles.collectionToolbar}>
-                    <h2>
-                      {personId
-                        ? contacts.find((contact) => contact.id === personId)
-                            ?.name
-                        : "All conversations"}{" "}
-                      <span className={styles.count}>
-                        {visibleConversations.length}
-                      </span>
-                    </h2>
-                    <div className={styles.collectionControls}>
-                      <label className={styles.search}>
-                        <Search />
-                        <input
-                          aria-label="Search conversations"
-                          placeholder="Search people, companies, or details"
-                          value={search}
-                          onChange={(event) => setSearch(event.target.value)}
-                        />
-                      </label>
-                      <label className={styles.filterSelect}>
-                        <span className="visually-hidden">Filter conversations</span>
-                        <select
-                          aria-label="Filter conversations"
-                          value={conversationFilter}
-                          onChange={(event) =>
-                            setConversationFilter(
-                              event.target.value as typeof conversationFilter,
-                            )
-                          }
-                        >
-                          <option value="all">All conversations</option>
-                          <option value="follow-up">Needs follow-up</option>
-                          <option value="ready">Recap ready</option>
-                          <option value="processing">Processing</option>
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-                  {visibleConversations.map((conversation) => (
-                    <button
-                      className={styles.conversationRow}
-                      key={conversation.id}
-                      onClick={() => openConversation(conversation.id)}
-                    >
-                      <span className={styles.avatar}>
-                        {initials(
-                          conversation.contacts[0]?.name || conversation.title,
-                        )}
-                      </span>
-                      <span className={styles.conversationRowMain}>
-                        <strong>
-                          {conversation.contacts[0]?.name || conversation.title}
-                          <span>{conversation.contacts[0]?.company}</span>
-                        </strong>
-                        <p>
-                          {conversation.insight?.wants || conversation.title}
-                        </p>
-                        <small>
-                          {dateLabel(conversation.startAt)} ·{" "}
-                          {Math.round(
-                            (Date.parse(conversation.endAt) -
-                              Date.parse(conversation.startAt)) /
-                              60000,
-                          )}{" "}
-                          min ·{" "}
-                          {conversation.id.startsWith("sample:")
-                            ? "Sample wearable"
-                            : conversation.source}
-                        </small>
-                      </span>
-                      <span className={styles.typePill}>
-                        {(conversation.followUps || []).some(
-                          (followUp) =>
-                            followUp.status !== "completed" &&
-                            followUp.status !== "dismissed",
-                        )
-                          ? "Follow-up"
-                          : conversation.status === "ready"
-                            ? "Recap ready"
-                            : conversation.status}
-                      </span>
-                      <ArrowUpRight />
-                    </button>
-                  ))}
-                  {!visibleConversations.length && (
-                    <div className={styles.emptyInline}>
-                      <Search />
-                      <h3>
-                        {search
-                          ? "No matching conversations"
-                          : "Your conversations will live here"}
-                      </h3>
-                      <p>
-                        {search
-                          ? "Try a client name, company, or another detail."
-                          : "Add a recording to get started, or explore the sample workspace."}
-                      </p>
-                    </div>
-                  )}
-                </section>
-              )}
               {view === "people" && (
                 <section>
                   <label className={`${styles.search} ${styles.peopleSearch}`}>
@@ -1336,13 +1095,8 @@ export function Workspace({
                             key={contact.id}
                             className={styles.personCard}
                             onClick={() => {
-                              setPersonId(contact.id);
                               setSearch("");
-                              if (mode === "live")
-                                router.push(
-                                  `${viewPath.conversations}?person=${encodeURIComponent(contact.id)}`,
-                                );
-                              else setView("conversations");
+                              if (history[0]) openConversation(history[0].id);
                             }}
                           >
                             <span className={styles.avatar}>

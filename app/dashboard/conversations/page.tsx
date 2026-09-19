@@ -1,7 +1,7 @@
-import { WorkspaceRoute } from "@/components/workspace/WorkspaceRoute";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function ConversationsPage() {
-  return <WorkspaceRoute mode="live" view="conversations" />;
+  redirect("/dashboard/calendar");
 }
