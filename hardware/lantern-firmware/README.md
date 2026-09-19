@@ -1,69 +1,79 @@
 # Lantern firmware
 
-This is the active firmware for the ZHENGCHEN 1.54-inch M1307/ML307 ESP32-S3
-board. It uses the board manufacturer's proven pin map. Version
-`0.2.8-lantern-pilot` adds server-backed voice commands and spoken consent to
-the complete 29-second conversation path. It always uploads the captured WAV
-and uses Agora live captions for command detection, with an OpenAI diarization
-pass for the final speaker-separated replay transcript.
+This is the active firmware for the ZHENGCHEN 1.54-inch M1307/ML307
+ESP32-S3 board. It uses the board manufacturer's proven display, microphone,
+speaker, battery, and button pin map.
+
+Version `0.4.3-session-recovery` adds a local WakeNet activation gate and
+buffered, low-latency speech playback while keeping one consistent
+centre-button fallback:
+
+- say "Computer" while ready: open a voice-activity command window (four seconds maximum)
+- say "start recording" or "status report" during that command window
+
+- short press while ready: open a new session and ask for spoken consent
+- short or long press while recording: stop and upload the session
+- long press while ready: play today's status report
+- short press on an error: retry the exact failed operation
+- long press on an error: cancel the session and return to ready
+- short or long press on complete/status: return to ready immediately
+
+After pairing or reboot, Lantern announces Sector 2418, its battery level, the
+paired owner's name, and the prototype wake phrase. The idle screen shows
+**READY** and **SAY COMPUTER OR PRESS**. Spoken yes/no remains mandatory because
+activation cannot provide consent for the other people in the conversation.
 
 ## What this build proves
 
-- 240 x 240 ST7789 display with a corrected green Lantern palette
-- Main-button short and long press handling
-- I2S microphone level sampling at 16 kHz
-- I2S speaker confirmation chimes at 24 kHz with a silent idle state
-- A 30-second PCM retry buffer in the board's 8 MB PSRAM
-- Battery ADC and charging-pin telemetry
-- First-boot 2.4 GHz Wi-Fi setup portal
-- One-time dashboard pairing and prototype NVS credential storage
-- Authenticated 15-second device heartbeats
-- Server-confirmed recording consent and Malaysia capture time
-- 16 kHz mono publishing through the Agora IoT SDK
-- Final Agora caption staging, unconditional private WAV upload, OpenAI
-  transcription recovery and OpenAI extraction
-- Long-press voice commands for recording and the daily status report
-- Spoken yes/no recording consent
-- Live Agora-caption recognition of "Ring, we're done" while recording
+- 240 x 240 ST7789 display with a green Lantern palette
+- I2S microphone capture at 16 kHz and speaker playback at 24 kHz
+- first-boot 2.4 GHz Wi-Fi or phone-hotspot setup through `Lantern-XXXX`
+- one-time dashboard pairing and authenticated device heartbeats
+- server-bound spoken consent with a second confirmation after the first no
+- Malaysia server time stamped when capture begins
+- live 16 kHz publishing and caption staging through the Agora IoT SDK
+- automatic local WAV fallback if the device cannot join Agora
+- private WAV upload, final OpenAI transcription, structured meeting summary,
+  and dashboard follow-up approval generation
+- direct spoken daily status reports from a long press while ready
+- operation-specific saving, completion, status, and error screens
+- idempotent stop, transcript, audio, and completion retries
+- automatic stale-session reset and one fresh start attempt after HTTP 409
+- background summary retries after the audio has safely uploaded
+- local WakeNet9 activation while idle, with no wake-word cloud request loop
 
-Short-press the main button once to enter the explicit consent screen, again
-to confirm consent and start the Agora-backed recording, and once more to stop.
-The pilot also stops automatically at 29 seconds. It then uploads the final
-captions and WAV, asks OpenAI to create the brief, and shows **Dashboard ready**.
-Long-press for at least 1.2 seconds, release, and speak within the eight-second
-command window. Say **"Lantern, status report"** or recite the Green Lantern
-oath to hear today's completed conversations and pending meeting approvals.
-Say **"Lantern, start recording"**, then answer the spoken consent prompt with
-**yes** or **no**. During a recording, say **"Ring, we're done"** to stop from
-Agora's live captions. The short-press start, consent, and stop controls remain
-available as a reliable fallback.
-On the saved screen, press volume-up to replay the latest five seconds through
-the speaker. Hold both volume buttons for three seconds to clear Wi-Fi and
-pairing settings.
+The bundled prototype WakeNet model recognises "Computer." The firmware keeps
+the model selector isolated so a separately trained "Lantern" WakeNet model can
+replace it later; changing the displayed name cannot retrain a wake model.
 
-The setup network is named `Lantern-XXXX`. Connect to it with password
-`lanternsetup`, then open `http://192.168.4.1`. Enter a 2.4 GHz Wi-Fi or phone
-hotspot and the required one-time pairing code from the live dashboard. A
-paired device can later change Wi-Fi without claiming a second identity.
+The board keeps a rolling 30-second WAV retry archive in PSRAM. A meeting may
+continue beyond 30 seconds through Agora, but this prototype uploads only the
+latest 30 seconds as replay audio. Full hour-long replay requires durable audio
+chunks and is still a separate reliability phase.
 
-After a local recording, the setup page can download the buffered PCM as a WAV
-file. This gives the bring-up build an independent mic/replay check before the
-durable cloud archive is connected.
+Hold both volume buttons for three seconds to clear Wi-Fi and pairing settings.
 
-The setup page can also install a locally built `build/lantern.bin`
-into the inactive OTA slot. This removes the repeated manual BOOT-button step
-during prototype development. The local updater is a development mechanism;
-production firmware still requires signed updates and rollback validation.
+## Wi-Fi and pairing
 
-After pairing and every reboot, Lantern fetches a short OpenAI-generated PCM
-announcement from the device-authenticated backend. It speaks the battery level
-and paired owner's name. OpenAI credentials remain on the backend; the ESP32
-receives only the generated 24 kHz audio stream.
+When no saved Wi-Fi is available, connect your phone or this laptop to the
+device network named `Lantern-XXXX` using password `lanternsetup`, then open
+`http://192.168.4.1`. Enter the 2.4 GHz phone hotspot name and password plus the
+one-time pairing code from the live dashboard. The setup page can also install
+a locally built `build/lantern.bin` into the inactive OTA slot.
+
+After setup, reconnect the laptop to normal internet. The ESP32 connects to the
+phone hotspot itself; the dashboard and ESP32 communicate through the deployed
+Lantern backend and do not need to be on the same local network.
+
+OpenAI, Agora, Google, Supabase, and Exa secrets stay on the backend. The device
+stores only its own paired credential and receives a short-lived Agora session
+token when a recording begins.
 
 ## Build and flash
 
-The repository's ignored `.tools/esp-idf` checkout is ESP-IDF 5.2.3, matching
-the later Agora embedded-SDK integration target.
+The ignored `.tools/esp-idf` checkout is ESP-IDF 5.2.3, matching the Agora
+embedded SDK integration. ESP-SR supplies only WakeNet; OpenAI recognises the
+two commands after wake activation and verifies spoken consent.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\setup-agora-sdk.ps1
@@ -72,61 +82,68 @@ powershell -ExecutionPolicy Bypass -File .\flash.ps1 -Port COM5
 ```
 
 This CH340K board may not enter the ROM loader through DTR/RTS. If automatic
-flashing fails, hold the main/BOOT button while reconnecting USB, keep it held,
-and run `flash.ps1 -Port COM5 -ManualBootloader`. Release the button after the
-write completes.
+flashing fails:
 
-The partition offsets intentionally match the verified factory layout. The
-full 16 MB factory backup remains under the Git-ignored `hardware/backups`
-directory and can restore the board with esptool.
+1. Unplug the ESP32.
+2. Hold the large centre/BOOT button.
+3. Reconnect USB while continuing to hold it.
+4. Run:
 
-## First end-to-end test
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\flash.ps1 -Port COM5 -ManualBootloader
+   ```
 
-Before flashing, deploy migration 005 and the current web build with Supabase,
-Agora Speech-to-Text and OpenAI configured. Google is not required to
-capture a conversation or create a pending approval.
+5. Release the centre button once writing begins.
+6. After the hash is verified, tap the small RESET/EN button once.
 
-1. Open the authenticated live dashboard and keep the **Lantern** page visible.
-2. Pair the device if it does not already appear as registered.
-3. Long-press the main button, release, and say "Lantern, start recording."
-   Answer "yes" after the consent tone. You can also tap once, confirm everyone
-   has agreed, then tap again.
-4. Confirm the screen shows a green Lantern accent plus the current Malaysia
-   date, start time, and elapsed recording timer beside `REC`.
-5. Speak for 10 to 20 seconds. Include a relative date, for example: "Mr Chung,
+The first WakeNet installation requires a full manual flash so `srmodels.bin`
+is written to the model partition. Later application-only flashes preserve the
+installed model as well as Wi-Fi and pairing credentials.
+
+## End-to-end hardware test
+
+Before testing, deploy the current web build and migrations with Supabase,
+Agora, and OpenAI configured. Google is needed only when approving a Calendar
+invitation from the dashboard.
+
+1. Open the live dashboard and confirm the paired device is online.
+2. Restart the board. It should announce the sector, battery, owner, and
+   "Ready," then show **SAY COMPUTER OR PRESS**.
+3. Say "Computer." Confirm the screen changes once to **LISTENING**. Say
+   "start recording" during the command window. It closes after you stop
+   speaking, with a four-second maximum. The centre button remains available
+   as a fallback.
+4. Lantern asks for recording consent and shows **SAY YES OR NO**.
+5. Say "yes." Lantern confirms consent and changes to **RECORDING** with an
+   elapsed timer and **PRESS CENTRE TO STOP**.
+6. Speak for 10 to 20 seconds. Include a clear agreement such as: "Mr Chung,
    let's meet tomorrow at 1 PM Malaysia time for 30 minutes."
-6. Say "Ring, we're done", tap once to stop, or let the 29-second pilot stop
-   itself.
-7. Wait for **Dashboard ready**. The open dashboard refreshes within ten
-   seconds.
-8. Open the new conversation. Verify the calendar date, OpenAI bullet points,
-   pending meeting approval, speaker-separated timestamped transcript, and
-   original-audio replay.
-9. Return the device to Ready, long-press, and say "Lantern, status report."
-   Confirm the speaker reads today's saved conversation and pending approval.
+7. Short-press the centre button. The display moves through finalising,
+   uploading audio, and processing summary.
+8. Confirm Lantern says "Recording uploaded. Session complete," shows
+   **UPLOADED TO DASHBOARD**, then returns to **READY** after three seconds.
+9. Open the new conversation in the dashboard. Verify the recording replay,
+   timestamped transcript, bullet summary, and pending meeting approval.
+10. Say "Computer," followed by "status report." Confirm Lantern plays today's
+   report, shows **REPORT COMPLETE**, and returns to ready. Long-pressing the
+   centre button while ready provides the same fallback.
 
-If provider processing fails after both uploads, the device keeps the same
-completion ID. Press once on the error screen to retry processing without creating a
-duplicate conversation.
+To test refusal, say "no" to the first consent prompt. Lantern asks again. A
+second no cancels the session; saying yes on the second prompt starts it.
 
-## Provider boundary
+If an operation fails, read the specific error text. Short-press to retry it.
+Long-press to cancel and return to ready. If audio upload succeeded but summary
+processing did not, Lantern still reports session completion and retries the
+same completion request in the background without creating a duplicate.
 
-Configure Agora and OpenAI only on the Lantern backend. The device
-receives a short-lived Agora RTC token for its own session; it never receives
-Agora REST, OpenAI, Google, or Supabase credentials. The backend stamps
-`CAPTURE_STARTED` with its own clock and returns the local
-`Asia/Kuala_Lumpur` date/time for the device screen and later OpenAI
-interpretation.
+## Provider boundary and remaining reliability work
 
-Agora is the live layer: it carries microphone audio, produces captions, and
-lets the firmware react to the spoken stop command. OpenAI performs short voice
-command transcription, the final diarized transcription, Malaysian
-code-switching extraction, and speech generation. Exa is used only for public
-company research in Lantern Relay; it does not identify people or speakers.
+Agora is the live transport and caption layer. OpenAI performs consent
+transcription, final diarized transcription, Malaysian code-switching
+extraction, and device speech. Exa enriches public company context in Lantern
+Relay; it does not identify people or speakers.
 
-This pilot keeps the whole WAV and final-caption batch in PSRAM. It proves the
-end-to-end contract but does not claim hour-long reliability. Durable chunks,
-acknowledgements, reconnect/resume, token renewal and explicit gap records are
-required next. The prototype device credential is currently stored in ordinary
-NVS; encrypted NVS, flash encryption, secure boot, and signed OTA are required
-before a field pilot.
+Before a field pilot, add acknowledged audio chunk uploads, reconnect/resume,
+Agora token renewal, durable incremental transcripts, and explicit gap
+records. Production firmware also needs encrypted NVS, flash encryption,
+secure boot, signed OTA updates, and rollback validation.

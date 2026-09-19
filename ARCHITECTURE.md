@@ -48,7 +48,7 @@ mode.
 | --- | --- | --- |
 | Lantern state machine | `lib/lantern-state.ts` | Enforces consent, recording, pause/reconnect, status-report, and pending-approval transitions without provider calls. |
 | Device identity | `lib/lantern-device-auth.ts`, migration 004 | Claims an expiring one-time code and validates a revocable per-device secret whose digest is stored server-side. |
-| Device voice commands | `/api/device/v1/command`, firmware 0.2.8 | Transcribes bounded push-to-talk commands with OpenAI, accepts Malaysian command variants, speaks the response, and keeps invitation execution in the dashboard. |
+| Device controls and consent | Centre-button firmware state machine, `/api/device/v1/command`, `/api/device/v1/speak`, firmware 0.3.1 | Keeps idle silent; short press opens server-bound spoken yes/no consent, a recording stops from the centre button, long press while ready plays the actual daily status report, and external invitations remain approval-only in the dashboard. |
 | Device sessions | `/api/device/v1/sessions` and `/api/device/v1/sessions/[id]/events` | Stores versioned, idempotent state transitions and rejects stale events. |
 | Device telemetry | `/api/device/v1/heartbeat`, `/api/devices` | Reports device state, firmware, battery, network, heap, and last error to the owner dashboard. |
 | Completed transcripts | `lib/workspace/model.ts`, `app/api/conversations/route.ts` | Validates finalized, ordered segments and conversation timing; processes synchronously with OpenAI. |
@@ -140,8 +140,9 @@ returns the stored result. A new event with an old version receives `409`.
 Quick mode starts in `awaiting_recording_consent`. The exact prompt ID must be
 accepted within 30 seconds before state can enter `recording`. Connection loss
 then permits at most 30 seconds of modeled retry buffering. Stopping moves
-through `finalising`, `processing`, and `report_ready`; audio archive acceptance
-and processing completion are simulated until the capture service exists.
+through `finalising`, `processing`, and `report_ready`. The device uploads the
+Agora caption batch and private WAV, then announces dashboard readiness only
+after synchronous processing succeeds.
 
 Status mode moves through oath listening and the daily report. Confirming a
 read-back proposal produces `pending_dashboard_approval`. The state machine has
@@ -401,13 +402,14 @@ adapters have no production environment dependency.
 
 The following are deliberately deferred:
 
-- Hour-plus wearable capture with provider token renewal, acknowledged audio
+- Hour-plus wearable replay with provider token renewal, acknowledged audio
   chunks, reconnect/resume, incremental durable transcript storage, and
-  explicit gap records. The implemented 29-second pilot validates the complete
-  contract before this reliability work.
-- Wake-word activation and the spoken daily Status Report flow. Quick Mode is
-  currently controlled by the device button and all external actions still
-  require approval in the dashboard.
+  explicit gap records. Agora can continue the live meeting after the local
+  buffer rolls over, but the current uploaded WAV contains only the latest 30
+  seconds.
+- A field-quality custom wake-word model. The prototype deliberately uses the
+  centre button while idle; its long-press daily Status Report flow is active.
+  All external actions still require approval in the dashboard.
 - A durable processing queue, recoverable background extraction, and complete
   failure reconciliation across providers, including abandoned import claims.
 - Validated speaker attribution and Malaysian mixed-language accuracy on real

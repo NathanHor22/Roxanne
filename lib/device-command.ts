@@ -1,5 +1,12 @@
-export type DeviceCommandContext = "ready" | "consent";
+export type DeviceCommandContext =
+  | "ready"
+  | "wake"
+  | "wake_word"
+  | "wake_command"
+  | "consent"
+  | "consent_retry";
 export type DeviceCommandIntent =
+  | "wake_detected"
   | "status_report"
   | "start_recording"
   | "stop_recording"
@@ -11,7 +18,7 @@ function normalizedCommand(value: string) {
   return value
     .normalize("NFKD")
     .toLocaleLowerCase("en")
-    .replace(/[’']/gu, "'")
+    .replace(/[\u2018\u2019]/gu, "'")
     .replace(/[^\p{L}\p{N}']+/gu, " ")
     .replace(/\s+/gu, " ")
     .trim();
@@ -35,7 +42,13 @@ export function interpretDeviceCommand(
   const command = normalizedCommand(transcript);
   if (!command) return "unknown";
 
-  if (context === "consent") {
+  const hasWakeAddress = /\b(?:lantern|latern|green lantern|ring)\b/iu.test(command);
+
+  if (context === "wake_word") {
+    return hasWakeAddress ? "wake_detected" : "unknown";
+  }
+
+  if (context === "consent" || context === "consent_retry") {
     if (
       /\b(?:no|nope|cancel|don't|do not|tak|tidak|jangan|belum|batal)\b/iu.test(command)
     ) {
@@ -48,6 +61,13 @@ export function interpretDeviceCommand(
     ) {
       return "consent_yes";
     }
+    return "unknown";
+  }
+
+  if (
+    context === "wake" &&
+    !hasWakeAddress
+  ) {
     return "unknown";
   }
 
@@ -66,6 +86,7 @@ export function interpretDeviceCommand(
   ) {
     return "start_recording";
   }
+  if (context === "wake_command") return "unknown";
   if (
     /\b(?:stop recording|stop the recording|meeting done|we're done|we are done|tamat rakaman|habis rakam|ring stop|lantern stop)\b/iu.test(
       command,
@@ -76,18 +97,32 @@ export function interpretDeviceCommand(
   return "unknown";
 }
 
-export function commandReply(intent: DeviceCommandIntent) {
+export function commandReply(
+  intent: DeviceCommandIntent,
+  context: DeviceCommandContext = "ready",
+) {
   switch (intent) {
+    case "wake_detected":
+      return "Lantern verified. Say your command.";
     case "start_recording":
-      return "I am ready to record. I need consent from everyone present. After the tone, say yes to continue, or no to cancel.";
+      return context === "wake_command"
+        ? "Start recording selected."
+        : "Recording requires consent. Do you consent to being recorded? Say yes or no.";
     case "stop_recording":
       return "There is no active recording to stop.";
     case "consent_yes":
-      return "Consent confirmed. Recording will begin now.";
+      return "Understood. Device authenticated. Consent confirmed. Recording now.";
     case "consent_no":
-      return "Understood. The recording was cancelled.";
+      return context === "consent_retry"
+        ? "Authentication failed. Recording was not started. Please start another session."
+        : "Not authenticated. Please confirm again. Do you consent to being recorded?";
     case "unknown":
-      return "I did not catch that. Say Lantern, start recording, or Lantern, status report.";
+      if (context === "consent" || context === "consent_retry") {
+        return "I did not hear a clear yes or no. Please confirm. Do you consent to being recorded?";
+      }
+      return context === "wake_command"
+        ? "I did not catch that. Say start recording or status report."
+        : "I did not catch that. Say Lantern, start recording, or Lantern, status report.";
     case "status_report":
       return "Preparing your status report.";
   }

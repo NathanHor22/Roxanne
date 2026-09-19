@@ -16,6 +16,14 @@ import {
   SAMPLE_STORAGE_KEY,
 } from "@/lib/workspace/sample";
 
+export type WorkspaceDeviceSummary = {
+  id: string;
+  name: string;
+  status: string;
+  battery_level: number | null;
+  last_seen_at: string | null;
+};
+
 export function useWorkspace(initialMode: WorkspaceMode) {
   const [mode, setMode] = useState<WorkspaceMode>(initialMode);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -23,6 +31,7 @@ export function useWorkspace(initialMode: WorkspaceMode) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [integrations, setIntegrations] = useState<Record<string, boolean>>({});
+  const [device, setDevice] = useState<WorkspaceDeviceSummary | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const generation = useRef(0);
   const actionLock = useRef(false);
@@ -45,6 +54,7 @@ export function useWorkspace(initialMode: WorkspaceMode) {
     setLoading(false);
     setError(null);
     setIntegrations({});
+    setDevice(null);
     const url = new URL(window.location.href);
     url.searchParams.set("mode", "sample");
     window.history.replaceState({}, "", url);
@@ -62,6 +72,7 @@ export function useWorkspace(initialMode: WorkspaceMode) {
         setLoading(true);
         setError(null);
         setIntegrations({});
+        setDevice(null);
         const url = new URL(window.location.href);
         url.searchParams.delete("mode");
         window.history.replaceState({}, "", url);
@@ -85,9 +96,28 @@ export function useWorkspace(initialMode: WorkspaceMode) {
         }
         setMeetings(payload.meetings || []);
         if (!silent) {
-          const result = await fetch("/api/integrations", { cache: "no-store" });
-          if (result.ok && current === generation.current)
-            setIntegrations((await result.json()).integrations || {});
+          const [integrationRequest, deviceRequest] = await Promise.allSettled([
+            fetch("/api/integrations", { cache: "no-store" }),
+            fetch("/api/devices", { cache: "no-store" }),
+          ]);
+          if (
+            integrationRequest.status === "fulfilled" &&
+            integrationRequest.value.ok &&
+            current === generation.current
+          )
+            setIntegrations(
+              (await integrationRequest.value.json()).integrations || {},
+            );
+          if (
+            deviceRequest.status === "fulfilled" &&
+            deviceRequest.value.ok &&
+            current === generation.current
+          ) {
+            const devicePayload = (await deviceRequest.value.json()) as {
+              devices?: WorkspaceDeviceSummary[];
+            };
+            setDevice(devicePayload.devices?.[0] || null);
+          }
         }
       } catch (cause) {
         if (!silent && current === generation.current)
@@ -260,6 +290,7 @@ export function useWorkspace(initialMode: WorkspaceMode) {
     error,
     notice,
     integrations,
+    device,
     working,
     approve,
     patchFollowUp,

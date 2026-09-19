@@ -224,11 +224,13 @@ void lantern_display_show(lantern_screen_t screen, const char *detail) {
     case LANTERN_SCREEN_SETUP: status = "WIFI SETUP"; accent = amber; break;
     case LANTERN_SCREEN_CONNECTING: status = "CONNECTING"; accent = amber; break;
     case LANTERN_SCREEN_READY: status = "READY"; break;
+    case LANTERN_SCREEN_LISTENING: status = "LISTENING"; break;
+    case LANTERN_SCREEN_UNDERSTANDING: status = "UNDERSTANDING"; accent = amber; break;
     case LANTERN_SCREEN_CONSENT: status = "CONSENT"; accent = amber; break;
     case LANTERN_SCREEN_RECORDING: status = "RECORDING"; accent = red; break;
-    case LANTERN_SCREEN_SAVED: status = "CLIP SAVED"; break;
+    case LANTERN_SCREEN_SAVING: status = "SAVING"; accent = amber; break;
+    case LANTERN_SCREEN_COMPLETE: status = "SESSION COMPLETE"; break;
     case LANTERN_SCREEN_STATUS: status = "STATUS REPORT"; break;
-    case LANTERN_SCREEN_PAIRED: status = "PAIRED"; break;
     case LANTERN_SCREEN_ERROR: status = "ERROR"; accent = red; break;
     case LANTERN_SCREEN_BOOTING: default: break;
   }

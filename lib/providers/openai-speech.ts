@@ -113,6 +113,8 @@ export async function createOpenAISpeech(
           }
         : {}),
       response_format: "pcm",
+      stream_format: "audio",
+      speed: 1.08,
     };
     const response = await (options.fetchImpl || fetch)(
       "https://api.openai.com/v1/audio/speech",

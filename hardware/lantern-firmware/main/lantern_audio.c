@@ -9,12 +9,15 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/stream_buffer.h"
 #include "freertos/task.h"
 
 #include "lantern_board.h"
 
 #define AUDIO_READ_SAMPLES 320
 #define AUDIO_WRITE_SAMPLES 240
+#define PCM_STREAM_BUFFER_BYTES (64 * 1024)
+#define PCM_PREFILL_BYTES (LANTERN_SPK_SAMPLE_RATE * sizeof(int16_t) / 8)
 #define RETRY_BUFFER_SECONDS 30
 #define RETRY_BUFFER_SAMPLES (LANTERN_MIC_SAMPLE_RATE * RETRY_BUFFER_SECONDS)
 
@@ -28,10 +31,17 @@ static volatile bool s_recording;
 static volatile bool s_streaming;
 static volatile uint32_t s_level;
 static lantern_audio_frame_callback_t s_frame_callback;
+static lantern_audio_frame_callback_t s_monitor_callback;
 static SemaphoreHandle_t s_speaker_lock;
-static bool s_pcm_playing;
-static bool s_pcm_has_pending_byte;
-static uint8_t s_pcm_pending_byte;
+static SemaphoreHandle_t s_pcm_finished;
+static StreamBufferHandle_t s_pcm_stream;
+static StaticStreamBuffer_t s_pcm_stream_state;
+static uint8_t *s_pcm_stream_storage;
+static TaskHandle_t s_pcm_task;
+static volatile bool s_pcm_playing;
+static volatile bool s_pcm_input_finished;
+static volatile bool s_pcm_failed;
+static volatile bool s_speaker_active;
 
 static esp_err_t speaker_start_silent(void) {
   int32_t silence[AUDIO_WRITE_SAMPLES] = {0};
@@ -56,6 +66,74 @@ static void speaker_stop_silent(void) {
   ESP_ERROR_CHECK_WITHOUT_ABORT(i2s_channel_disable(s_speaker));
 }
 
+static void pcm_playback_task(void *argument) {
+  (void)argument;
+  uint8_t input[AUDIO_WRITE_SAMPLES * sizeof(int16_t)];
+  int32_t output[AUDIO_WRITE_SAMPLES];
+  while (true) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    bool speaker_started = false;
+    while (s_pcm_playing) {
+      size_t available = xStreamBufferBytesAvailable(s_pcm_stream);
+      if (!speaker_started) {
+        // Hold a small amount of PCM before enabling I2S. This absorbs normal
+        // HTTPS/hotspot jitter without waiting for the complete reply.
+        if (!s_pcm_input_finished && available < PCM_PREFILL_BYTES) {
+          vTaskDelay(pdMS_TO_TICKS(5));
+          continue;
+        }
+        if (!available || speaker_start_silent() != ESP_OK) {
+          s_pcm_failed = true;
+          break;
+        }
+        speaker_started = true;
+      }
+
+      if (!available) {
+        if (s_pcm_input_finished) break;
+        vTaskDelay(pdMS_TO_TICKS(5));
+        continue;
+      }
+
+      size_t wanted = sizeof(input);
+      if (available < wanted) {
+        if (!s_pcm_input_finished) {
+          vTaskDelay(pdMS_TO_TICKS(2));
+          continue;
+        }
+        wanted = available;
+      }
+      wanted &= ~(size_t)1;
+      if (!wanted) {
+        s_pcm_failed = true;
+        break;
+      }
+      size_t received = xStreamBufferReceive(s_pcm_stream, input, wanted, 0);
+      received &= ~(size_t)1;
+      size_t sample_count = received / sizeof(int16_t);
+      for (size_t index = 0; index < sample_count; ++index) {
+        int16_t sample = (int16_t)((uint16_t)input[index * 2] |
+          ((uint16_t)input[index * 2 + 1] << 8));
+        output[index] = (int32_t)sample * 32768;
+      }
+      size_t bytes_written = 0;
+      esp_err_t result = i2s_channel_write(
+        s_speaker, output, sample_count * sizeof(output[0]), &bytes_written,
+        pdMS_TO_TICKS(250));
+      if (result != ESP_OK || bytes_written != sample_count * sizeof(output[0])) {
+        s_pcm_failed = true;
+        break;
+      }
+    }
+
+    if (speaker_started) speaker_stop_silent();
+    s_pcm_playing = false;
+    s_speaker_active = false;
+    xSemaphoreGive(s_speaker_lock);
+    xSemaphoreGive(s_pcm_finished);
+  }
+}
+
 static int16_t buffered_sample(size_t chronological_index) {
   size_t oldest = s_sample_count == RETRY_BUFFER_SAMPLES ? s_write_index : 0;
   return s_retry_buffer[(oldest + chronological_index) % RETRY_BUFFER_SAMPLES];
@@ -73,7 +151,11 @@ static void microphone_task(void *argument) {
     size_t samples = bytes_read / sizeof(raw[0]);
     uint64_t absolute_total = 0;
     for (size_t index = 0; index < samples; ++index) {
-      int32_t value = raw[index] >> 12;
+      // The microphone delivers left-aligned 24-bit samples in a 32-bit I2S
+      // slot. A 12-bit shift over-amplified room noise and clipped speech,
+      // leaving the AFE VAD permanently in its speech state. Preserve two bits
+      // of useful gain while restoring enough headroom for speech/silence.
+      int32_t value = raw[index] >> 14;
       if (value > INT16_MAX) value = INT16_MAX;
       if (value < INT16_MIN) value = INT16_MIN;
       int16_t sample = (int16_t)value;
@@ -86,14 +168,26 @@ static void microphone_task(void *argument) {
       }
     }
     s_level = samples ? (uint32_t)(absolute_total / samples) : 0;
+    lantern_audio_frame_callback_t monitor = s_monitor_callback;
+    if (monitor && !s_speaker_active && samples) monitor(converted, samples);
     lantern_audio_frame_callback_t callback = s_frame_callback;
     if (s_streaming && callback && samples) callback(converted, samples);
   }
 }
 
 esp_err_t lantern_audio_init(void) {
-  s_speaker_lock = xSemaphoreCreateMutex();
-  if (!s_speaker_lock) return ESP_ERR_NO_MEM;
+  // Playback is opened by the HTTPS callback and closed by the PCM worker, so
+  // this gate must allow a different task to release it. A FreeRTOS mutex has
+  // owner-only priority-inheritance semantics and asserts in that pattern.
+  s_speaker_lock = xSemaphoreCreateBinary();
+  s_pcm_finished = xSemaphoreCreateBinary();
+  s_pcm_stream_storage = heap_caps_malloc(
+    PCM_STREAM_BUFFER_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!s_speaker_lock || !s_pcm_finished || !s_pcm_stream_storage) return ESP_ERR_NO_MEM;
+  xSemaphoreGive(s_speaker_lock);
+  s_pcm_stream = xStreamBufferCreateStatic(
+    PCM_STREAM_BUFFER_BYTES, 1, s_pcm_stream_storage, &s_pcm_stream_state);
+  if (!s_pcm_stream) return ESP_ERR_NO_MEM;
 
   i2s_chan_config_t speaker_channel = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
   speaker_channel.dma_desc_num = 6;
@@ -137,16 +231,22 @@ esp_err_t lantern_audio_init(void) {
 
   s_retry_buffer = heap_caps_malloc(RETRY_BUFFER_SAMPLES * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (!s_retry_buffer) return ESP_ERR_NO_MEM;
+  if (xTaskCreatePinnedToCore(
+        pcm_playback_task, "lantern_pcm", 4096, NULL, 7, &s_pcm_task, 1) != pdPASS) {
+    return ESP_ERR_NO_MEM;
+  }
   // Agora's synchronous PCM encode/send path runs inside this callback task
   // and needs substantially more stack than the I2S capture loop alone.
   xTaskCreatePinnedToCore(microphone_task, "lantern_mic", 12288, NULL, 6, NULL, 1);
-  ESP_LOGI(TAG, "I2S microphone and speaker ready; 30-second PSRAM buffer allocated");
+  ESP_LOGI(TAG, "I2S microphone and speaker ready; meeting retry buffer allocated");
   return ESP_OK;
 }
 
 void lantern_audio_chime(unsigned count) {
   if (!s_speaker || !s_speaker_lock || xSemaphoreTake(s_speaker_lock, pdMS_TO_TICKS(500)) != pdTRUE) return;
+  s_speaker_active = true;
   if (speaker_start_silent() != ESP_OK) {
+    s_speaker_active = false;
     xSemaphoreGive(s_speaker_lock);
     return;
   }
@@ -165,72 +265,51 @@ void lantern_audio_chime(unsigned count) {
     if (tone + 1 < count) vTaskDelay(pdMS_TO_TICKS(90));
   }
   speaker_stop_silent();
+  s_speaker_active = false;
   xSemaphoreGive(s_speaker_lock);
 }
 
 esp_err_t lantern_audio_pcm_begin(void) {
-  if (!s_speaker || !s_speaker_lock || s_pcm_playing) return ESP_ERR_INVALID_STATE;
-  if (xSemaphoreTake(s_speaker_lock, pdMS_TO_TICKS(1000)) != pdTRUE) return ESP_ERR_TIMEOUT;
-  esp_err_t result = speaker_start_silent();
-  if (result != ESP_OK) {
-    xSemaphoreGive(s_speaker_lock);
-    return result;
+  if (!s_speaker || !s_speaker_lock || !s_pcm_stream || !s_pcm_task || s_pcm_playing) {
+    return ESP_ERR_INVALID_STATE;
   }
+  if (xSemaphoreTake(s_speaker_lock, pdMS_TO_TICKS(1000)) != pdTRUE) return ESP_ERR_TIMEOUT;
+  xStreamBufferReset(s_pcm_stream);
+  xSemaphoreTake(s_pcm_finished, 0);
   s_pcm_playing = true;
-  s_pcm_has_pending_byte = false;
-  ESP_LOGI(TAG, "24 kHz PCM playback started");
+  s_pcm_input_finished = false;
+  s_pcm_failed = false;
+  s_speaker_active = true;
+  xTaskNotifyGive(s_pcm_task);
+  ESP_LOGI(TAG, "24 kHz buffered PCM playback opened");
   return ESP_OK;
 }
 
 esp_err_t lantern_audio_pcm_write(const void *data, size_t length) {
   if (!s_pcm_playing || !data || !length) return length ? ESP_ERR_INVALID_STATE : ESP_OK;
   const uint8_t *bytes = data;
-  int32_t output[AUDIO_WRITE_SAMPLES];
-  size_t output_count = 0;
-  size_t offset = 0;
-  while (offset < length || s_pcm_has_pending_byte) {
-    uint8_t low;
-    uint8_t high;
-    if (s_pcm_has_pending_byte) {
-      if (offset >= length) break;
-      low = s_pcm_pending_byte;
-      high = bytes[offset++];
-      s_pcm_has_pending_byte = false;
-    } else {
-      if (offset + 1 >= length) {
-        s_pcm_pending_byte = bytes[offset];
-        s_pcm_has_pending_byte = true;
-        break;
-      }
-      low = bytes[offset++];
-      high = bytes[offset++];
+  size_t sent = 0;
+  while (sent < length && s_pcm_playing) {
+    size_t chunk = xStreamBufferSend(
+      s_pcm_stream, bytes + sent, length - sent, pdMS_TO_TICKS(2000));
+    if (!chunk) {
+      s_pcm_failed = true;
+      return ESP_ERR_TIMEOUT;
     }
-    int16_t sample = (int16_t)((uint16_t)low | ((uint16_t)high << 8));
-    output[output_count++] = (int32_t)sample * 32768;
-    if (output_count == AUDIO_WRITE_SAMPLES) {
-      size_t bytes_written = 0;
-      esp_err_t result = i2s_channel_write(
-        s_speaker, output, sizeof(output), &bytes_written, pdMS_TO_TICKS(500));
-      if (result != ESP_OK || bytes_written != sizeof(output)) return ESP_FAIL;
-      output_count = 0;
-    }
+    sent += chunk;
   }
-  if (output_count) {
-    size_t bytes_written = 0;
-    esp_err_t result = i2s_channel_write(
-      s_speaker, output, output_count * sizeof(output[0]), &bytes_written, pdMS_TO_TICKS(500));
-    if (result != ESP_OK || bytes_written != output_count * sizeof(output[0])) return ESP_FAIL;
-  }
-  return ESP_OK;
+  return sent == length ? ESP_OK : ESP_FAIL;
 }
 
 void lantern_audio_pcm_end(void) {
   if (!s_pcm_playing) return;
-  speaker_stop_silent();
-  s_pcm_playing = false;
-  s_pcm_has_pending_byte = false;
-  xSemaphoreGive(s_speaker_lock);
-  ESP_LOGI(TAG, "PCM playback finished");
+  s_pcm_input_finished = true;
+  xTaskNotifyGive(s_pcm_task);
+  if (xSemaphoreTake(s_pcm_finished, pdMS_TO_TICKS(5000)) != pdTRUE) {
+    ESP_LOGE(TAG, "PCM playback drain timed out");
+    s_pcm_failed = true;
+  }
+  ESP_LOGI(TAG, "PCM playback finished%s", s_pcm_failed ? " with errors" : "");
 }
 
 void lantern_audio_set_recording(bool recording) {
@@ -251,7 +330,12 @@ void lantern_audio_set_frame_callback(lantern_audio_frame_callback_t callback) {
   s_frame_callback = callback;
 }
 
+void lantern_audio_set_monitor_callback(lantern_audio_frame_callback_t callback) {
+  s_monitor_callback = callback;
+}
+
 bool lantern_audio_is_recording(void) { return s_recording; }
+bool lantern_audio_is_speaker_active(void) { return s_speaker_active; }
 uint32_t lantern_audio_level(void) { return s_level; }
 size_t lantern_audio_buffered_samples(void) { return s_sample_count; }
 unsigned lantern_audio_buffered_seconds(void) { return (unsigned)(s_sample_count / LANTERN_MIC_SAMPLE_RATE); }

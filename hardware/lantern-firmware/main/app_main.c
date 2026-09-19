@@ -12,67 +12,133 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "lantern_audio.h"
 #include "lantern_agora.h"
+#include "lantern_audio.h"
 #include "lantern_board.h"
 #include "lantern_display.h"
 #include "lantern_network.h"
 #include "lantern_storage.h"
 #include "lantern_transcript.h"
+#include "lantern_wake.h"
 
 typedef enum {
   LOCAL_READY,
+  LOCAL_COMMAND_LISTENING,
+  LOCAL_COMMAND_PROCESSING,
   LOCAL_AWAITING_CONSENT,
   LOCAL_RECORDING,
-  LOCAL_FINALISING,
-  LOCAL_SAVED,
+  LOCAL_SAVING,
+  LOCAL_COMPLETE,
   LOCAL_STATUS,
-  LOCAL_COMMAND,
   LOCAL_ERROR,
 } local_state_t;
+
+typedef enum {
+  RECOVERY_NONE,
+  RECOVERY_SESSION_START,
+  RECOVERY_COMMAND,
+  RECOVERY_CONSENT_CAPTURE,
+  RECOVERY_RECORDING_START,
+  RECOVERY_STOP,
+  RECOVERY_UPLOAD,
+  RECOVERY_STATUS,
+  RECOVERY_SUMMARY,
+} recovery_action_t;
 
 static const char *TAG = "lantern";
 static lantern_config_t s_config;
 static local_state_t s_state = LOCAL_READY;
+static recovery_action_t s_recovery = RECOVERY_NONE;
 static adc_oneshot_unit_handle_t s_adc;
 static int s_battery_level = 50;
 static TickType_t s_state_entered_at;
+static TickType_t s_last_summary_retry_at;
 static lantern_cloud_session_t s_cloud_session;
+static lantern_cloud_session_t s_pending_completion;
 static unsigned s_last_recording_second = UINT32_MAX;
 static volatile bool s_network_update_pending;
+static volatile bool s_summary_retrying;
+static bool s_summary_retry_pending;
 static bool s_pair_announcement_shown;
+static bool s_agora_active;
+static bool s_used_agora;
+static bool s_transcript_uploaded;
+static bool s_audio_uploaded;
+static bool s_wake_available;
+
+#define VOICE_ACTIVITY_LEVEL 180
+#define VOICE_SILENCE_MS 650
+#define VOICE_MIN_CAPTURE_MS 1000
+
+static void show_ready(void);
+static void start_spoken_consent(bool announce_request);
+static void capture_spoken_consent(void);
+static esp_err_t accept_recording_consent(void);
+static void finalise_recording(void);
+static void upload_current_session(bool announce_upload);
+static void play_status_report(void);
+static void capture_wake_command(void);
+static bool ready_for_cloud_action(void);
+
+static void capture_short_utterance(unsigned maximum_ms) {
+  lantern_audio_set_recording(true);
+  TickType_t started_at = xTaskGetTickCount();
+  TickType_t last_voice_at = started_at;
+  bool heard_voice = false;
+  while ((xTaskGetTickCount() - started_at) * portTICK_PERIOD_MS < maximum_ms) {
+    TickType_t now = xTaskGetTickCount();
+    unsigned elapsed_ms = (unsigned)((now - started_at) * portTICK_PERIOD_MS);
+    if (lantern_audio_level() >= VOICE_ACTIVITY_LEVEL) {
+      heard_voice = true;
+      last_voice_at = now;
+    } else if (heard_voice && elapsed_ms >= VOICE_MIN_CAPTURE_MS &&
+               (now - last_voice_at) * portTICK_PERIOD_MS >= VOICE_SILENCE_MS) {
+      break;
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+  lantern_audio_set_recording(false);
+  ESP_LOGI(TAG, "voice window captured %u ms activity=%s level=%u",
+    (unsigned)((xTaskGetTickCount() - started_at) * portTICK_PERIOD_MS),
+    heard_voice ? "yes" : "no", (unsigned)lantern_audio_level());
+}
+
+static unsigned elapsed_state_seconds(void) {
+  return (unsigned)((xTaskGetTickCount() - s_state_entered_at) * portTICK_PERIOD_MS / 1000);
+}
 
 static void show_recording_progress(void) {
-  unsigned elapsed =
-    (unsigned)((xTaskGetTickCount() - s_state_entered_at) * portTICK_PERIOD_MS / 1000);
+  unsigned elapsed = elapsed_state_seconds();
   if (elapsed == s_last_recording_second) return;
   s_last_recording_second = elapsed;
-  char detail[32];
-  snprintf(
-    detail,
-    sizeof(detail),
-    "%.10s %.5s %02u:%02u",
-    s_cloud_session.local_date,
-    s_cloud_session.local_time,
-    elapsed / 60,
-    elapsed % 60);
+  char detail[40];
+  snprintf(detail, sizeof(detail), "%02u:%02u PRESS CENTRE TO STOP", elapsed / 60, elapsed % 60);
   lantern_display_show(LANTERN_SCREEN_RECORDING, detail);
 }
 
-static void show_error(const char *detail) {
+static void stop_local_capture(void) {
+  lantern_wake_set_enabled(false);
   lantern_audio_set_recording(false);
+  lantern_audio_set_streaming(false);
   lantern_agora_stop();
-  s_state = LOCAL_ERROR;
-  s_state_entered_at = xTaskGetTickCount();
-  lantern_display_show(LANTERN_SCREEN_ERROR, detail ? detail : "TRY AGAIN");
-  lantern_audio_chime(3);
+  s_agora_active = false;
 }
 
-static void abort_cloud_session(void) {
-  if (s_cloud_session.session_id[0]) {
-    lantern_network_abort_session(&s_cloud_session);
-    memset(&s_cloud_session, 0, sizeof(s_cloud_session));
-  }
+static void show_error(recovery_action_t recovery, const char *detail, const char *prompt) {
+  stop_local_capture();
+  s_recovery = recovery;
+  s_state = LOCAL_ERROR;
+  s_state_entered_at = xTaskGetTickCount();
+  lantern_display_show(LANTERN_SCREEN_ERROR, detail ? detail : "PRESS TO RETRY");
+  if (!prompt || lantern_network_play_prompt(prompt) != ESP_OK) lantern_audio_chime(3);
+}
+
+static void clear_active_session(void) {
+  memset(&s_cloud_session, 0, sizeof(s_cloud_session));
+  s_agora_active = false;
+  s_used_agora = false;
+  s_transcript_uploaded = false;
+  s_audio_uploaded = false;
 }
 
 static int battery_from_adc(int raw) {
@@ -110,17 +176,31 @@ static void power_and_battery_init(void) {
   ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc, ADC_CHANNEL_7, &channel));
 }
 
+static void update_battery_level(void) {
+  int raw = 0;
+  if (adc_oneshot_read(s_adc, ADC_CHANNEL_7, &raw) == ESP_OK) {
+    s_battery_level = battery_from_adc(raw);
+  }
+}
+
 static void show_ready(void) {
+  lantern_wake_set_enabled(false);
   lantern_network_status_t network;
   lantern_network_get_status(&network);
+  s_state = LOCAL_READY;
+  s_recovery = RECOVERY_NONE;
+  s_state_entered_at = xTaskGetTickCount();
   if (network.setup_portal_active && !network.wifi_connected) {
     lantern_display_show(LANTERN_SCREEN_SETUP, network.setup_ssid);
   } else if (network.wifi_connected && network.paired) {
-    lantern_display_show(LANTERN_SCREEN_READY, "PRESS FOR QUICK");
+    lantern_display_show(
+      LANTERN_SCREEN_READY,
+      s_wake_available ? "SAY COMPUTER OR PRESS" : "PRESS CENTRE TO START");
+    if (s_wake_available) lantern_wake_set_enabled(true);
   } else if (network.wifi_connected) {
-    lantern_display_show(LANTERN_SCREEN_READY, "HARDWARE READY");
+    lantern_display_show(LANTERN_SCREEN_READY, "PAIR IN DASHBOARD");
   } else {
-    lantern_display_show(LANTERN_SCREEN_CONNECTING, "WAIT OR SETUP");
+    lantern_display_show(LANTERN_SCREEN_CONNECTING, "WAIT OR OPEN WIFI SETUP");
   }
 }
 
@@ -128,238 +208,399 @@ static void network_changed(const lantern_network_status_t *status) {
   ESP_LOGI(TAG, "network wifi=%d portal=%d paired=%d ip=%s", status->wifi_connected,
     status->setup_portal_active, status->paired, status->ip_address);
   // ESP-IDF invokes this callback on the small sys_evt task. Defer display,
-  // audio, and delays to Lantern's telemetry task so Wi-Fi events never block
-  // or overflow the system event loop.
+  // speech, and delays to Lantern's health task.
   s_network_update_pending = true;
 }
 
 static esp_err_t open_quick_consent(void) {
+  lantern_wake_set_enabled(false);
   lantern_display_show(LANTERN_SCREEN_CONNECTING, "OPENING SESSION");
   if (lantern_network_begin_quick(&s_cloud_session) != ESP_OK) {
-    show_error("HOLD TO RESTART");
+    show_error(RECOVERY_SESSION_START, "SESSION START FAILED", "session_error");
     return ESP_FAIL;
   }
   s_state = LOCAL_AWAITING_CONSENT;
   s_state_entered_at = xTaskGetTickCount();
-  lantern_display_show(LANTERN_SCREEN_CONSENT, "CONSENT REQUIRED");
-  ESP_LOGI(TAG, "quick mode awaiting server-bound consent");
+  lantern_display_show(LANTERN_SCREEN_CONSENT, "SAY YES OR NO");
+  ESP_LOGI(TAG, "quick mode awaiting spoken consent");
   return ESP_OK;
+}
+
+static esp_err_t capture_consent_response(const char *context, char intent[32]) {
+  lantern_display_show(LANTERN_SCREEN_CONSENT, "SAY YES OR NO");
+  lantern_audio_chime(1);
+  vTaskDelay(pdMS_TO_TICKS(250));
+  capture_short_utterance(3000);
+  if (lantern_audio_buffered_samples() < LANTERN_MIC_SAMPLE_RATE / 2) return ESP_FAIL;
+  lantern_display_show(LANTERN_SCREEN_CONNECTING, "VERIFYING CONSENT");
+  return lantern_network_run_voice_command(context, s_battery_level, intent, 32);
+}
+
+static void cancel_pending_consent(void) {
+  if (s_cloud_session.session_id[0] &&
+      lantern_network_confirm_consent(&s_cloud_session, false, NULL) != ESP_OK) {
+    ESP_LOGW(TAG, "server did not acknowledge rejected consent; requesting reset");
+    lantern_network_restart_session();
+  }
+  clear_active_session();
+  show_ready();
 }
 
 static esp_err_t accept_recording_consent(void) {
   lantern_agora_transport_t transport;
-  lantern_display_show(LANTERN_SCREEN_CONNECTING, "STARTING AGORA");
+  memset(&transport, 0, sizeof(transport));
+  lantern_display_show(LANTERN_SCREEN_CONNECTING, "STARTING RECORDING");
   if (lantern_network_confirm_consent(&s_cloud_session, true, &transport) != ESP_OK) {
-    abort_cloud_session();
-    show_error("AGORA SETUP FAILED");
+    show_error(RECOVERY_RECORDING_START, "RECORDING START FAILED", "session_error");
     return ESP_FAIL;
   }
-  if (lantern_agora_start(&transport) != ESP_OK) {
-    lantern_network_stop_recording(&s_cloud_session);
-    abort_cloud_session();
-    show_error("AGORA JOIN FAILED");
-    return ESP_FAIL;
+
+  lantern_transcript_reset();
+  s_agora_active = lantern_agora_start(&transport) == ESP_OK;
+  s_used_agora = s_agora_active;
+  if (!s_agora_active) {
+    ESP_LOGW(TAG, "Agora device join failed; continuing with the local WAV archive");
+    if (lantern_network_play_prompt("local_recording") != ESP_OK) lantern_audio_chime(1);
   }
-  // Keep the start chime and spoken consent response out of both the recording
-  // and the Agora transcript.
-  lantern_audio_chime(2);
   if (lantern_network_capture_started(&s_cloud_session) != ESP_OK) {
-    lantern_agora_stop();
-    abort_cloud_session();
-    show_error("CLOCK SYNC FAILED");
+    show_error(RECOVERY_RECORDING_START, "CLOCK SYNC FAILED", "session_error");
     return ESP_FAIL;
   }
+
   s_state = LOCAL_RECORDING;
+  s_recovery = RECOVERY_NONE;
   s_state_entered_at = xTaskGetTickCount();
   s_last_recording_second = UINT32_MAX;
-  show_recording_progress();
+  s_transcript_uploaded = false;
+  s_audio_uploaded = false;
   lantern_audio_set_recording(true);
-  lantern_audio_set_streaming(true);
-  ESP_LOGI(TAG, "Agora recording started at %s %s Malaysia time",
+  lantern_audio_set_streaming(s_agora_active);
+  show_recording_progress();
+  ESP_LOGI(TAG, "%s recording started at %s %s Malaysia time",
+    s_agora_active ? "Agora and local" : "local fallback",
     s_cloud_session.local_date, s_cloud_session.local_time);
   return ESP_OK;
 }
 
-static esp_err_t capture_voice_command(const char *context, unsigned seconds,
-                                       const char *screen_detail, char intent[32]) {
-  lantern_display_show(LANTERN_SCREEN_STATUS, screen_detail);
-  lantern_audio_chime(1);
-  vTaskDelay(pdMS_TO_TICKS(250));
-  lantern_audio_set_recording(true);
-  vTaskDelay(pdMS_TO_TICKS(seconds * 1000));
-  lantern_audio_set_recording(false);
-  if (lantern_audio_buffered_samples() < LANTERN_MIC_SAMPLE_RATE / 2) return ESP_FAIL;
-  lantern_display_show(LANTERN_SCREEN_CONNECTING, "UNDERSTANDING");
-  return lantern_network_run_voice_command(context, s_battery_level, intent, 32);
-}
-
-static void handle_ready_voice_command(void) {
-  lantern_network_status_t network;
-  lantern_network_get_status(&network);
-  if (!network.wifi_connected || !network.paired) {
-    show_error(network.wifi_connected ? "PAIR IN DASHBOARD" : "CONNECT WIFI FIRST");
-    return;
-  }
-  s_state = LOCAL_COMMAND;
-  s_state_entered_at = xTaskGetTickCount();
-  char intent[32];
-  if (capture_voice_command("ready", 8, "SAY A COMMAND", intent) != ESP_OK) {
-    show_error("VOICE COMMAND OFFLINE");
-    return;
-  }
-  if (strcmp(intent, "status_report") == 0) {
-    s_state = LOCAL_STATUS;
-    lantern_display_show(LANTERN_SCREEN_STATUS, "REPORT COMPLETE");
-    return;
-  }
-  if (strcmp(intent, "start_recording") == 0) {
-    if (open_quick_consent() != ESP_OK) return;
+static void capture_spoken_consent(void) {
+  unsigned rejection_count = 0;
+  for (unsigned attempt = 0; attempt < 3; ++attempt) {
     char consent[32];
-    if (capture_voice_command("consent", 3, "SAY YES OR NO", consent) != ESP_OK) {
-      lantern_network_confirm_consent(&s_cloud_session, false, NULL);
-      memset(&s_cloud_session, 0, sizeof(s_cloud_session));
-      show_error("CONSENT VOICE OFFLINE");
+    const char *context = rejection_count ? "consent_retry" : "consent";
+    if (capture_consent_response(context, consent) != ESP_OK) {
+      show_error(RECOVERY_CONSENT_CAPTURE, "CONSENT CHECK FAILED", "consent_error");
       return;
     }
     if (strcmp(consent, "consent_yes") == 0) {
       accept_recording_consent();
       return;
     }
-    lantern_network_confirm_consent(&s_cloud_session, false, NULL);
-    memset(&s_cloud_session, 0, sizeof(s_cloud_session));
-    s_state = LOCAL_READY;
-    s_state_entered_at = xTaskGetTickCount();
-    show_ready();
+    if (strcmp(consent, "consent_no") == 0 && ++rejection_count >= 2) {
+      cancel_pending_consent();
+      return;
+    }
+  }
+  if (lantern_network_play_prompt("consent_failure") != ESP_OK) lantern_audio_chime(2);
+  cancel_pending_consent();
+}
+
+static void start_spoken_consent(bool announce_request) {
+  if (open_quick_consent() != ESP_OK) return;
+  if (announce_request && lantern_network_play_prompt("consent_request") != ESP_OK) {
+    lantern_audio_chime(1);
+  }
+  capture_spoken_consent();
+}
+
+static void session_complete(bool processing_pending) {
+  unsigned buffered_seconds = lantern_audio_buffered_seconds();
+  s_state = LOCAL_COMPLETE;
+  s_recovery = RECOVERY_NONE;
+  lantern_display_show(
+    LANTERN_SCREEN_COMPLETE,
+    processing_pending ? "SUMMARY PROCESSING" : "UPLOADED TO DASHBOARD");
+  if (lantern_network_play_prompt(
+        processing_pending ? "processing_pending" : "upload_complete") != ESP_OK) {
+    lantern_audio_chime(2);
+  }
+  s_state_entered_at = xTaskGetTickCount();
+  ESP_LOGI(TAG, "session upload complete; local archive contains %u seconds", buffered_seconds);
+  clear_active_session();
+}
+
+static void upload_current_session(bool announce_upload) {
+  s_state = LOCAL_SAVING;
+  s_state_entered_at = xTaskGetTickCount();
+  if (announce_upload && lantern_network_play_prompt("recording_uploading") != ESP_OK) {
+    lantern_audio_chime(1);
+  }
+
+  unsigned caption_packets = lantern_transcript_packet_count();
+  if (!s_transcript_uploaded && s_used_agora && caption_packets) {
+    lantern_display_show(LANTERN_SCREEN_SAVING, "UPLOADING TRANSCRIPT");
+    if (lantern_network_upload_transcript(&s_cloud_session) == ESP_OK) {
+      s_transcript_uploaded = true;
+    } else {
+      ESP_LOGW(TAG, "Agora captions unavailable; server will transcribe the WAV archive");
+    }
+  }
+
+  if (!s_audio_uploaded) {
+    lantern_display_show(LANTERN_SCREEN_SAVING, "UPLOADING AUDIO");
+    if (lantern_network_upload_audio(&s_cloud_session) != ESP_OK) {
+      show_error(RECOVERY_UPLOAD, "AUDIO UPLOAD PAUSED", "upload_error");
+      return;
+    }
+    s_audio_uploaded = true;
+  }
+
+  lantern_display_show(LANTERN_SCREEN_SAVING, "PROCESSING SUMMARY");
+  if (lantern_network_complete_session(&s_cloud_session) != ESP_OK) {
+    s_pending_completion = s_cloud_session;
+    s_summary_retry_pending = true;
+    s_last_summary_retry_at = xTaskGetTickCount();
+    session_complete(true);
     return;
   }
-  s_state = LOCAL_READY;
+  session_complete(false);
+}
+
+static void continue_after_stop(void) {
+  lantern_display_show(LANTERN_SCREEN_SAVING, "CLOSING SESSION");
+  if (lantern_network_stop_recording(&s_cloud_session) != ESP_OK) {
+    show_error(RECOVERY_STOP, "SESSION STOP PAUSED", "stop_error");
+    return;
+  }
+  upload_current_session(true);
+}
+
+static void finalise_recording(void) {
+  s_state = LOCAL_SAVING;
   s_state_entered_at = xTaskGetTickCount();
+  lantern_audio_set_recording(false);
+  lantern_display_show(LANTERN_SCREEN_SAVING, "FINALISING SPEECH");
+  // Leave the live microphone path open briefly so Agora can finalize the last
+  // sentence. The local archive ends exactly at the centre-button press.
+  if (s_agora_active) vTaskDelay(pdMS_TO_TICKS(3000));
+  lantern_audio_set_streaming(false);
+  lantern_agora_stop();
+  s_agora_active = false;
+  continue_after_stop();
+}
+
+static void play_status_report(void) {
+  lantern_wake_set_enabled(false);
+  s_state = LOCAL_STATUS;
+  s_recovery = RECOVERY_NONE;
+  s_state_entered_at = xTaskGetTickCount();
+  lantern_display_show(LANTERN_SCREEN_STATUS, "LOADING TODAY");
+  if (lantern_network_play_briefing("status", s_battery_level) != ESP_OK) {
+    show_error(RECOVERY_STATUS, "REPORT UNAVAILABLE", "status_error");
+    return;
+  }
+  lantern_display_show(LANTERN_SCREEN_STATUS, "REPORT COMPLETE");
+  s_state_entered_at = xTaskGetTickCount();
+}
+
+static void command_not_recognised(void) {
+  s_state = LOCAL_COMMAND_PROCESSING;
+  s_state_entered_at = xTaskGetTickCount();
+  lantern_display_show(LANTERN_SCREEN_UNDERSTANDING, "COMMAND NOT RECOGNISED");
+  lantern_audio_chime(2);
+  vTaskDelay(pdMS_TO_TICKS(1200));
   show_ready();
+}
+
+static void capture_wake_command(void) {
+  if (s_state != LOCAL_READY || !ready_for_cloud_action()) return;
+  lantern_wake_set_enabled(false);
+  s_state = LOCAL_COMMAND_LISTENING;
+  s_recovery = RECOVERY_NONE;
+  s_state_entered_at = xTaskGetTickCount();
+  lantern_display_show(LANTERN_SCREEN_LISTENING, "START RECORDING OR STATUS");
+  lantern_audio_chime(1);
+  vTaskDelay(pdMS_TO_TICKS(250));
+
+  capture_short_utterance(4000);
+  if (lantern_audio_buffered_samples() < LANTERN_MIC_SAMPLE_RATE / 2) {
+    command_not_recognised();
+    return;
+  }
+
+  s_state = LOCAL_COMMAND_PROCESSING;
+  s_state_entered_at = xTaskGetTickCount();
+  lantern_display_show(LANTERN_SCREEN_UNDERSTANDING, "CHECKING COMMAND");
+  char intent[32];
+  esp_err_t result = lantern_network_run_voice_command(
+    "wake_command", s_battery_level, intent, sizeof(intent));
+  if (result == ESP_ERR_NOT_FOUND) {
+    command_not_recognised();
+    return;
+  }
+  if (result != ESP_OK) {
+    show_error(RECOVERY_COMMAND, "COMMAND SERVICE OFFLINE", "command_error");
+    return;
+  }
+
+  if (strcmp(intent, "start_recording") == 0) {
+    start_spoken_consent(true);
+    return;
+  }
+  if (strcmp(intent, "status_report") == 0) {
+    s_state = LOCAL_STATUS;
+    s_recovery = RECOVERY_NONE;
+    lantern_display_show(LANTERN_SCREEN_STATUS, "REPORT COMPLETE");
+    s_state_entered_at = xTaskGetTickCount();
+    return;
+  }
+  command_not_recognised();
+}
+
+static void retry_pending_summary(bool user_requested) {
+  if (!s_summary_retry_pending || s_summary_retrying) return;
+  s_summary_retrying = true;
+  if (user_requested) lantern_display_show(LANTERN_SCREEN_SAVING, "RETRYING SUMMARY");
+  esp_err_t result = lantern_network_complete_session(&s_pending_completion);
+  s_last_summary_retry_at = xTaskGetTickCount();
+  if (result == ESP_OK) {
+    s_summary_retry_pending = false;
+    memset(&s_pending_completion, 0, sizeof(s_pending_completion));
+    ESP_LOGI(TAG, "background summary retry completed");
+    if (user_requested) {
+      lantern_display_show(LANTERN_SCREEN_COMPLETE, "SUMMARY READY");
+      if (lantern_network_play_prompt("upload_complete") != ESP_OK) lantern_audio_chime(2);
+      s_state = LOCAL_COMPLETE;
+      s_state_entered_at = xTaskGetTickCount();
+    }
+  } else {
+    ESP_LOGW(TAG, "summary retry remains pending");
+    if (user_requested) {
+      s_state = LOCAL_ERROR;
+      s_recovery = RECOVERY_SUMMARY;
+      lantern_display_show(LANTERN_SCREEN_ERROR, "SUMMARY STILL PROCESSING");
+      if (lantern_network_play_prompt("processing_pending") != ESP_OK) lantern_audio_chime(2);
+      s_state_entered_at = xTaskGetTickCount();
+    }
+  }
+  s_summary_retrying = false;
+}
+
+static void retry_error(void) {
+  recovery_action_t action = s_recovery;
+  switch (action) {
+    case RECOVERY_SESSION_START:
+      lantern_display_show(LANTERN_SCREEN_CONNECTING, "RETRYING SESSION");
+      start_spoken_consent(true);
+      break;
+    case RECOVERY_COMMAND:
+      show_ready();
+      capture_wake_command();
+      break;
+    case RECOVERY_CONSENT_CAPTURE:
+      s_state = LOCAL_AWAITING_CONSENT;
+      if (lantern_network_play_prompt("consent_request") != ESP_OK) lantern_audio_chime(1);
+      capture_spoken_consent();
+      break;
+    case RECOVERY_RECORDING_START:
+      s_state = LOCAL_AWAITING_CONSENT;
+      accept_recording_consent();
+      break;
+    case RECOVERY_STOP:
+      s_state = LOCAL_SAVING;
+      continue_after_stop();
+      break;
+    case RECOVERY_UPLOAD:
+      upload_current_session(false);
+      break;
+    case RECOVERY_STATUS:
+      play_status_report();
+      break;
+    case RECOVERY_SUMMARY:
+      retry_pending_summary(true);
+      break;
+    case RECOVERY_NONE:
+    default:
+      show_ready();
+      break;
+  }
+}
+
+static bool ready_for_cloud_action(void) {
+  lantern_network_status_t network;
+  lantern_network_get_status(&network);
+  if (!network.wifi_connected || !network.paired) {
+    show_ready();
+    lantern_audio_chime(1);
+    return false;
+  }
+  return true;
 }
 
 static void handle_short_press(void) {
   switch (s_state) {
-    case LOCAL_READY: {
-      lantern_network_status_t network;
-      lantern_network_get_status(&network);
-      if (!network.wifi_connected || !network.paired) {
-        show_error(network.wifi_connected ? "PAIR IN DASHBOARD" : "CONNECT WIFI FIRST");
+    case LOCAL_READY:
+      if (!ready_for_cloud_action()) break;
+      if (s_summary_retry_pending) {
+        retry_pending_summary(true);
         break;
       }
-      if (open_quick_consent() == ESP_OK) {
-        lantern_display_show(LANTERN_SCREEN_CONSENT, "PRESS TO AGREE");
-        lantern_audio_chime(1);
-      }
+      start_spoken_consent(true);
       break;
-    }
-    case LOCAL_AWAITING_CONSENT: {
-      accept_recording_consent();
+    case LOCAL_RECORDING:
+      finalise_recording();
       break;
-    }
-    case LOCAL_RECORDING: {
-      lantern_audio_set_recording(false);
-      s_state = LOCAL_FINALISING;
-      s_state_entered_at = xTaskGetTickCount();
-      lantern_display_show(LANTERN_SCREEN_CONNECTING, "FINALISING SPEECH");
-      // Stop extending the local WAV at the user's button press, but keep
-      // publishing microphone frames briefly. The silence after the utterance
-      // lets Agora finalize and return its last sentence before its bot exits.
-      vTaskDelay(pdMS_TO_TICKS(3000));
-      lantern_audio_set_streaming(false);
-      if (lantern_network_stop_recording(&s_cloud_session) != ESP_OK) {
-        abort_cloud_session();
-        show_error("STOP FAILED");
-        break;
-      }
-      vTaskDelay(pdMS_TO_TICKS(400));
-      lantern_agora_stop();
-      unsigned caption_packets = lantern_transcript_packet_count();
-      ESP_LOGI(TAG, "staged %u Agora caption packets", caption_packets);
-      if (caption_packets) {
-        lantern_display_show(LANTERN_SCREEN_CONNECTING, "UPLOADING WORDS");
-        if (lantern_network_upload_transcript(&s_cloud_session) != ESP_OK) {
-          ESP_LOGW(TAG, "Agora captions unavailable; preserving WAV for server transcription");
-        }
-      } else {
-        ESP_LOGW(TAG, "no Agora captions; preserving WAV for server transcription");
-      }
-      lantern_display_show(LANTERN_SCREEN_CONNECTING, "UPLOADING AUDIO");
-      if (lantern_network_upload_audio(&s_cloud_session) != ESP_OK) {
-        abort_cloud_session();
-        show_error("AUDIO UPLOAD FAILED");
-        break;
-      }
-      lantern_display_show(LANTERN_SCREEN_CONNECTING, "BUILDING BRIEF");
-      if (lantern_network_complete_session(&s_cloud_session) != ESP_OK) {
-        show_error("BRIEF PROCESS FAILED");
-        break;
-      }
-      s_state = LOCAL_SAVED;
-      s_state_entered_at = xTaskGetTickCount();
-      lantern_display_show(LANTERN_SCREEN_SAVED, "DASHBOARD READY");
-      lantern_audio_chime(2);
-      ESP_LOGI(TAG, "conversation saved to dashboard; %u audio seconds",
-        lantern_audio_buffered_seconds());
-      memset(&s_cloud_session, 0, sizeof(s_cloud_session));
-      break;
-    }
-    case LOCAL_FINALISING:
-      break;
-    case LOCAL_SAVED:
+    case LOCAL_COMPLETE:
     case LOCAL_STATUS:
-    case LOCAL_COMMAND:
-      s_state = LOCAL_READY;
-      s_state_entered_at = xTaskGetTickCount();
       show_ready();
       break;
     case LOCAL_ERROR:
-      if (s_cloud_session.session_id[0] && s_cloud_session.completion_event_id[0]) {
-        lantern_display_show(LANTERN_SCREEN_CONNECTING, "RETRYING BRIEF");
-        if (lantern_network_complete_session(&s_cloud_session) == ESP_OK) {
-          s_state = LOCAL_SAVED;
-          lantern_display_show(LANTERN_SCREEN_SAVED, "DASHBOARD READY");
-          lantern_audio_chime(2);
-          memset(&s_cloud_session, 0, sizeof(s_cloud_session));
-        } else {
-          show_error("BRIEF STILL OFFLINE");
-        }
-      } else {
-        s_state = LOCAL_READY;
-        s_state_entered_at = xTaskGetTickCount();
-        show_ready();
-      }
+      retry_error();
+      break;
+    case LOCAL_AWAITING_CONSENT:
+    case LOCAL_COMMAND_LISTENING:
+    case LOCAL_COMMAND_PROCESSING:
+    case LOCAL_SAVING:
       break;
   }
 }
 
-static void handle_long_press(void) {
-  if (s_state == LOCAL_RECORDING) {
-    handle_short_press();
-    return;
-  }
-  if (s_state == LOCAL_ERROR) {
-    lantern_display_show(LANTERN_SCREEN_CONNECTING, "RESTARTING SESSION");
+static void cancel_error(void) {
+  lantern_display_show(LANTERN_SCREEN_CONNECTING, "CANCELLING SESSION");
+  stop_local_capture();
+  lantern_network_status_t network;
+  lantern_network_get_status(&network);
+  if (network.wifi_connected && network.paired) {
     if (lantern_network_restart_session() != ESP_OK) {
-      show_error("RESTART FAILED");
-      return;
+      ESP_LOGW(TAG, "server reset failed while cancelling; local controls are returning to ready");
     }
-    memset(&s_cloud_session, 0, sizeof(s_cloud_session));
-    s_state = LOCAL_READY;
-    s_state_entered_at = xTaskGetTickCount();
-    lantern_display_show(LANTERN_SCREEN_PAIRED, "SESSION RESET");
-    lantern_audio_chime(1);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    show_ready();
-    ESP_LOGI(TAG, "explicit server session restart completed");
-    return;
   }
-  if (s_state == LOCAL_AWAITING_CONSENT || s_state == LOCAL_FINALISING ||
-      s_state == LOCAL_COMMAND) return;
-  if (s_state == LOCAL_SAVED || s_state == LOCAL_STATUS) {
-    s_state = LOCAL_READY;
-    s_state_entered_at = xTaskGetTickCount();
+  clear_active_session();
+  memset(&s_pending_completion, 0, sizeof(s_pending_completion));
+  s_summary_retry_pending = false;
+  show_ready();
+}
+
+static void handle_long_press(void) {
+  switch (s_state) {
+    case LOCAL_READY:
+      if (ready_for_cloud_action()) play_status_report();
+      break;
+    case LOCAL_RECORDING:
+      finalise_recording();
+      break;
+    case LOCAL_ERROR:
+      cancel_error();
+      break;
+    case LOCAL_COMPLETE:
+    case LOCAL_STATUS:
+      show_ready();
+      break;
+    case LOCAL_AWAITING_CONSENT:
+    case LOCAL_COMMAND_LISTENING:
+    case LOCAL_COMMAND_PROCESSING:
+    case LOCAL_SAVING:
+      break;
   }
-  handle_ready_voice_command();
 }
 
 static void button_task(void *argument) {
@@ -372,12 +613,17 @@ static void button_task(void *argument) {
     .pull_up_en = GPIO_PULLUP_ENABLE,
   };
   ESP_ERROR_CHECK(gpio_config(&buttons));
-  bool was_pressed = false;
-  bool up_was_pressed = false;
+  // Opening the CH340 serial port briefly drives BOOT. Ignore that transition.
+  vTaskDelay(pdMS_TO_TICKS(800));
+  bool was_pressed = gpio_get_level(LANTERN_BUTTON_MAIN_GPIO) == 0;
   bool reset_started = false;
   TickType_t pressed_at = 0;
   TickType_t reset_at = 0;
   while (true) {
+    if (s_state == LOCAL_READY && lantern_wake_take_detection()) {
+      ESP_LOGI(TAG, "WakeNet activation accepted; opening command window");
+      capture_wake_command();
+    }
     bool pressed = gpio_get_level(LANTERN_BUTTON_MAIN_GPIO) == 0;
     bool up_pressed = gpio_get_level(LANTERN_BUTTON_UP_GPIO) == 0;
     bool down_pressed = gpio_get_level(LANTERN_BUTTON_DOWN_GPIO) == 0;
@@ -387,10 +633,7 @@ static void button_task(void *argument) {
       if (held_ms >= 1200) handle_long_press();
       else if (held_ms >= 40) handle_short_press();
     }
-    if (!up_pressed && up_was_pressed && s_state == LOCAL_SAVED) {
-      lantern_audio_play_latest(5);
-    }
-    up_was_pressed = up_pressed;
+
     if (up_pressed && down_pressed) {
       if (!reset_started) {
         reset_started = true;
@@ -404,26 +647,11 @@ static void button_task(void *argument) {
     } else {
       reset_started = false;
     }
-    if (s_state == LOCAL_AWAITING_CONSENT &&
-        (xTaskGetTickCount() - s_state_entered_at) * portTICK_PERIOD_MS >= 30000) {
-      lantern_network_confirm_consent(&s_cloud_session, false, NULL);
-      memset(&s_cloud_session, 0, sizeof(s_cloud_session));
-      s_state = LOCAL_READY;
-      s_state_entered_at = xTaskGetTickCount();
-      show_ready();
-      ESP_LOGI(TAG, "local consent prompt expired");
-    }
-    if (s_state == LOCAL_RECORDING &&
-        lantern_agora_take_stop_command()) {
-      ESP_LOGI(TAG, "finalising after spoken Ring stop command");
-      handle_short_press();
-    }
-    if (s_state == LOCAL_RECORDING &&
-        (xTaskGetTickCount() - s_state_entered_at) * portTICK_PERIOD_MS >= 29000) {
-      ESP_LOGI(TAG, "30-second vertical-slice limit reached; finalising automatically");
-      handle_short_press();
-    }
+
     if (s_state == LOCAL_RECORDING) show_recording_progress();
+    if ((s_state == LOCAL_COMPLETE || s_state == LOCAL_STATUS) && elapsed_state_seconds() >= 3) {
+      show_ready();
+    }
     was_pressed = pressed;
     vTaskDelay(pdMS_TO_TICKS(20));
   }
@@ -441,7 +669,7 @@ static void telemetry_task(void *argument) {
       if (s_state == LOCAL_READY) {
         if (network.wifi_connected && network.paired && !s_pair_announcement_shown) {
           s_pair_announcement_shown = true;
-          lantern_display_show(LANTERN_SCREEN_PAIRED, "SECTOR 2814 ONLINE");
+          lantern_display_show(LANTERN_SCREEN_CONNECTING, "SECTOR 2418 ONLINE");
           if (lantern_network_play_briefing("boot", s_battery_level) != ESP_OK) {
             lantern_audio_chime(2);
             vTaskDelay(pdMS_TO_TICKS(700));
@@ -450,8 +678,8 @@ static void telemetry_task(void *argument) {
         show_ready();
       }
     }
-    int raw = 0;
-    if (adc_oneshot_read(s_adc, ADC_CHANNEL_7, &raw) == ESP_OK) s_battery_level = battery_from_adc(raw);
+
+    update_battery_level();
     if (++seconds % 5 == 0) {
       ESP_LOGI(TAG, "health battery=%d%% charging=%d mic_level=%u heap=%u psram=%u state=%d",
         s_battery_level, gpio_get_level(LANTERN_CHARGING_GPIO),
@@ -461,6 +689,13 @@ static void telemetry_task(void *argument) {
     if (seconds % 15 == 0 && s_state == LOCAL_READY) {
       lantern_network_send_heartbeat("ready", 0, s_battery_level);
     }
+
+    if (s_summary_retry_pending && !s_summary_retrying && s_state == LOCAL_READY &&
+        (xTaskGetTickCount() - s_last_summary_retry_at) * portTICK_PERIOD_MS >= 30000) {
+      lantern_network_status_t network;
+      lantern_network_get_status(&network);
+      if (network.wifi_connected && network.paired) retry_pending_summary(false);
+    }
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
@@ -469,10 +704,17 @@ void app_main(void) {
   ESP_LOGI(TAG, "Lantern %s booting", LANTERN_FIRMWARE_VERSION);
   s_state_entered_at = xTaskGetTickCount();
   power_and_battery_init();
+  update_battery_level();
   ESP_ERROR_CHECK(lantern_storage_init());
   ESP_ERROR_CHECK(lantern_storage_load(&s_config));
   ESP_ERROR_CHECK(lantern_display_init());
   ESP_ERROR_CHECK(lantern_audio_init());
+  if (lantern_wake_init() == ESP_OK) {
+    s_wake_available = true;
+    lantern_audio_set_monitor_callback(lantern_wake_feed);
+  } else {
+    ESP_LOGW(TAG, "WakeNet unavailable; centre-button fallback is active");
+  }
   ESP_ERROR_CHECK(lantern_transcript_init());
   // HTTPS and Agora calls have deep library call chains even though their bulk
   // buffers live in PSRAM. Keep enough internal task stack for both paths.
@@ -480,5 +722,7 @@ void app_main(void) {
   xTaskCreate(telemetry_task, "lantern_health", 8192, NULL, 3, NULL);
   ESP_ERROR_CHECK(lantern_network_start(&s_config, network_changed));
   show_ready();
-  ESP_LOGI(TAG, "bring-up complete; short press=quick, long press=voice command");
+  ESP_LOGI(TAG,
+    "bring-up complete; wake phrase=%s, short press=start/stop, long press=status/cancel",
+    s_wake_available ? LANTERN_WAKE_PHRASE : "disabled");
 }

@@ -264,17 +264,19 @@ stores its SHA-256 digest. Request examples and the current hardware status are
 in [HARDWARE.md](HARDWARE.md).
 
 The active ESP32-S3 firmware is in `hardware/lantern-firmware`. Version
-`0.2.2-lantern-pilot` builds the first provider-connected path: server-confirmed
-consent and capture time, Agora audio and captions, a private WAV upload, OpenAI
-processing, and dashboard delivery. The WAV is uploaded even when Agora captions
-are unavailable, allowing OpenAI diarized transcription to recover the meeting
-before structured extraction runs. The pilot deliberately stops at 29 seconds
-while we verify the complete loop; hour-long chunked capture, reconnect and
-token renewal are the next reliability phase. Run its
-`setup-agora-sdk.ps1` once before a clean firmware build. The currently flashed
-board has the `0.2.1-lantern-pilot` image; the `0.2.2` WAV-preservation update is
-ready for its next flash. The provider-backed capture path will activate after
-this backend and migration are deployed and the credentials are configured.
+`0.3.1-button-state-machine` keeps the idle microphone private and uses one
+consistent centre-button flow: short press starts spoken consent, either press
+stops an active recording, and long press while ready plays today's status
+report. The provider-connected path records the server capture time, publishes
+audio and captions through Agora, uploads a private WAV, runs OpenAI
+processing, and delivers the dashboard brief. The WAV is uploaded even when
+Agora captions are unavailable, allowing OpenAI diarized transcription to
+recover the meeting before structured extraction runs. Stop and upload retries
+reuse their original event IDs, and summary failures retry in the background.
+The local replay archive is currently the latest 30 seconds; hour-long chunked
+audio, reconnect, and token renewal remain the next reliability phase. Run
+`setup-agora-sdk.ps1` once before a clean firmware build, then build and flash
+the application with `flash.ps1`.
 
 Legacy follow-up and WhatsApp experiments remain in the repository but are not
 part of the Lantern prototype environment or its Calendar approval flow.

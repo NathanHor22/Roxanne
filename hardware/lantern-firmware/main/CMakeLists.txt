@@ -8,6 +8,7 @@ idf_component_register(
     "lantern_network.c"
     "lantern_storage.c"
     "lantern_transcript.c"
+    "lantern_wake.c"
   INCLUDE_DIRS "."
   REQUIRES
     agora_iot_sdk
@@ -20,6 +21,7 @@ idf_component_register(
     esp_lcd
     esp_netif
     esp_wifi
+    espressif__esp-sr
     json
     mbedtls
     nvs_flash

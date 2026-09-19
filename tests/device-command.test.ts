@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { commandReply, interpretDeviceCommand } from "../lib/device-command";
+import { devicePrompt } from "../lib/device-prompts";
 
 test("recognises ready-state voice commands in English and Malaysian phrasing", () => {
   assert.equal(
@@ -26,6 +27,44 @@ test("recognises ready-state voice commands in English and Malaysian phrasing", 
   );
 });
 
+test("cloud wake recognition requires Lantern or Ring before acting", () => {
+  assert.equal(
+    interpretDeviceCommand("Lantern, start recording", "wake"),
+    "start_recording",
+  );
+  assert.equal(
+    interpretDeviceCommand("Latern, mula rakam meeting sekarang", "wake"),
+    "start_recording",
+  );
+  assert.equal(
+    interpretDeviceCommand("Ring status report", "wake"),
+    "status_report",
+  );
+  assert.equal(interpretDeviceCommand("start recording", "wake"), "unknown");
+  assert.equal(
+    interpretDeviceCommand("we should start recording the call", "wake"),
+    "unknown",
+  );
+});
+
+test("wake word and following command are verified as separate states", () => {
+  assert.equal(interpretDeviceCommand("Lantern", "wake_word"), "wake_detected");
+  assert.equal(interpretDeviceCommand("Latern", "wake_word"), "wake_detected");
+  assert.equal(interpretDeviceCommand("start recording", "wake_word"), "unknown");
+  assert.equal(
+    interpretDeviceCommand("start recording", "wake_command"),
+    "start_recording",
+  );
+  assert.equal(commandReply("wake_detected"), "Lantern verified. Say your command.");
+});
+
+test("wake command mode accepts only the two idle commands", () => {
+  assert.equal(interpretDeviceCommand("start recording", "wake_command"), "start_recording");
+  assert.equal(interpretDeviceCommand("status report", "wake_command"), "status_report");
+  assert.equal(interpretDeviceCommand("stop recording", "wake_command"), "unknown");
+  assert.equal(commandReply("start_recording", "wake_command"), "Start recording selected.");
+});
+
 test("the oath unlocks a status report without requiring an exact recitation", () => {
   assert.equal(
     interpretDeviceCommand(
@@ -41,4 +80,30 @@ test("consent is explicit and a negative answer wins", () => {
   assert.equal(interpretDeviceCommand("No, jangan record", "consent"), "consent_no");
   assert.equal(interpretDeviceCommand("Maybe later", "consent"), "unknown");
   assert.match(commandReply("start_recording"), /consent/iu);
+  assert.match(commandReply("consent_no", "consent"), /confirm again/iu);
+  assert.match(commandReply("consent_no", "consent_retry"), /authentication failed/iu);
+  assert.match(commandReply("consent_yes", "consent_retry"), /recording now/iu);
+});
+
+test("device prompts describe the actual recording and upload states", () => {
+  assert.equal(
+    devicePrompt("consent_success"),
+    "Understood. Device authenticated. Consent confirmed. Recording now.",
+  );
+  assert.equal(
+    devicePrompt("recording_uploading"),
+    "Recording stopped. Uploading now. Keep Lantern powered on.",
+  );
+  assert.equal(
+    devicePrompt("upload_complete"),
+    "Recording uploaded. Session complete.",
+  );
+  assert.match(devicePrompt("session_error"), /centre button to retry/iu);
+  assert.match(devicePrompt("upload_error"), /keep Lantern powered on/iu);
+  assert.match(devicePrompt("processing_pending"), /summary is still processing/iu);
+  assert.equal(devicePrompt("wake_retry"), "Verification failed. Please try again.");
+  assert.equal(
+    devicePrompt("wake_failure"),
+    "Verification failed. Please verify yourself.",
+  );
 });

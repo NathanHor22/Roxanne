@@ -36,9 +36,10 @@ export function buildBootBriefing(input: {
 }) {
   const battery = Math.max(0, Math.min(100, Math.round(input.batteryLevel)));
   return [
-    "Lantern. Sector twenty eight fourteen online.",
+    "Lantern. Sector twenty four eighteen online.",
     `Battery at ${battery} percent.`,
     `Welcome, ${cleanSpeech(input.ownerName, 80)}.`,
+    "Ready. Say computer or press the centre button.",
   ].join(" ");
 }
 
@@ -73,7 +74,7 @@ export function buildStatusBriefing(input: DeviceStatusBriefing) {
   } else {
     parts.push("No meeting approvals are waiting.");
   }
-  parts.push("Status report complete. Lantern, Sector twenty eight fourteen.");
+  parts.push("Status report complete. Lantern, Sector twenty four eighteen.");
   return parts.join(" ");
 }
 

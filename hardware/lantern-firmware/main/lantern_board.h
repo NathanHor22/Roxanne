@@ -2,7 +2,7 @@
 
 #include "driver/gpio.h"
 
-#define LANTERN_FIRMWARE_VERSION "0.2.8-lantern-pilot"
+#define LANTERN_FIRMWARE_VERSION "0.4.3-session-recovery"
 #define LANTERN_MODEL "ZHENGCHEN-1.54-M1307"
 #define LANTERN_API_BASE_URL "https://roxanne-two.vercel.app"
 

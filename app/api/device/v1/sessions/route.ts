@@ -34,9 +34,6 @@ export async function POST(request: Request) {
   if (!client) return noStore("Lantern service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return noStore("Device credential is invalid or revoked.", 403);
-  if (device.state !== "ready" && device.state !== "report_ready") {
-    return noStore(`Lantern cannot start while it is ${device.state}.`, 409);
-  }
 
   try {
     const input = requestSchema.parse(await request.json());
@@ -55,6 +52,10 @@ export async function POST(request: Request) {
         { session: lanternMachineSchema.parse(replay.machine), duplicate: true },
         { headers: { "cache-control": "no-store" } },
       );
+    }
+
+    if (device.state !== "ready" && device.state !== "report_ready") {
+      return noStore(`Lantern cannot start while it is ${device.state}.`, 409);
     }
 
     const { data: active, error: activeError } = await client

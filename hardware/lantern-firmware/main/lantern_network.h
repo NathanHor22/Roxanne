@@ -30,6 +30,12 @@ typedef struct {
 typedef struct {
   char session_id[37];
   char prompt_id[121];
+  char begin_event_id[37];
+  char consent_event_id[37];
+  char capture_event_id[37];
+  char stop_event_id[37];
+  char transcript_event_id[37];
+  char audio_event_id[37];
   char completion_event_id[37];
   unsigned version;
   char local_date[11];
@@ -40,6 +46,7 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
 void lantern_network_get_status(lantern_network_status_t *status);
 esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_version, int battery_level);
 esp_err_t lantern_network_play_briefing(const char *kind, int battery_level);
+esp_err_t lantern_network_play_prompt(const char *kind);
 esp_err_t lantern_network_run_voice_command(const char *context, int battery_level,
                                             char *intent, size_t intent_capacity);
 esp_err_t lantern_network_restart_session(void);
@@ -51,6 +58,6 @@ esp_err_t lantern_network_confirm_consent(
 esp_err_t lantern_network_capture_started(lantern_cloud_session_t *session);
 esp_err_t lantern_network_stop_recording(lantern_cloud_session_t *session);
 esp_err_t lantern_network_abort_session(lantern_cloud_session_t *session);
-esp_err_t lantern_network_upload_transcript(const lantern_cloud_session_t *session);
-esp_err_t lantern_network_upload_audio(const lantern_cloud_session_t *session);
+esp_err_t lantern_network_upload_transcript(lantern_cloud_session_t *session);
+esp_err_t lantern_network_upload_audio(lantern_cloud_session_t *session);
 esp_err_t lantern_network_complete_session(lantern_cloud_session_t *session);

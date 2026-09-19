@@ -420,6 +420,25 @@ test("OpenAI fallback uses standard transcription when diarization is unavailabl
   ]);
 });
 
+test("OpenAI standard transcription carries short-command keyword guidance", async () => {
+  let requestForm: FormData | undefined;
+  const result = await transcribeWithOpenAI(new Blob(["wake-audio"]), {
+    apiKey: "openai-key",
+    modelId: "whisper-1",
+    prompt: "Lantern. Green Lantern. Ring.",
+    fetchImpl: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      assert.ok(init?.body instanceof FormData);
+      requestForm = init.body;
+      return Response.json({ text: "Lantern" });
+    }) as typeof fetch,
+  });
+
+  assert.equal(requestForm?.get("model"), "whisper-1");
+  assert.equal(requestForm?.get("response_format"), "json");
+  assert.equal(requestForm?.get("prompt"), "Lantern. Green Lantern. Ring.");
+  assert.equal(result.text, "Lantern");
+});
+
 test("credential-free extraction uses deterministic transcript-derived rules", () => {
   const transcript = [
     {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -12,6 +13,7 @@ import {
   ChevronRight,
   Clock3,
   Headphones,
+  Home,
   LayoutGrid,
   List,
   LoaderCircle,
@@ -19,8 +21,6 @@ import {
   LogOut,
   MessageSquare,
   MoreHorizontal,
-  Network,
-  Plus,
   Radio,
   RotateCcw,
   Search,
@@ -51,13 +51,12 @@ import {
 import { ApprovalDialog } from "./ApprovalDialog";
 import { RecordingDialog } from "./RecordingDialog";
 import { LanternDevicePanel } from "./LanternDevicePanel";
-import { RelayPanel } from "./RelayPanel";
 import styles from "./workspace.module.css";
 
-type View =
+export type WorkspaceView =
+  | "overview"
   | "calendar"
   | "conversations"
-  | "relay"
   | "people"
   | "device"
   | "settings";
@@ -70,13 +69,46 @@ export type WorkspaceAccount = {
 type WorkspaceProps = {
   account: WorkspaceAccount | null;
   initialMode: WorkspaceMode;
+  initialView?: WorkspaceView;
 };
 
-export function Workspace({ account, initialMode }: WorkspaceProps) {
+const viewPath: Record<WorkspaceView, string> = {
+  overview: "/dashboard",
+  conversations: "/dashboard/conversations",
+  calendar: "/dashboard/calendar",
+  people: "/dashboard/people",
+  device: "/dashboard/lantern",
+  settings: "/dashboard/settings",
+};
+
+const viewLabel: Record<WorkspaceView, string> = {
+  overview: "Overview",
+  conversations: "Conversations",
+  calendar: "Calendar",
+  people: "People",
+  device: "Lantern",
+  settings: "Settings",
+};
+
+export function Workspace({
+  account,
+  initialMode,
+  initialView = "overview",
+}: WorkspaceProps) {
+  const router = useRouter();
   const workspace = useWorkspace(initialMode);
-  const { meetings, mode, loading, error, notice, working, integrations } =
+  const {
+    meetings,
+    mode,
+    loading,
+    error,
+    notice,
+    working,
+    integrations,
+    device,
+  } =
     workspace;
-  const [view, setView] = useState<View>("calendar");
+  const [view, setView] = useState<WorkspaceView>(initialView);
   const [visibleMonth, setVisibleMonth] = useState(() =>
     formatDateKey(new Date()).slice(0, 7),
   );
@@ -119,14 +151,18 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
   const upcoming = scheduled
     .filter((meeting) => Date.parse(meeting.endAt) > now.getTime())
     .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+  const nextMeeting = upcoming[0] || null;
   const tasks = conversations
     .flatMap((meeting) => meeting.followUps || [])
     .filter(
       (item) =>
         item.type !== "schedule" &&
         item.status !== "completed" &&
-        item.status !== "dismissed",
+      item.status !== "dismissed",
     );
+  const todayConversations = conversations.filter(
+    (meeting) => formatDateKey(meeting.startAt) === today,
+  );
   const selectedMeeting =
     meetings.find((meeting) => meeting.id === selectedId) || null;
   const grid = getMonthGrid(visibleMonth, { today });
@@ -153,19 +189,27 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
     : "?";
 
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("view");
+    const searchParams = new URLSearchParams(window.location.search);
+    const requested = searchParams.get("view");
+    const requestedPerson = searchParams.get("person");
     if (
-      ["calendar", "conversations", "relay", "people", "device", "settings"].includes(
+      ["overview", "calendar", "conversations", "people", "device", "settings"].includes(
         requested || "",
       )
     )
-      setView(requested as View);
-  }, []);
+      setView(requested as WorkspaceView);
+    if (initialView === "conversations" && requestedPerson)
+      setPersonId(requestedPerson);
+  }, [initialView]);
 
-  const navigate = (next: View) => {
+  const navigate = (next: WorkspaceView) => {
     setView(next);
     setSearch("");
     setPersonId(null);
+    if (mode === "live") {
+      router.push(viewPath[next]);
+      return;
+    }
     const url = new URL(window.location.href);
     url.searchParams.set("view", next);
     window.history.replaceState({}, "", url);
@@ -180,7 +224,7 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
     if (created) {
       setVisibleMonth(formatDateKey(created.startAt).slice(0, 7));
       setSelectedDate(formatDateKey(created.startAt));
-      setView("calendar");
+      navigate("calendar");
       setSelectedId(created.id);
     }
     return created;
@@ -206,17 +250,23 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
         <nav aria-label="Main navigation">
           {(
             [
-              { id: "calendar", label: "Calendar", icon: CalendarDays },
+              { id: "overview", label: "Overview", icon: Home },
               { id: "conversations", label: "Conversations", icon: Headphones },
-              { id: "relay", label: "Relay", icon: Network },
+              { id: "calendar", label: "Calendar", icon: CalendarDays },
               { id: "people", label: "People", icon: Users },
               { id: "device", label: "Lantern", icon: Radio },
             ] as const
           ).map(({ id, label, icon: Icon }) => (
-            <button
+            <Link
               key={id}
               className={`${styles.navItem} ${view === id ? styles.navActive : ""}`}
-              onClick={() => navigate(id)}
+              href={mode === "live" ? viewPath[id] : `/?mode=sample&view=${id}`}
+              onClick={(event) => {
+                if (mode === "sample") {
+                  event.preventDefault();
+                  navigate(id);
+                }
+              }}
               aria-label={label}
               aria-current={view === id ? "page" : undefined}
             >
@@ -225,7 +275,7 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
               {id === "conversations" && conversations.length > 0 && (
                 <small>{conversations.length}</small>
               )}
-            </button>
+            </Link>
           ))}
         </nav>
         <div className={styles.sidebarBottom}>
@@ -233,24 +283,32 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
             <span className={styles.deviceIcon}>
               <Radio />
             </span>
-            <strong>Your wearable</strong>
+            <strong>{device?.name || "Your Lantern"}</strong>
             <p>
               {mode === "sample"
-                ? "Explore a captured conversation."
-                : "No device connected"}
+                ? "Explore the device experience."
+                : device
+                  ? `${device.status}${device.battery_level != null ? ` · ${device.battery_level}% battery` : ""}`
+                  : "Pair a device to see its health"}
             </p>
             <button aria-label="Open Lantern" onClick={() => navigate("device")}>
               Open Lantern <ArrowUpRight />
             </button>
           </div>
-          <button
+          <Link
             className={`${styles.navItem} ${view === "settings" ? styles.navActive : ""}`}
             aria-label="Settings"
-            onClick={() => navigate("settings")}
+            href={mode === "live" ? viewPath.settings : "/?mode=sample&view=settings"}
+            onClick={(event) => {
+              if (mode === "sample") {
+                event.preventDefault();
+                navigate("settings");
+              }
+            }}
           >
             <Settings2 />
             <span>Settings</span>
-          </button>
+          </Link>
           <div
             className={`${styles.account} ${account ? "" : styles.accountSignedOut}`}
           >
@@ -276,7 +334,7 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
           <div>
             <span className={styles.breadcrumb}>Workspace</span>
             <ChevronRight />
-            <strong>{view.charAt(0).toUpperCase() + view.slice(1)}</strong>
+            <strong>{viewLabel[view]}</strong>
           </div>
           <div className={styles.topbarRight}>
             <span className={styles.timezone}>Kuala Lumpur · MYT</span>
@@ -327,42 +385,44 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
           <header className={styles.pageHeader}>
             <div>
               <p className={styles.eyebrow}>
-                {view === "calendar"
+                {view === "overview"
+                  ? "TODAY IN LANTERN"
+                  : view === "calendar"
                   ? "A LITTLE CONTEXT. A BETTER FOLLOW-UP."
-                  : view === "relay"
-                    ? "THE RIGHT PEOPLE, CONNECTED"
                   : view === "device"
                     ? "YOUR CONVERSATIONS, WITH YOU"
                   : "YOUR BUSINESS MEMORY"}
               </p>
               <h1>
-                {view === "calendar"
+                {view === "overview"
+                  ? mode === "sample"
+                    ? "A clear view of every follow-up."
+                    : `Welcome back, ${accountName.split(" ")[0]}.`
+                  : view === "calendar"
                   ? "Your conversations, connected."
                   : view === "conversations"
                     ? "Every conversation matters."
-                    : view === "relay"
-                      ? "See who in the room should meet."
                     : view === "people"
                       ? "Pick up where you left off."
                       : view === "device"
                         ? "Meet Lantern."
-                      : "Make yourself at home."}
+                      : "Keep Lantern connected."}
               </h1>
               <p>
-                {view === "calendar"
+                {view === "overview"
+                  ? "Review what needs you, then get back to your clients."
+                  : view === "calendar"
                   ? "What’s coming up, what you agreed, and everything worth remembering."
                   : view === "conversations"
                     ? "The important details, ready when you need them."
-                    : view === "relay"
-                      ? "OpenAI compares saved conversation evidence while Exa adds current public company context."
                     : view === "people"
                       ? "Conversations and commitments, organised around your clients."
                       : view === "device"
-                        ? "Test the consent, capture, status report, and approval flow before connecting providers."
-                      : "Manage your connections and workspace preferences."}
+                        ? "Pair your recorder, check its health, and manage its connection."
+                      : "Manage your account, calendar connection, language, and privacy."}
               </p>
             </div>
-            {view !== "settings" && view !== "device" && view !== "relay" && (
+            {view !== "settings" && view !== "device" && (
               <button
                 className={styles.secondaryButton}
                 onClick={() =>
@@ -415,43 +475,254 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
             </div>
           ) : (
             <>
-              {view === "calendar" && (
-                <>
-                  <div className={styles.summaryBar}>
-                    <div>
-                      <span className={`${styles.statIcon} ${styles.green}`}>
-                        <CalendarDays />
-                      </span>
-                      <span>
-                        <strong>{upcoming.length}</strong>
-                        <small>Upcoming meetings</small>
-                      </span>
-                    </div>
-                    <div>
+              {view === "overview" && (
+                <div className={styles.overview}>
+                  <section
+                    className={styles.overviewStats}
+                    aria-label="Workspace summary"
+                  >
+                    <button onClick={() => navigate("calendar")}>
                       <span className={`${styles.statIcon} ${styles.amber}`}>
                         <CheckCheck />
                       </span>
                       <span>
                         <strong>{pending.length}</strong>
-                        <small>Awaiting approval</small>
+                        <small>Pending approvals</small>
                       </span>
-                    </div>
-                    <div>
+                      <ArrowUpRight />
+                    </button>
+                    <button onClick={() => navigate("conversations")}>
                       <span className={`${styles.statIcon} ${styles.blue}`}>
-                        <MessageSquare />
+                        <Headphones />
                       </span>
                       <span>
-                        <strong>{tasks.length}</strong>
-                        <small>Open follow-ups</small>
+                        <strong>{todayConversations.length}</strong>
+                        <small>Conversations today</small>
                       </span>
-                    </div>
-                    <span className={styles.summaryCaption}>
-                      <span />
-                      {mode === "sample"
-                        ? "A preview of your day, connected"
-                        : "Your conversations in one place"}
-                    </span>
+                      <ArrowUpRight />
+                    </button>
+                    <button onClick={() => navigate("calendar")}>
+                      <span className={`${styles.statIcon} ${styles.green}`}>
+                        <CalendarDays />
+                      </span>
+                      <span>
+                        <strong>
+                          {nextMeeting ? timeLabel(nextMeeting.startAt) : "Clear"}
+                        </strong>
+                        <small>Next meeting</small>
+                      </span>
+                      <ArrowUpRight />
+                    </button>
+                    <button onClick={() => navigate("device")}>
+                      <span className={`${styles.statIcon} ${styles.green}`}>
+                        <Radio />
+                      </span>
+                      <span>
+                        <strong>
+                          {mode === "sample"
+                            ? "Sample"
+                            : device?.battery_level != null
+                              ? `${device.battery_level}%`
+                              : device
+                                ? "Paired"
+                                : "Set up"}
+                        </strong>
+                        <small>
+                          {device?.name || "Lantern device"}
+                        </small>
+                      </span>
+                      <ArrowUpRight />
+                    </button>
+                  </section>
+
+                  <div className={styles.overviewGrid}>
+                    <section className={styles.attentionPanel}>
+                      <header className={styles.sectionHeader}>
+                        <div>
+                          <span className={styles.eyebrow}>NEEDS YOUR ATTENTION</span>
+                          <h2>Ready for your decision</h2>
+                        </div>
+                        <span className={styles.count}>{pending.length + tasks.length}</span>
+                      </header>
+                      <div className={styles.attentionList}>
+                        {pending.slice(0, 3).map((approval) => {
+                          const missing = missingApprovalDetails(approval.details);
+                          return (
+                            <article key={approval.id} className={styles.attentionRow}>
+                              <span className={styles.smallAvatar}>
+                                {initials(approval.contact?.name || "Client")}
+                              </span>
+                              <button
+                                className={styles.attentionCopy}
+                                onClick={() => openConversation(approval.conversationId)}
+                              >
+                                <strong>{approval.title}</strong>
+                                <small>
+                                  {approval.contact?.name || "Client"}
+                                  {approval.details.startAt
+                                    ? ` · ${dateLabel(approval.details.startAt, { weekday: "short" })} at ${timeLabel(approval.details.startAt)}`
+                                    : " · Time needs confirmation"}
+                                </small>
+                              </button>
+                              <button
+                                className={styles.compactAction}
+                                disabled={Boolean(working)}
+                                onClick={() =>
+                                  missing.length
+                                    ? setEditing(approval)
+                                    : void approve(approval)
+                                }
+                              >
+                                {working === approval.id ? (
+                                  <LoaderCircle className={styles.spin} />
+                                ) : (
+                                  <Check />
+                                )}
+                                {missing.length ? "Review" : "Approve"}
+                              </button>
+                            </article>
+                          );
+                        })}
+                        {tasks.slice(0, Math.max(0, 4 - pending.length)).map((task) => {
+                          const conversation = conversations.find(
+                            (entry) => entry.id === task.meetingId,
+                          );
+                          return (
+                            <article key={task.id} className={styles.attentionRow}>
+                              <span className={`${styles.smallAvatar} ${styles.taskAvatar}`}>
+                                <MessageSquare />
+                              </span>
+                              <button
+                                className={styles.attentionCopy}
+                                onClick={() => conversation && openConversation(conversation.id)}
+                              >
+                                <strong>{task.description}</strong>
+                                <small>
+                                  {conversation?.contacts[0]?.name || "Follow-up"}
+                                  {task.dueAt ? ` · Due ${dateLabel(task.dueAt)}` : ""}
+                                </small>
+                              </button>
+                              <button
+                                className={styles.iconButton}
+                                aria-label={`Mark ${task.description} complete`}
+                                disabled={Boolean(working)}
+                                onClick={() => void workspace.patchFollowUp(task.id, { status: "completed" })}
+                              >
+                                <Check />
+                              </button>
+                            </article>
+                          );
+                        })}
+                        {!pending.length && !tasks.length && (
+                          <div className={styles.caughtUp}>
+                            <CheckCheck />
+                            <div>
+                              <strong>You are all caught up.</strong>
+                              <p>New approvals and follow-ups will appear here.</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
+                    <aside className={styles.dayPanel}>
+                      <header className={styles.sectionHeader}>
+                        <div>
+                          <span className={styles.eyebrow}>UP NEXT</span>
+                          <h2>Your calendar</h2>
+                        </div>
+                        <button
+                          className={styles.iconButton}
+                          aria-label="Open calendar"
+                          onClick={() => navigate("calendar")}
+                        >
+                          <ArrowUpRight />
+                        </button>
+                      </header>
+                      <div className={styles.dayList}>
+                        {upcoming.slice(0, 3).map((meeting) => (
+                          <button
+                            key={meeting.id}
+                            className={styles.dayRow}
+                            onClick={() => openConversation(meeting.id)}
+                          >
+                            <time dateTime={meeting.startAt}>
+                              <strong>{timeLabel(meeting.startAt)}</strong>
+                              <span>{dateLabel(meeting.startAt, { weekday: "short" })}</span>
+                            </time>
+                            <span>
+                              <strong>{meeting.title}</strong>
+                              <small>
+                                {meeting.contacts[0]?.name || "Calendar meeting"}
+                              </small>
+                            </span>
+                          </button>
+                        ))}
+                        {!upcoming.length && (
+                          <div className={styles.caughtUp}>
+                            <CalendarDays />
+                            <div>
+                              <strong>Your calendar is clear.</strong>
+                              <p>Approved meetings will appear here.</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </aside>
                   </div>
+
+                  <section className={styles.latestPanel}>
+                    <header className={styles.sectionHeader}>
+                      <div>
+                        <span className={styles.eyebrow}>RECENT CONVERSATIONS</span>
+                        <h2>Pick up where you left off</h2>
+                      </div>
+                      <button
+                        className={styles.textButton}
+                        onClick={() => navigate("conversations")}
+                      >
+                        View all <ArrowRight />
+                      </button>
+                    </header>
+                    <div className={styles.latestList}>
+                      {conversations.slice(0, 5).map((conversation) => (
+                        <button
+                          key={conversation.id}
+                          className={styles.latestRow}
+                          onClick={() => openConversation(conversation.id)}
+                        >
+                          <span className={styles.avatar}>
+                            {initials(conversation.contacts[0]?.name || conversation.title)}
+                          </span>
+                          <span className={styles.latestIdentity}>
+                            <strong>{conversation.contacts[0]?.name || conversation.title}</strong>
+                            <small>{conversation.contacts[0]?.company || "Conversation"}</small>
+                          </span>
+                          <span className={styles.latestSummary}>
+                            {conversation.insight?.wants || conversation.title}
+                          </span>
+                          <time dateTime={conversation.startAt}>
+                            {dateLabel(conversation.startAt)}
+                          </time>
+                          <span className={styles.statusPill}>
+                            {conversation.status === "ready" ? "Ready" : conversation.status}
+                          </span>
+                          <ArrowUpRight />
+                        </button>
+                      ))}
+                      {!conversations.length && (
+                        <div className={styles.emptyInline}>
+                          <Headphones />
+                          <h3>Your first conversation will appear here.</h3>
+                          <p>Record with Lantern or add an audio file to begin.</p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              )}
+              {view === "calendar" && (
+                <>
                   <div className={styles.calendarLayout}>
                     <section
                       className={styles.calendarSurface}
@@ -864,89 +1135,6 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
                       </p>
                     </aside>
                   </div>
-                  <section className={styles.recent}>
-                    <header>
-                      <div>
-                        <span className={styles.eyebrow}>
-                          FRESH IN YOUR MEMORY
-                        </span>
-                        <h2>Recent conversations</h2>
-                      </div>
-                      <button
-                        className={styles.textButton}
-                        onClick={() => navigate("conversations")}
-                      >
-                        View all <ArrowRight />
-                      </button>
-                    </header>
-                    <div className={styles.recentGrid}>
-                      {conversations.slice(0, 3).map((conversation, index) => (
-                        <button
-                          className={styles.recentCard}
-                          key={conversation.id}
-                          onClick={() => openConversation(conversation.id)}
-                        >
-                          <div className={styles.recentCardTop}>
-                            <span
-                              className={`${styles.smallAvatar} ${index === 1 ? styles.peachAvatar : index === 2 ? styles.blueAvatar : ""}`}
-                            >
-                              {initials(
-                                conversation.contacts[0]?.name ||
-                                  conversation.title,
-                              )}
-                            </span>
-                            <span>
-                              <strong>
-                                {conversation.contacts[0]?.name ||
-                                  conversation.title}
-                              </strong>
-                              <small>
-                                {conversation.contacts[0]?.company ||
-                                  "Conversation"}
-                              </small>
-                            </span>
-                            <ArrowUpRight />
-                          </div>
-                          <p>
-                            {conversation.insight?.wants || conversation.title}
-                          </p>
-                          <footer>
-                            <span>{dateLabel(conversation.startAt)}</span>
-                            <span>
-                              <Headphones />
-                              {Math.round(
-                                (Date.parse(conversation.endAt) -
-                                  Date.parse(conversation.startAt)) /
-                                  60_000,
-                              )}{" "}
-                              min
-                            </span>
-                            <span className={styles.memoryPill}>
-                              {conversation.status === "ready"
-                                ? "Recap ready"
-                                : conversation.status}
-                            </span>
-                          </footer>
-                        </button>
-                      ))}
-                    </div>
-                    {!conversations.length && (
-                      <div className={styles.emptyInline}>
-                        <Headphones />
-                        <h3>Your next conversation starts here.</h3>
-                        <p>
-                          Captured conversations and their recaps will appear
-                          here.
-                        </p>
-                        <button
-                          className={styles.secondaryButton}
-                          onClick={() => setRecordingOpen(true)}
-                        >
-                          Add a recording
-                        </button>
-                      </div>
-                    )}
-                  </section>
                 </>
               )}
 
@@ -1029,15 +1217,6 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
                   )}
                 </section>
               )}
-              {view === "relay" && (
-                <RelayPanel
-                  meetings={meetings}
-                  mode={mode}
-                  integrations={integrations}
-                  onOpenConversation={openConversation}
-                  onNotice={workspace.setNotice}
-                />
-              )}
               {view === "people" && (
                 <section>
                   <label className={`${styles.search} ${styles.peopleSearch}`}>
@@ -1069,7 +1248,11 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
                             onClick={() => {
                               setPersonId(contact.id);
                               setSearch("");
-                              setView("conversations");
+                              if (mode === "live")
+                                router.push(
+                                  `${viewPath.conversations}?person=${encodeURIComponent(contact.id)}`,
+                                );
+                              else setView("conversations");
                             }}
                           >
                             <span className={styles.avatar}>
@@ -1104,7 +1287,11 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
                 </section>
               )}
               {view === "device" && (
-                <LanternDevicePanel mode={mode} integrations={integrations} />
+                <LanternDevicePanel
+                  mode={mode}
+                  integrations={integrations}
+                  conversationCount={conversations.length}
+                />
               )}
               {view === "settings" && (
                 <div className={styles.settingsGrid}>
@@ -1133,7 +1320,7 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
                     {mode === "live" ? (
                       <a
                         className={styles.secondaryButton}
-                        href="/api/google/connect?returnTo=%2Fdashboard%3Fview%3Dsettings"
+                        href="/api/google/connect?returnTo=%2Fdashboard%2Fsettings"
                       >
                         {integrations.google
                           ? "Reconnect Google Calendar"
@@ -1150,32 +1337,6 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
                     )}
                   </section>
                   <section className={styles.settingsCard}>
-                    <span className={styles.settingsIcon}>
-                      <Radio />
-                    </span>
-                    <h2>Your wearable</h2>
-                    <p>
-                      Carry your conversations with you. Connected recordings
-                      will flow into your workspace.
-                    </p>
-                    <span className={styles.connectionState}>
-                      <i className={styles.neutralDot} />
-                      No device connected
-                    </span>
-                    <p className={styles.subtle}>
-                      Recording and transcript imports are available while your
-                      wearable is being set up.
-                    </p>
-                    {mode === "live" && (
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={() => setRecordingOpen(true)}
-                      >
-                        Add a recording <Plus />
-                      </button>
-                    )}
-                  </section>
-                  <section className={styles.settingsCard}>
                     <h2>Language & region</h2>
                     <p>
                       Choose the language used for processing your recordings.
@@ -1185,68 +1346,6 @@ export function Workspace({ account, initialMode }: WorkspaceProps) {
                       <span>Timezone</span>
                       <strong>Asia/Kuala_Lumpur</strong>
                     </div>
-                  </section>
-                  <section className={styles.settingsCard}>
-                    <h2>Workspace</h2>
-                    <p>
-                      {mode === "sample"
-                        ? "Explore the full approval and recap flow with sample client conversations."
-                        : "Your recordings, recaps, and approvals belong to your personal workspace."}
-                    </p>
-                    {mode === "sample" ? (
-                      <Link
-                        className={styles.secondaryButton}
-                        href={account ? "/dashboard" : "/login?next=/dashboard"}
-                      >
-                        Open live workspace <ArrowRight />
-                      </Link>
-                    ) : (
-                      <span className={styles.connectionState}>
-                        <i className={styles.greenDot} /> Live workspace active
-                      </span>
-                    )}
-                    {mode === "sample" && (
-                      <button
-                        className={styles.textButton}
-                        disabled={Boolean(working)}
-                        onClick={() => workspace.loadSample(true)}
-                      >
-                        <RotateCcw />
-                        Reset sample conversations
-                      </button>
-                    )}
-                  </section>
-                  <section className={styles.settingsCard}>
-                    <span className={styles.settingsIcon}>
-                      <Network />
-                    </span>
-                    <h2>Lantern Relay</h2>
-                    <p>
-                      OpenAI reasons across saved conversations. Exa adds only
-                      public company context to support each introduction.
-                    </p>
-                    <span className={styles.connectionState}>
-                      <i
-                        className={
-                          mode === "live" && integrations.openai
-                            ? styles.greenDot
-                            : styles.neutralDot
-                        }
-                      />
-                      {mode === "sample"
-                        ? "Sample matching"
-                        : integrations.openai
-                          ? integrations.exa
-                            ? "OpenAI and Exa connected"
-                            : "OpenAI connected · Exa optional"
-                          : "OpenAI API key required"}
-                    </span>
-                    <button
-                      className={styles.secondaryButton}
-                      onClick={() => navigate("relay")}
-                    >
-                      Open Relay <ArrowRight />
-                    </button>
                   </section>
                   <section className={styles.settingsCard}>
                     <span className={styles.settingsIcon}>

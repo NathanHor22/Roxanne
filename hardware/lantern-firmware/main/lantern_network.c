@@ -620,7 +620,9 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
     portal_result = start_setup_portal();
   }
   ESP_ERROR_CHECK(esp_wifi_start());
-  esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+  // Voice commands and streamed PCM are latency-sensitive. Modem power save
+  // can defer hotspot packets until the next beacon and cause audible gaps.
+  esp_wifi_set_ps(WIFI_PS_NONE);
   if (portal_result != ESP_OK) return portal_result;
   if (has_wifi && xTaskCreate(connection_task, "lantern_connect", 8192, NULL, 5, NULL) != pdPASS) {
     return ESP_ERR_NO_MEM;
@@ -703,6 +705,51 @@ esp_err_t lantern_network_play_briefing(const char *kind, int battery_level) {
   return success ? ESP_OK : ESP_FAIL;
 }
 
+esp_err_t lantern_network_play_prompt(const char *kind) {
+  if (!kind || !s_config || !s_status.wifi_connected || !lantern_storage_is_paired(s_config)) {
+    return ESP_ERR_INVALID_STATE;
+  }
+  char url[256];
+  snprintf(url, sizeof(url), "%s/api/device/v1/speak", LANTERN_API_BASE_URL);
+  audio_response_t *audio = heap_caps_calloc(
+    1, sizeof(audio_response_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!audio) return ESP_ERR_NO_MEM;
+  esp_http_client_config_t config = {
+    .url = url,
+    .event_handler = audio_http_event,
+    .user_data = audio,
+    .timeout_ms = 60000,
+    .crt_bundle_attach = esp_crt_bundle_attach,
+    .buffer_size = 4096,
+  };
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (!client) {
+    free(audio);
+    return ESP_FAIL;
+  }
+  char authorization[140];
+  device_authorization(authorization);
+  char body[80];
+  snprintf(body, sizeof(body), "{\"kind\":\"%s\"}", kind);
+  esp_http_client_set_method(client, HTTP_METHOD_POST);
+  esp_http_client_set_header(client, "Content-Type", "application/json");
+  esp_http_client_set_header(client, "Authorization", authorization);
+  esp_http_client_set_post_field(client, body, (int)strlen(body));
+  esp_err_t result = esp_http_client_perform(client);
+  int status = result == ESP_OK ? esp_http_client_get_status_code(client) : -1;
+  if (audio->playback_started) lantern_audio_pcm_end();
+  bool success = result == ESP_OK && status == 200 && audio->content_is_pcm &&
+    audio->audio_bytes > 0 && !audio->playback_failed;
+  if (!success) {
+    ESP_LOGW(TAG, "prompt %s failed HTTP %d: %.192s", kind, status, audio->response.data);
+  } else {
+    ESP_LOGI(TAG, "prompt %s played %u PCM bytes", kind, (unsigned)audio->audio_bytes);
+  }
+  esp_http_client_cleanup(client);
+  free(audio);
+  return success ? ESP_OK : ESP_FAIL;
+}
+
 esp_err_t lantern_network_run_voice_command(const char *context, int battery_level,
                                             char *intent, size_t intent_capacity) {
   if (!context || !intent || !intent_capacity || !s_config || !s_status.wifi_connected ||
@@ -770,6 +817,11 @@ esp_err_t lantern_network_run_voice_command(const char *context, int battery_lev
   if (audio->playback_started) lantern_audio_pcm_end();
   esp_http_client_cleanup(client);
   free(wav);
+  if (result == ESP_OK && status == 204) {
+    ESP_LOGI(TAG, "cloud wake verifier ignored a non-Lantern utterance");
+    free(audio);
+    return ESP_ERR_NOT_FOUND;
+  }
   if (result != ESP_OK || status != 200 || !audio->content_is_pcm ||
       !audio->audio_bytes || audio->playback_failed || !audio->command[0]) {
     if (!audio->content_is_pcm && audio->response.length) {
@@ -815,35 +867,62 @@ esp_err_t lantern_network_begin_quick(lantern_cloud_session_t *session) {
   if (!session || !s_config || !s_status.wifi_connected || !lantern_storage_is_paired(s_config)) {
     return ESP_ERR_INVALID_STATE;
   }
-  memset(session, 0, sizeof(*session));
-  char event_id[37];
-  uuid_v4(event_id);
-  char body[128];
-  snprintf(body, sizeof(body), "{\"eventId\":\"%s\",\"mode\":\"quick\"}", event_id);
-  char authorization[140];
-  device_authorization(authorization);
-  response_buffer_t *response = response_buffer_create();
-  if (!response) return ESP_ERR_NO_MEM;
-  int status = post_json("/api/device/v1/sessions", body, authorization, response);
-  if (status != 201 && status != 200) {
-    provider_error("Session start", status, response);
+  char preserved_event_id[37];
+  snprintf(preserved_event_id, sizeof(preserved_event_id), "%s", session->begin_event_id);
+
+  for (unsigned attempt = 0; attempt < 2; ++attempt) {
+    memset(session, 0, sizeof(*session));
+    if (attempt == 0 && preserved_event_id[0]) {
+      snprintf(session->begin_event_id, sizeof(session->begin_event_id), "%s",
+        preserved_event_id);
+    } else {
+      uuid_v4(session->begin_event_id);
+    }
+
+    char body[128];
+    snprintf(body, sizeof(body), "{\"eventId\":\"%s\",\"mode\":\"quick\"}",
+      session->begin_event_id);
+    char authorization[140];
+    device_authorization(authorization);
+    response_buffer_t *response = response_buffer_create();
+    if (!response) return ESP_ERR_NO_MEM;
+    int status = post_json("/api/device/v1/sessions", body, authorization, response);
+
+    if (status == 409 && attempt == 0) {
+      provider_error("Session start", status, response);
+      free(response);
+      ESP_LOGW(TAG, "stale cloud session detected; resetting it before one fresh start");
+      if (lantern_network_restart_session() != ESP_OK) return ESP_FAIL;
+      continue;
+    }
+    if (status != 201 && status != 200) {
+      provider_error("Session start", status, response);
+      free(response);
+      return ESP_FAIL;
+    }
+    bool valid = parse_session_response(response->data, session, NULL) && session->prompt_id[0];
     free(response);
-    return ESP_FAIL;
+    if (!valid) {
+      set_error("Session response was invalid");
+      return ESP_FAIL;
+    }
+    return ESP_OK;
   }
-  bool valid = parse_session_response(response->data, session, NULL) && session->prompt_id[0];
-  free(response);
-  if (!valid) {
-    set_error("Session response was invalid");
-    return ESP_FAIL;
-  }
-  return ESP_OK;
+  return ESP_FAIL;
 }
 
 static esp_err_t send_session_event(lantern_cloud_session_t *session, const char *event_json,
-                                    lantern_agora_transport_t *transport) {
+                                    lantern_agora_transport_t *transport,
+                                    char persistent_event_id[37]) {
   if (!session || !session->session_id[0]) return ESP_ERR_INVALID_ARG;
   char event_id[37];
-  uuid_v4(event_id);
+  char *selected_event_id = event_id;
+  if (persistent_event_id) {
+    if (!persistent_event_id[0]) uuid_v4(persistent_event_id);
+    selected_event_id = persistent_event_id;
+  } else {
+    uuid_v4(event_id);
+  }
   char path[160];
   snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/events", session->session_id);
   size_t needed = strlen(event_json) + 180;
@@ -851,7 +930,7 @@ static esp_err_t send_session_event(lantern_cloud_session_t *session, const char
   if (!body) return ESP_ERR_NO_MEM;
   snprintf(body, needed,
     "{\"eventId\":\"%s\",\"expectedVersion\":%u,\"event\":%s}",
-    event_id, session->version, event_json);
+    selected_event_id, session->version, event_json);
   char authorization[140];
   device_authorization(authorization);
   response_buffer_t *response = response_buffer_create();
@@ -882,7 +961,8 @@ esp_err_t lantern_network_confirm_consent(lantern_cloud_session_t *session, bool
     "{\"type\":\"RECORDING_CONSENT\",\"at\":\"1970-01-01T00:00:00Z\"," 
     "\"promptId\":\"%s\",\"accepted\":%s}",
     session ? session->prompt_id : "", accepted ? "true" : "false");
-  esp_err_t result = send_session_event(session, event, transport);
+  esp_err_t result = send_session_event(
+    session, event, transport, session ? session->consent_event_id : NULL);
   if (result != ESP_OK || !accepted) return result;
   if (!transport || !transport->app_id[0] || !transport->channel[0] ||
       !transport->token[0] || !transport->publisher_uid || !transport->stt_bot_uid) {
@@ -894,25 +974,28 @@ esp_err_t lantern_network_confirm_consent(lantern_cloud_session_t *session, bool
 
 esp_err_t lantern_network_capture_started(lantern_cloud_session_t *session) {
   return send_session_event(
-    session, "{\"type\":\"CAPTURE_STARTED\",\"at\":\"1970-01-01T00:00:00Z\"}", NULL);
+    session, "{\"type\":\"CAPTURE_STARTED\",\"at\":\"1970-01-01T00:00:00Z\"}", NULL,
+    session ? session->capture_event_id : NULL);
 }
 
 esp_err_t lantern_network_stop_recording(lantern_cloud_session_t *session) {
   return send_session_event(
-    session, "{\"type\":\"STOP\",\"at\":\"1970-01-01T00:00:00Z\"}", NULL);
+    session, "{\"type\":\"STOP\",\"at\":\"1970-01-01T00:00:00Z\"}", NULL,
+    session ? session->stop_event_id : NULL);
 }
 
 esp_err_t lantern_network_abort_session(lantern_cloud_session_t *session) {
   return send_session_event(
-    session, "{\"type\":\"RESET\",\"at\":\"1970-01-01T00:00:00Z\"}", NULL);
+    session, "{\"type\":\"RESET\",\"at\":\"1970-01-01T00:00:00Z\"}", NULL, NULL);
 }
 
-esp_err_t lantern_network_upload_transcript(const lantern_cloud_session_t *session) {
+esp_err_t lantern_network_upload_transcript(lantern_cloud_session_t *session) {
   if (!session || !session->session_id[0] || !lantern_transcript_size()) return ESP_ERR_INVALID_STATE;
   char path[168], authorization[140], event_id[37];
   snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/transcript", session->session_id);
   device_authorization(authorization);
-  uuid_v4(event_id);
+  if (!session->transcript_event_id[0]) uuid_v4(session->transcript_event_id);
+  snprintf(event_id, sizeof(event_id), "%s", session->transcript_event_id);
   response_buffer_t *response = response_buffer_create();
   if (!response) return ESP_ERR_NO_MEM;
   int status = post_binary(path, "application/x-lantern-agora-caption-batch",
@@ -926,7 +1009,7 @@ esp_err_t lantern_network_upload_transcript(const lantern_cloud_session_t *sessi
   return ESP_OK;
 }
 
-esp_err_t lantern_network_upload_audio(const lantern_cloud_session_t *session) {
+esp_err_t lantern_network_upload_audio(lantern_cloud_session_t *session) {
   if (!session || !session->session_id[0]) return ESP_ERR_INVALID_ARG;
   size_t samples = lantern_audio_buffered_samples();
   if (!samples) return ESP_ERR_INVALID_STATE;
@@ -955,7 +1038,8 @@ esp_err_t lantern_network_upload_audio(const lantern_cloud_session_t *session) {
   char path[160], authorization[140], event_id[37];
   snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/audio", session->session_id);
   device_authorization(authorization);
-  uuid_v4(event_id);
+  if (!session->audio_event_id[0]) uuid_v4(session->audio_event_id);
+  snprintf(event_id, sizeof(event_id), "%s", session->audio_event_id);
   response_buffer_t *response = response_buffer_create();
   if (!response) {
     free(wav);

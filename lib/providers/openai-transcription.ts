@@ -64,7 +64,12 @@ function readProviderErrorCode(body: string) {
   }
 }
 
-function createTranscriptionForm(audio: Blob, fileName: string, model: string) {
+function createTranscriptionForm(
+  audio: Blob,
+  fileName: string,
+  model: string,
+  prompt?: string,
+) {
   const form = new FormData();
   form.append("file", audio, fileName || "lantern.wav");
   form.append("model", model);
@@ -73,6 +78,8 @@ function createTranscriptionForm(audio: Blob, fileName: string, model: string) {
     form.append("chunking_strategy", "auto");
   } else {
     form.append("response_format", "json");
+    const guidance = prompt?.trim().slice(0, 1_000);
+    if (guidance) form.append("prompt", guidance);
   }
   return form;
 }
@@ -86,6 +93,7 @@ export async function transcribeWithOpenAI(
     fetchImpl?: typeof fetch;
     apiKey?: string | null;
     modelId?: string;
+    prompt?: string;
   } = {},
 ): Promise<TranscriptionResult> {
   const runtime = env();
@@ -129,7 +137,7 @@ export async function transcribeWithOpenAI(
         response = await (options.fetchImpl ?? fetch)(OPENAI_TRANSCRIPTION_URL, {
           method: "POST",
           headers: { authorization: `Bearer ${apiKey}` },
-          body: createTranscriptionForm(audio, fileName, model),
+          body: createTranscriptionForm(audio, fileName, model, options.prompt),
           signal: controller.signal,
         });
       } catch (error) {

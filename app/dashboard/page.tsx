@@ -1,21 +1,7 @@
-import { LanguageProvider } from "@/components/i18n/LanguageProvider";
-import { Workspace } from "@/components/workspace/Workspace";
-import { getAuthenticatedLanternUser } from "@/lib/supabase/session";
+import { WorkspaceRoute } from "@/components/workspace/WorkspaceRoute";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const user = await getAuthenticatedLanternUser();
-  const account = user?.email
-    ? {
-        email: user.email,
-        displayName: user.displayName,
-      }
-    : null;
-
-  return (
-    <LanguageProvider>
-      <Workspace account={account} initialMode="live" />
-    </LanguageProvider>
-  );
+  return <WorkspaceRoute mode="live" view="overview" />;
 }

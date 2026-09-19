@@ -142,6 +142,8 @@
   padding: 11px 13px;
   border-radius: 7px;
   text-align: left;
+  cursor: pointer;
+  text-decoration: none;
 }
 .navItem:hover {
   background: #ffffff0b;
@@ -614,6 +616,263 @@
   height: 5px;
   background: #8aab85;
   border-radius: 50%;
+}
+.overview {
+  display: grid;
+  gap: 22px;
+}
+.overviewStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.overviewStats > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--w-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--w-ink);
+  text-align: left;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+.overviewStats > button:hover {
+  border-color: #b8ccbE;
+  box-shadow: 0 9px 24px #1633220a;
+  transform: translateY(-1px);
+}
+.overviewStats > button > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.overviewStats strong {
+  overflow: hidden;
+  color: #173c2a;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overviewStats small {
+  overflow: hidden;
+  color: var(--w-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overviewStats > button > svg {
+  width: 15px;
+  margin-left: auto;
+  color: #9aaba0;
+}
+.overviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
+  gap: 22px;
+  align-items: stretch;
+}
+.attentionPanel,
+.dayPanel,
+.latestPanel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--w-line);
+  border-radius: 10px;
+  background: #fff;
+}
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 21px 22px 17px;
+}
+.sectionHeader h2 {
+  margin: 3px 0 0;
+  font: 400 22px/1.2 Georgia, serif;
+  letter-spacing: -0.35px;
+}
+.attentionList,
+.dayList,
+.latestList {
+  border-top: 1px solid #e9eee9;
+}
+.attentionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 75px;
+  padding: 13px 18px;
+  border-bottom: 1px solid #edf1ed;
+}
+.attentionRow:last-child {
+  border-bottom: 0;
+}
+.attentionCopy {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.attentionCopy strong,
+.latestIdentity strong,
+.dayRow > span strong {
+  overflow: hidden;
+  color: #263a30;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attentionCopy small,
+.latestIdentity small,
+.dayRow > span small {
+  overflow: hidden;
+  color: var(--w-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compactAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #cfe1d5;
+  border-radius: 6px;
+  background: #eef8f1;
+  color: #17653b;
+  font-size: 12px !important;
+  font-weight: 650;
+}
+.compactAction:hover {
+  border-color: #9fc3ab;
+  background: #e4f4e9;
+}
+.compactAction svg,
+.taskAvatar svg {
+  width: 14px;
+  height: 14px;
+}
+.taskAvatar {
+  background: #edf1f5;
+  color: #657d8c;
+}
+.caughtUp {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 28px 22px;
+  color: #6b7b70;
+}
+.caughtUp > svg {
+  width: 19px;
+  color: #318058;
+}
+.caughtUp strong {
+  color: #365244;
+  font-size: 13px;
+}
+.caughtUp p {
+  margin: 4px 0 0;
+  color: var(--w-muted);
+  font-size: 12px;
+}
+.dayRow {
+  display: grid;
+  grid-template-columns: 67px minmax(0, 1fr);
+  gap: 13px;
+  width: 100%;
+  padding: 16px 20px;
+  border: 0;
+  border-bottom: 1px solid #edf1ed;
+  background: #fff;
+  text-align: left;
+}
+.dayRow:hover,
+.latestRow:hover {
+  background: #f8fbf8;
+}
+.dayRow:last-child {
+  border-bottom: 0;
+}
+.dayRow time,
+.dayRow > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.dayRow time {
+  padding-right: 12px;
+  border-right: 1px solid #e6ebe6;
+}
+.dayRow time strong {
+  color: #286348;
+  font-size: 12px;
+  font-weight: 650;
+}
+.dayRow time span {
+  color: var(--w-muted);
+  font-size: 11px;
+}
+.latestRow {
+  display: grid;
+  grid-template-columns: 42px minmax(135px, 0.7fr) minmax(220px, 1.5fr) 75px 66px 18px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 20px;
+  border: 0;
+  border-bottom: 1px solid #edf1ed;
+  background: #fff;
+  text-align: left;
+}
+.latestRow:last-child {
+  border-bottom: 0;
+}
+.latestRow .avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 12px;
+}
+.latestIdentity {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.latestSummary {
+  overflow: hidden;
+  color: #63736a;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.latestRow time {
+  color: var(--w-muted);
+  font-size: 12px;
+}
+.statusPill {
+  padding: 4px 7px;
+  border-radius: 99px;
+  background: #eaf5ed;
+  color: #2c704a;
+  font-size: 11px;
+  text-align: center;
+  text-transform: capitalize;
+}
+.latestRow > svg {
+  width: 15px;
+  color: #9ba9a0;
 }
 .calendarLayout {
   display: grid;
@@ -2085,6 +2344,18 @@
   }
 }
 @media (max-width: 800px) {
+  .overviewStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .overviewGrid {
+    grid-template-columns: 1fr;
+  }
+  .latestRow {
+    grid-template-columns: 42px minmax(120px, 0.8fr) minmax(180px, 1.2fr) 70px 18px;
+  }
+  .latestRow .statusPill {
+    display: none;
+  }
   .calendarLayout {
     grid-template-columns: 1fr;
   }
@@ -2294,6 +2565,56 @@
   }
   .content {
     padding: 23px 14px 16px;
+  }
+  .overview {
+    gap: 14px;
+  }
+  .overviewStats {
+    gap: 9px;
+  }
+  .overviewStats > button {
+    min-height: 91px;
+    align-items: flex-start;
+    padding: 13px;
+  }
+  .overviewStats > button > .statIcon {
+    display: none;
+  }
+  .overviewStats > button > svg {
+    width: 13px;
+  }
+  .overviewStats strong {
+    font-size: 18px;
+  }
+  .overviewStats small {
+    white-space: normal;
+  }
+  .sectionHeader {
+    padding: 18px 16px 14px;
+  }
+  .sectionHeader h2 {
+    font-size: 20px;
+  }
+  .attentionRow {
+    gap: 9px;
+    padding: 13px;
+  }
+  .attentionRow .smallAvatar {
+    width: 34px;
+    height: 34px;
+  }
+  .compactAction {
+    padding-inline: 8px;
+  }
+  .latestRow {
+    grid-template-columns: 38px minmax(0, 1fr) 18px;
+    gap: 10px;
+    padding: 13px 15px;
+  }
+  .latestSummary,
+  .latestRow time,
+  .latestRow .statusPill {
+    display: none;
   }
   .pageHeader h1 {
     font-size: 29px;

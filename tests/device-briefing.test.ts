@@ -14,7 +14,7 @@ test("builds an owner-specific boot briefing with bounded battery", () => {
   assert.equal(ownerSpokenName(null, "nigel.tan@example.com"), "nigel tan");
   assert.equal(
     buildBootBriefing({ ownerName: "Nathan Hor", batteryLevel: 140 }),
-    "Lantern. Sector twenty eight fourteen online. Battery at 100 percent. Welcome, Nathan Hor.",
+    "Lantern. Sector twenty four eighteen online. Battery at 100 percent. Welcome, Nathan Hor. Ready. Say computer or press the centre button.",
   );
 });
 
@@ -58,6 +58,8 @@ test("OpenAI speech requests streamable 24 kHz PCM without exposing its key", as
   assert.equal(body.model, "gpt-4o-mini-tts");
   assert.equal(body.voice, "cedar");
   assert.equal(body.response_format, "pcm");
+  assert.equal(body.stream_format, "audio");
+  assert.equal(body.speed, 1.08);
   assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0, 0, 1, 0]);
 });
 
@@ -84,6 +86,8 @@ test("OpenAI speech falls back to tts-1 PCM when the project cannot access the p
   assert.equal(fallback.model, "tts-1");
   assert.equal(fallback.voice, "alloy");
   assert.equal(fallback.response_format, "pcm");
+  assert.equal(fallback.stream_format, "audio");
+  assert.equal(fallback.speed, 1.08);
   assert.equal("instructions" in fallback, false);
   assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [2, 0]);
 });

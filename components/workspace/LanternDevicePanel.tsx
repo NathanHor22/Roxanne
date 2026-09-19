@@ -1,32 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BatteryMedium,
-  Check,
-  CloudOff,
+  CheckCircle2,
+  CircleAlert,
+  Cpu,
+  ExternalLink,
   Gauge,
+  HardDrive,
+  KeyRound,
   LoaderCircle,
-  Mic2,
-  Pause,
-  Play,
   Radio,
-  RotateCcw,
+  RefreshCw,
   ShieldCheck,
-  Square,
-  Volume2,
+  Signal,
+  Unplug,
   Wifi,
 } from "lucide-react";
 
-import {
-  advanceLantern,
-  createLanternMachine,
-  lanternStateLabel,
-  type LanternEvent,
-  type LanternMachine,
-  type LanternState,
-} from "@/lib/lantern-state";
+import { lanternStateLabel, type LanternState } from "@/lib/lantern-state";
 import type { WorkspaceMode } from "@/lib/workspace/model";
 import styles from "./lantern-device.module.css";
 
@@ -45,154 +39,76 @@ interface DeviceRecord {
   last_error: string | null;
 }
 
-const statusCopy: Record<LanternState, string> = {
-  connecting: "Finding a trusted connection",
-  ready: "Say “Ring” or use the main button",
-  awaiting_recording_consent: "Has everyone agreed to this recording?",
-  recording: "Conversation capture is active",
-  paused: "Capture is paused",
-  offline_buffering: "Holding a short protected audio buffer",
-  finalising: "Closing and checking the audio manifest",
-  processing: "The recording is safe. Preparing the recap.",
-  report_ready: "The conversation is ready in Lantern",
-  oath_listening: "Green Lantern of Sector 2418, state your oath",
-  status_report: "Three conversations. One approval needs you.",
-  awaiting_action_confirmation:
-    "Nigel, Friday 18 September, 1:00 PM MYT, 45 minutes",
-  pending_dashboard_approval: "Prepared in Lantern. Nothing has been sent.",
-  error: "Use the recovery instruction shown below",
-};
+const setupAddress = "http://192.168.4.1/";
 
-function futurePrompt(now: Date) {
-  return new Date(now.getTime() + 30_000).toISOString();
+function relativeLastSeen(value: string | null) {
+  if (!value) return "Waiting for first heartbeat";
+  const elapsed = Date.now() - Date.parse(value);
+  if (!Number.isFinite(elapsed) || elapsed < 0) return "Last seen recently";
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "Seen just now";
+  if (minutes < 60) return `Seen ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Seen ${hours} hr ago`;
+  return `Seen ${Math.floor(hours / 24)} day${hours >= 48 ? "s" : ""} ago`;
 }
 
-function makeId(prefix: string) {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
-
-function elapsedLabel(startedAt: string | null, tick: number) {
-  if (!startedAt) return "00:00";
-  const total = Math.max(0, Math.floor((tick - Date.parse(startedAt)) / 1000));
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+function heapLabel(bytes: number | null) {
+  if (bytes == null) return "Not reported";
+  return `${Math.max(0, bytes / 1024).toFixed(0)} KB free`;
 }
 
 export function LanternDevicePanel({
   mode,
   integrations,
+  conversationCount,
 }: {
   mode: WorkspaceMode;
   integrations: Record<string, boolean>;
+  conversationCount: number;
 }) {
-  const [machine, setMachine] = useState<LanternMachine>(() =>
-    createLanternMachine("ready"),
-  );
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
+  const [loading, setLoading] = useState(mode === "live");
   const [deviceError, setDeviceError] = useState<string | null>(null);
-  const [tick, setTick] = useState(() => Date.now());
-  const [transitionError, setTransitionError] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [pairingExpiresAt, setPairingExpiresAt] = useState<string | null>(null);
-  const [pairingWorking, setPairingWorking] = useState(false);
+  const [working, setWorking] = useState(false);
 
-  useEffect(() => {
-    if (machine.state !== "recording") return;
-    const timer = window.setInterval(() => setTick(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [machine.state]);
-
-  useEffect(() => {
+  const loadDevices = useCallback(async (showLoading = false) => {
     if (mode !== "live") {
       setDevices([]);
-      setDeviceError(null);
+      setLoading(false);
       return;
     }
-    const controller = new AbortController();
-    const loadDevices = () => {
-      void fetch("/api/devices", { cache: "no-store", signal: controller.signal })
-        .then(async (response) => {
-          const payload = (await response.json().catch(() => ({}))) as {
-            devices?: DeviceRecord[];
-            error?: string;
-          };
-          if (!response.ok) {
-            throw new Error(payload.error || "Device status is unavailable.");
-          }
-          setDevices(payload.devices || []);
-          setDeviceError(null);
-        })
-        .catch((cause: unknown) => {
-          if (!controller.signal.aborted) {
-            setDeviceError(
-              cause instanceof Error ? cause.message : "Device status is unavailable.",
-            );
-          }
-        });
-    };
-    loadDevices();
-    const refresh = window.setInterval(loadDevices, 15_000);
-    return () => {
-      controller.abort();
-      window.clearInterval(refresh);
-    };
+    if (showLoading) setLoading(true);
+    try {
+      const response = await fetch("/api/devices", { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as {
+        devices?: DeviceRecord[];
+        error?: string;
+      };
+      if (!response.ok)
+        throw new Error(payload.error || "Device status is unavailable.");
+      setDevices(payload.devices || []);
+      setDeviceError(null);
+    } catch (cause) {
+      setDeviceError(
+        cause instanceof Error ? cause.message : "Device status is unavailable.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [mode]);
 
-  const dispatch = (event: LanternEvent) => {
-    try {
-      setMachine((current) => advanceLantern(current, event));
-      setTransitionError(null);
-      setTick(Date.now());
-    } catch (cause) {
-      setTransitionError(
-        cause instanceof Error ? cause.message : "That action is not available.",
-      );
-    }
-  };
-
-  const now = () => new Date();
-  const startQuick = () => {
-    const current = now();
-    dispatch({
-      type: "BEGIN_QUICK",
-      at: current.toISOString(),
-      sessionId: makeId("quick"),
-      promptId: makeId("consent"),
-      promptExpiresAt: futurePrompt(current),
-    });
-  };
-  const startStatus = () =>
-    dispatch({
-      type: "BEGIN_STATUS",
-      at: now().toISOString(),
-      sessionId: makeId("report"),
-    });
-  const answerPrompt = (accepted: boolean) => {
-    if (!machine.prompt) return;
-    dispatch({
-      type:
-        machine.prompt.kind === "recording_consent"
-          ? "RECORDING_CONSENT"
-          : "ACTION_CONFIRMATION",
-      at: now().toISOString(),
-      promptId: machine.prompt.id,
-      accepted,
-    });
-  };
-  const proposeAction = () => {
-    const current = now();
-    dispatch({
-      type: "ACTION_PROPOSED",
-      at: current.toISOString(),
-      proposalId: makeId("proposal"),
-      promptId: makeId("confirmation"),
-      promptExpiresAt: futurePrompt(current),
-    });
-  };
+  useEffect(() => {
+    void loadDevices(true);
+    if (mode !== "live") return;
+    const refresh = window.setInterval(() => void loadDevices(), 15_000);
+    return () => window.clearInterval(refresh);
+  }, [loadDevices, mode]);
 
   const createPairing = async () => {
-    setPairingWorking(true);
+    setWorking(true);
     setDeviceError(null);
     try {
       const response = await fetch("/api/devices/pairing", {
@@ -204,9 +120,8 @@ export function LanternDevicePanel({
         pairing?: { code: string; expiresAt: string };
         error?: string;
       };
-      if (!response.ok || !payload.pairing) {
+      if (!response.ok || !payload.pairing)
         throw new Error(payload.error || "Pairing could not begin.");
-      }
       setPairingCode(payload.pairing.code);
       setPairingExpiresAt(payload.pairing.expiresAt);
     } catch (cause) {
@@ -214,12 +129,12 @@ export function LanternDevicePanel({
         cause instanceof Error ? cause.message : "Pairing could not begin.",
       );
     } finally {
-      setPairingWorking(false);
+      setWorking(false);
     }
   };
 
   const revokeDevice = async (deviceId: string) => {
-    setPairingWorking(true);
+    setWorking(true);
     setDeviceError(null);
     try {
       const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}`, {
@@ -231,412 +146,206 @@ export function LanternDevicePanel({
         revoked?: boolean;
         error?: string;
       };
-      if (!response.ok || !payload.revoked) {
+      if (!response.ok || !payload.revoked)
         throw new Error(payload.error || "Lantern could not be revoked.");
-      }
       setDevices((current) => current.filter((device) => device.id !== deviceId));
+      setPairingCode(null);
     } catch (cause) {
       setDeviceError(
         cause instanceof Error ? cause.message : "Lantern could not be revoked.",
       );
     } finally {
-      setPairingWorking(false);
+      setWorking(false);
     }
   };
 
-  const primaryDevice = devices[0];
-  const screenTone = useMemo(() => {
-    if (machine.state === "recording") return styles.screenRecording;
-    if (machine.state === "offline_buffering" || machine.state === "error")
-      return styles.screenWarning;
-    if (
-      machine.state === "pending_dashboard_approval" ||
-      machine.state === "awaiting_action_confirmation"
-    )
-      return styles.screenApproval;
-    return styles.screenReady;
-  }, [machine.state]);
+  const primaryDevice = devices[0] || null;
+  const lastSeen = useMemo(
+    () => relativeLastSeen(primaryDevice?.last_seen_at || null),
+    [primaryDevice?.last_seen_at],
+  );
 
-  return (
-    <section className={styles.layout} aria-label="Lantern device workspace">
-      <div className={styles.prototypeNotice}>
-        <ShieldCheck />
-        <span>
-          <strong>
-            {mode === "sample" ? "Interactive flow preview" : "Agora capture pilot"}
-          </strong>
-          {mode === "sample"
-            ? "This exercises Lantern’s consent and approval rules. It records no audio and contacts nobody."
-            : integrations.agora && integrations.openai
-              ? "A paired Lantern can capture a 30-second conversation, send it through Agora and OpenAI, and add the recording and recap here automatically."
-              : "The capture build is ready. Connect Agora and OpenAI in the server environment before installing it on the Lantern."}
-        </span>
-      </div>
-
-      <div className={styles.heroGrid}>
-        <section className={styles.deviceStage}>
-          <div className={`${styles.deviceShell} ${screenTone}`}>
-            <div className={styles.deviceTopline}>
-              <span>
-                <Wifi /> {machine.state === "offline_buffering" ? "Offline" : "MYT"}
-              </span>
-              <BatteryMedium />
-            </div>
-            <div className={styles.ring} aria-hidden="true">
-              <span />
-            </div>
-            <div className={styles.screenText}>
-              {machine.state === "recording" ? (
-                <span className={styles.recLabel}><i /> REC</span>
-              ) : null}
-              <strong>{lanternStateLabel(machine.state)}</strong>
-              <p>{statusCopy[machine.state]}</p>
-              {machine.state === "recording" ? (
-                <time>{elapsedLabel(machine.recordingStartedAt, tick)}</time>
-              ) : null}
-              {machine.state === "offline_buffering" ? (
-                <time>{machine.bufferedSeconds}s buffered</time>
-              ) : null}
-            </div>
-          </div>
-          <div className={styles.hardwareLabel}>
-            <span>ZHENGCHEN · ESP32-S3</span>
-            <small>240 × 240 screen preview</small>
-          </div>
-        </section>
-
-        <section className={styles.controlPanel}>
-          <header>
-            <span className={styles.kicker}>DEVICE FLOW</span>
-            <span className={styles.version}>State {machine.version}</span>
-          </header>
-          <h2>{lanternStateLabel(machine.state)}</h2>
-          <p>{statusCopy[machine.state]}</p>
-
-          <div className={styles.controls}>
-            {machine.state === "ready" || machine.state === "report_ready" ? (
-              <>
-                <button className={styles.primary} onClick={startQuick}>
-                  <Mic2 /> Start quick meeting
-                </button>
-                <button className={styles.secondary} onClick={startStatus}>
-                  <Radio /> Start status report
-                </button>
-              </>
-            ) : null}
-            {machine.state === "awaiting_recording_consent" ? (
-              <>
-                <button className={styles.primary} onClick={() => answerPrompt(true)}>
-                  <Check /> Yes, everyone agreed
-                </button>
-                <button className={styles.secondary} onClick={() => answerPrompt(false)}>
-                  Cancel meeting
-                </button>
-              </>
-            ) : null}
-            {machine.state === "recording" ? (
-              <>
-                <button
-                  className={styles.primary}
-                  onClick={() => dispatch({ type: "PAUSE", at: now().toISOString() })}
-                >
-                  <Pause /> Pause capture
-                </button>
-                <button
-                  className={styles.danger}
-                  onClick={() => dispatch({ type: "STOP", at: now().toISOString() })}
-                >
-                  <Square /> We’re done
-                </button>
-                <button
-                  className={styles.textAction}
-                  onClick={() => dispatch({ type: "CONNECTION_LOST", at: now().toISOString() })}
-                >
-                  Simulate connection loss
-                </button>
-              </>
-            ) : null}
-            {machine.state === "paused" ? (
-              <>
-                <button
-                  className={styles.primary}
-                  onClick={() => dispatch({ type: "RESUME", at: now().toISOString() })}
-                >
-                  <Play /> Resume
-                </button>
-                <button
-                  className={styles.danger}
-                  onClick={() => dispatch({ type: "STOP", at: now().toISOString() })}
-                >
-                  <Square /> End meeting
-                </button>
-              </>
-            ) : null}
-            {machine.state === "offline_buffering" ? (
-              <>
-                <button
-                  className={styles.secondary}
-                  onClick={() =>
-                    dispatch({
-                      type: "BUFFER_UPDATED",
-                      at: now().toISOString(),
-                      bufferedSeconds: Math.min(30, machine.bufferedSeconds + 5),
-                    })
-                  }
-                >
-                  <CloudOff /> Add 5 buffered seconds
-                </button>
-                <button
-                  className={styles.primary}
-                  onClick={() => dispatch({ type: "CONNECTION_RESTORED", at: now().toISOString() })}
-                >
-                  <Wifi /> Restore connection
-                </button>
-                <button
-                  className={styles.danger}
-                  onClick={() => dispatch({ type: "STOP", at: now().toISOString() })}
-                >
-                  <Square /> End safely
-                </button>
-              </>
-            ) : null}
-            {machine.state === "finalising" ? (
-              <button
-                className={styles.primary}
-                onClick={() => dispatch({ type: "ARCHIVE_ACCEPTED", at: now().toISOString() })}
-              >
-                <Check /> Confirm archive received
-              </button>
-            ) : null}
-            {machine.state === "processing" ? (
-              <button
-                className={styles.primary}
-                onClick={() => dispatch({ type: "PROCESSING_COMPLETE", at: now().toISOString() })}
-              >
-                <LoaderCircle /> Complete mock processing
-              </button>
-            ) : null}
-            {machine.state === "oath_listening" ? (
-              <>
-                <button
-                  className={styles.primary}
-                  onClick={() => dispatch({ type: "OATH_RESULT", at: now().toISOString(), accepted: true })}
-                >
-                  <Volume2 /> Accept completed oath
-                </button>
-                <button
-                  className={styles.secondary}
-                  onClick={() => dispatch({ type: "OATH_RESULT", at: now().toISOString(), accepted: false })}
-                >
-                  End ritual
-                </button>
-              </>
-            ) : null}
-            {machine.state === "status_report" ? (
-              <>
-                <div className={styles.reportCard}>
-                  <span>MEETING 2 OF 3</span>
-                  <strong>Mr. Chung · Follow-up agreed</strong>
-                  <p>Friday, 18 September 2026 · 1:00 PM MYT · 45 minutes</p>
-                  <small>n-i-g-e-l-t-a-n-j-c at gmail dot com</small>
-                </div>
-                <button className={styles.primary} onClick={proposeAction}>
-                  Prepare this meeting
-                </button>
-                <button
-                  className={styles.secondary}
-                  onClick={() => dispatch({ type: "DISMISS_REPORT", at: now().toISOString() })}
-                >
-                  Finish report
-                </button>
-              </>
-            ) : null}
-            {machine.state === "awaiting_action_confirmation" ? (
-              <>
-                <button className={styles.primary} onClick={() => answerPrompt(true)}>
-                  <Check /> Yes, prepare it
-                </button>
-                <button className={styles.secondary} onClick={() => answerPrompt(false)}>
-                  No, continue report
-                </button>
-              </>
-            ) : null}
-            {machine.state === "pending_dashboard_approval" ? (
-              <>
-                <div className={styles.approvalCard}>
-                  <span>WAITING FOR YOU</span>
-                  <strong>Nothing has been sent</strong>
-                  <p>The exact proposal version now requires dashboard approval.</p>
-                </div>
-                <button
-                  className={styles.primary}
-                  onClick={() => dispatch({ type: "DASHBOARD_RESOLVED", at: now().toISOString() })}
-                >
-                  <Check /> Mark dashboard review complete
-                </button>
-              </>
-            ) : null}
-            {machine.state === "error" ? (
-              <button
-                className={styles.primary}
-                onClick={() => dispatch({ type: "RESET", at: now().toISOString() })}
-              >
-                <RotateCcw /> Return to ready
-              </button>
-            ) : null}
-          </div>
-          {transitionError ? <p className={styles.error} role="alert">{transitionError}</p> : null}
-        </section>
-      </div>
-
-      <section className={styles.setupGuide} aria-labelledby="lantern-setup-title">
-        <header>
-          <div>
-            <span className={styles.kicker}>FIRST-TIME SETUP</span>
-            <h2 id="lantern-setup-title">Pair the Lantern with your workspace</h2>
-          </div>
-          <span className={styles.setupBadge}><Wifi /> 2.4 GHz Wi-Fi</span>
-        </header>
-        <ol>
-          <li>
-            <span>1</span>
-            <div>
-              <strong>{mode === "sample" ? "Sign in to pair your device" : "Create a pairing code"}</strong>
-              <p>
-                {mode === "sample"
-                  ? "Pairing codes belong to your private workspace."
-                  : pairingCode
-                    ? "Enter this one-time code in the Lantern setup page."
-                    : "Generate a one-time code before joining the Lantern setup network."}
-              </p>
-              {mode === "sample" ? (
-                <Link
-                  className={styles.setupAction}
-                  href="/login?next=%2Fdashboard%3Fview%3Ddevice"
-                >
-                  Sign in to pair your device
-                </Link>
-              ) : pairingCode ? (
-                <div className={styles.setupPairingCode}>
-                  <code>{pairingCode}</code>
-                  <small>
-                    Expires {pairingExpiresAt
-                      ? new Date(pairingExpiresAt).toLocaleTimeString("en-MY", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "soon"}
-                  </small>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.setupAction}
-                  disabled={pairingWorking}
-                  onClick={() => void createPairing()}
-                >
-                  {pairingWorking ? "Creating…" : "Create pairing code"}
-                </button>
-              )}
-            </div>
-          </li>
-          <li>
-            <span>2</span>
-            <div><strong>Join Lantern-XXXX</strong><p>Use a second phone or laptop and the setup password <code>lanternsetup</code>.</p></div>
-          </li>
-          <li>
-            <span>3</span>
-            <div><strong>Open 192.168.4.1</strong><p>Enter a 2.4 GHz hotspot name, password, and the Lantern pairing code.</p></div>
-          </li>
-          <li>
-            <span>4</span>
-            <div><strong>Wait for Ready</strong><p>Return here and confirm the device appears online before recording.</p></div>
-          </li>
-        </ol>
-        <p className={styles.setupPrivacy}>
-          Keep the target hotspot switched on while you configure from the second
-          device. Your Wi-Fi password stays on the Lantern. Agora, OpenAI, Google,
-          and Gmail credentials stay in the server environment.
-        </p>
+  if (loading) {
+    return (
+      <section className={styles.deviceLoading} aria-live="polite">
+        <LoaderCircle />
+        <p>Checking your Lantern…</p>
       </section>
+    );
+  }
 
-      <div className={styles.infoGrid}>
-        <section className={styles.infoCard}>
-          <header><Radio /><span>Registered device</span></header>
-          <strong>{primaryDevice?.name || "Lantern prototype"}</strong>
+  if (mode === "sample" || !primaryDevice) {
+    return (
+      <section className={styles.pairingLayout} aria-label="Lantern setup">
+        <div className={styles.pairingIntro}>
+          <span className={styles.pairingIcon}><Radio /></span>
+          <span className={styles.kicker}>PAIR YOUR LANTERN</span>
+          <h2>Connect the recorder once.</h2>
           <p>
-            {mode === "sample"
-              ? "Sample mode uses the exact state rules without reaching providers."
-              : deviceError || (primaryDevice ? `Last seen ${primaryDevice.last_seen_at ? new Date(primaryDevice.last_seen_at).toLocaleString("en-MY") : "not yet"}.` : "No registered device is available yet.")}
+            Lantern will remember the workspace and upload completed conversations
+            whenever it can reach your 2.4 GHz hotspot.
           </p>
-          <span className={styles.detailPill}>
-            {primaryDevice
-              ? `${lanternStateLabel(primaryDevice.device_state)} · ${primaryDevice.battery_level ?? "—"}% · ${primaryDevice.network_type || "network unknown"}`
-              : mode === "sample"
-                ? "simulated"
-                : "awaiting pairing"}
-          </span>
-          {mode === "live" && primaryDevice ? (
-            <button
-              type="button"
-              className={styles.cardAction}
-              disabled={pairingWorking}
-              onClick={() => void revokeDevice(primaryDevice.id)}
-            >
-              Revoke device access
-            </button>
-          ) : null}
-          {pairingCode ? (
-            <div className={styles.pairingCode}>
-              <span>PAIRING CODE</span>
+          {mode === "sample" ? (
+            <Link className={styles.pairingPrimary} href="/login?next=%2Fdashboard%2Flantern">
+              Sign in to pair a device
+            </Link>
+          ) : pairingCode ? (
+            <div className={styles.activePairingCode}>
+              <span>ONE-TIME PAIRING CODE</span>
               <strong>{pairingCode}</strong>
               <small>
-                {`Expires ${pairingExpiresAt ? new Date(pairingExpiresAt).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" }) : "soon"}`}
+                Expires {pairingExpiresAt
+                  ? new Date(pairingExpiresAt).toLocaleTimeString("en-MY", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "soon"}
               </small>
             </div>
-          ) : mode === "sample" ? (
-            <Link
-              className={styles.cardAction}
-              href="/login?next=%2Fdashboard%3Fview%3Ddevice"
-            >
-              Sign in to pair your device
-            </Link>
           ) : (
             <button
-              type="button"
-              className={styles.cardAction}
-              disabled={pairingWorking}
+              className={styles.pairingPrimary}
+              disabled={working}
               onClick={() => void createPairing()}
             >
-              {pairingWorking ? "Creating…" : "Create pairing code"}
+              <KeyRound /> {working ? "Creating…" : "Create pairing code"}
             </button>
           )}
-        </section>
-        <section className={styles.infoCard}>
-          <header><Gauge /><span>Hardware build</span></header>
-          <strong>Lantern 0.2 capture firmware</strong>
-          <p>The ESP32-S3 build is ready for the first provider-connected device test.</p>
-          <span className={styles.detailPill}>
-            {mode === "sample"
-              ? "30-second flow preview"
-              : integrations.agora && integrations.openai
-                ? "Providers ready"
-                : "Provider setup required"}
-          </span>
-        </section>
-        <section className={styles.infoCard}>
-          <header><Mic2 /><span>Capture contract</span></header>
-          <strong>16 kHz mono · Agora Opus</strong>
-          <p>The server stamps the exact Malaysia date and time when capture begins.</p>
-          <span className={styles.detailPill}>Asia/Kuala_Lumpur</span>
-        </section>
-        <section className={styles.infoCard}>
-          <header><ShieldCheck /><span>Action boundary</span></header>
-          <strong>Voice prepares. You approve.</strong>
-          <p>A spoken yes cannot contact a client in the first release.</p>
-          <span className={styles.detailPill}>Enforced by state</span>
-        </section>
+          {deviceError && <p className={styles.deviceError} role="alert">{deviceError}</p>}
+        </div>
+
+        <div className={styles.setupSteps}>
+          <header>
+            <span className={styles.kicker}>FIRST-TIME SETUP</span>
+            <span><Wifi /> 2.4 GHz hotspot</span>
+          </header>
+          <ol>
+            <li>
+              <span>1</span>
+              <div>
+                <strong>Create the pairing code</strong>
+                <p>Keep this page open. The code expires and works only once.</p>
+              </div>
+            </li>
+            <li>
+              <span>2</span>
+              <div>
+                <strong>Join Lantern-XXXX</strong>
+                <p>On this laptop or your phone, temporarily join the Lantern setup Wi-Fi.</p>
+              </div>
+            </li>
+            <li>
+              <span>3</span>
+              <div>
+                <strong>Open the setup page</strong>
+                <p>Enter your hotspot name, password, and the pairing code.</p>
+                <a href={setupAddress} target="_blank" rel="noreferrer">
+                  Open 192.168.4.1 <ExternalLink />
+                </a>
+              </div>
+            </li>
+            <li>
+              <span>4</span>
+              <div>
+                <strong>Return here when the screen says paired</strong>
+                <p>This page will switch to device health after the first heartbeat.</p>
+              </div>
+            </li>
+          </ol>
+          <footer>
+            <ShieldCheck /> Your hotspot password stays on the Lantern.
+          </footer>
+        </div>
+      </section>
+    );
+  }
+
+  const deviceHealthy = primaryDevice.status === "online" && !primaryDevice.last_error;
+
+  return (
+    <section className={styles.healthLayout} aria-label="Lantern device health">
+      <header className={styles.healthHero}>
+        <div className={styles.deviceIdentity}>
+          <span className={styles.connectedRing}><Radio /></span>
+          <div>
+            <span className={styles.kicker}>PAIRED DEVICE</span>
+            <h2>{primaryDevice.name}</h2>
+            <p>{primaryDevice.model || "ESP32-S3 Lantern"} · {lastSeen}</p>
+          </div>
+        </div>
+        <span className={deviceHealthy ? styles.onlineBadge : styles.attentionBadge}>
+          {deviceHealthy ? <CheckCircle2 /> : <CircleAlert />}
+          {deviceHealthy ? "Online" : primaryDevice.status || "Needs attention"}
+        </span>
+      </header>
+
+      {deviceError && <p className={styles.deviceError} role="alert">{deviceError}</p>}
+
+      <div className={styles.healthStats}>
+        <article>
+          <BatteryMedium />
+          <span><strong>{primaryDevice.battery_level ?? "—"}%</strong><small>Battery</small></span>
+        </article>
+        <article>
+          <Signal />
+          <span><strong>{primaryDevice.network_type || "Unknown"}</strong><small>Connection</small></span>
+        </article>
+        <article>
+          <Gauge />
+          <span><strong>{lanternStateLabel(primaryDevice.device_state)}</strong><small>Current state</small></span>
+        </article>
+        <article>
+          <HardDrive />
+          <span><strong>{conversationCount}</strong><small>Conversations</small></span>
+        </article>
       </div>
+
+      <div className={styles.healthGrid}>
+        <section className={styles.deviceDetails}>
+          <header>
+            <div><span className={styles.kicker}>DEVICE DETAILS</span><h3>Hardware and firmware</h3></div>
+            <button aria-label="Refresh device status" disabled={working} onClick={() => void loadDevices(true)}>
+              <RefreshCw /> Refresh
+            </button>
+          </header>
+          <dl>
+            <div><dt><Cpu /> Firmware</dt><dd>{primaryDevice.firmware_version || "Not reported"}</dd></div>
+            <div><dt><Radio /> Model</dt><dd>{primaryDevice.model || "ESP32-S3"}</dd></div>
+            <div><dt><HardDrive /> Available memory</dt><dd>{heapLabel(primaryDevice.free_heap_bytes)}</dd></div>
+            <div><dt><ShieldCheck /> Device access</dt><dd>Paired to this workspace</dd></div>
+          </dl>
+          {primaryDevice.last_error && (
+            <div className={styles.lastError}>
+              <CircleAlert />
+              <span><strong>Last device error</strong><p>{primaryDevice.last_error}</p></span>
+            </div>
+          )}
+        </section>
+
+        <aside className={styles.connectionCard}>
+          <span className={styles.kicker}>CONNECTIONS</span>
+          <h3>Capture services</h3>
+          <ul>
+            <li><span><i className={integrations.agora ? styles.goodDot : styles.neutralServiceDot} />Agora transcription</span><strong>{integrations.agora ? "Ready" : "Check setup"}</strong></li>
+            <li><span><i className={integrations.openai ? styles.goodDot : styles.neutralServiceDot} />OpenAI processing</span><strong>{integrations.openai ? "Ready" : "Check setup"}</strong></li>
+            <li><span><i className={styles.goodDot} />Workspace pairing</span><strong>Ready</strong></li>
+          </ul>
+          <a className={styles.wifiAction} href={setupAddress} target="_blank" rel="noreferrer">
+            <Wifi /> Reconfigure Wi-Fi <ExternalLink />
+          </a>
+          <p>Join the Lantern-XXXX setup network before opening the Wi-Fi page.</p>
+        </aside>
+      </div>
+
+      <footer className={styles.deviceDangerZone}>
+        <div>
+          <strong>Remove this Lantern</strong>
+          <p>Revoking access stops this device from uploading to your workspace.</p>
+        </div>
+        <button disabled={working} onClick={() => void revokeDevice(primaryDevice.id)}>
+          <Unplug /> {working ? "Removing…" : "Revoke device"}
+        </button>
+      </footer>
     </section>
   );
 }
