@@ -38,6 +38,8 @@ static lantern_network_callback_t s_callback;
 static lantern_network_status_t s_status;
 static httpd_handle_t s_server;
 
+static esp_err_t start_setup_portal(void);
+
 typedef struct {
   char data[RESPONSE_CAPACITY];
   size_t length;
@@ -67,6 +69,27 @@ static void set_error(const char *message) {
   snprintf(s_status.last_error, sizeof(s_status.last_error), "%s", message ? message : "unknown error");
   ESP_LOGW(TAG, "%s", s_status.last_error);
   notify();
+}
+
+static bool recover_rejected_credential(int status) {
+  if ((status != 401 && status != 403) || !s_config || !lantern_storage_is_paired(s_config)) {
+    return false;
+  }
+  ESP_LOGW(TAG, "cloud rejected the device credential; preserving Wi-Fi and reopening pairing");
+  esp_err_t result = lantern_storage_clear_device(s_config);
+  if (result != ESP_OK) {
+    set_error("Could not reset revoked pairing");
+    return true;
+  }
+  s_status.paired = false;
+  s_status.last_error[0] = '\0';
+  result = start_setup_portal();
+  if (result != ESP_OK) {
+    set_error("Pairing reset; restart Lantern");
+    return true;
+  }
+  set_error("Pairing reset; create a new code");
+  return true;
 }
 
 static void uuid_v4(char output[37]) {
@@ -237,6 +260,7 @@ static bool parse_session_response(const char *body, lantern_cloud_session_t *se
 }
 
 static void provider_error(const char *operation, int status, const response_buffer_t *response) {
+  if (recover_rejected_credential(status)) return;
   char detail[96];
   cJSON *root = cJSON_Parse(response->data);
   cJSON *error = root ? cJSON_GetObjectItemCaseSensitive(root, "error") : NULL;
@@ -346,10 +370,10 @@ static esp_err_t setup_page(httpd_req_t *request) {
     "max-width:420px;margin:40px auto;padding:24px}h1{color:#35ff8c}p{color:#a9c9b7;line-height:1.55}label{display:block;margin-top:18px;color:#d9f7e5}"
     "input{width:100%;box-sizing:border-box;padding:13px;margin-top:7px;border-radius:8px;border:1px solid #28704c;background:#071b12;color:#effff5}"
     "button{margin-top:24px;width:100%;padding:14px;border:0;border-radius:8px;background:#35ff8c;color:#03110c;font-weight:700}</style></head>"
-    "<body><h1>Lantern</h1><p>Connect this device to a 2.4 GHz Wi-Fi network or phone hotspot. Use the one-time pairing code from your Lantern dashboard.</p>"
-    "<form method=post action=/configure><label>Wi-Fi name<input name=ssid maxlength=32 required></label>"
+    "<body><h1>Lantern</h1><p>Use the one-time pairing code from your Lantern dashboard. If Lantern already knows this Wi-Fi, leave the Wi-Fi fields blank.</p>"
+    "<form method=post action=/configure><label>Wi-Fi name<input name=ssid maxlength=32 placeholder='Leave blank to keep saved Wi-Fi'></label>"
     "<label>Wi-Fi password<input name=password type=password maxlength=64></label>"
-    "<label>Pairing code (required on first setup)<input name=code maxlength=20 placeholder='XXXXX-XXXXX'></label><button>Connect Lantern</button></form>"
+    "<label>Pairing code (required to pair or reconnect)<input name=code maxlength=20 placeholder='XXXXX-XXXXX'></label><button>Connect Lantern</button></form>"
     "<p><a href=/audio.wav style='color:#35ff8c'>Download the latest microphone test</a></p>"
     "<hr style='border-color:#164d34'><h2>Local firmware update</h2><input id=firmware type=file accept=.bin>"
     "<button type=button onclick='updateFirmware()'>Install update</button><p id=result></p>"
@@ -483,12 +507,22 @@ static esp_err_t configure(httpd_req_t *request) {
   form_field(body, "password", password, sizeof(password));
   form_field(body, "code", code, sizeof(code));
   bool has_valid_code = code[0] && normalize_pairing_code(code);
-  if (!ssid[0] || (!lantern_storage_is_paired(s_config) && !has_valid_code) ||
+  const char *selected_ssid = ssid[0] ? ssid : s_config->wifi_ssid;
+  const char *selected_password = ssid[0] ? password : s_config->wifi_password;
+  if (!selected_ssid[0] || (!lantern_storage_is_paired(s_config) && !has_valid_code) ||
       (code[0] && !has_valid_code)) {
     httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Check the Wi-Fi name and 10-character pairing code");
     return ESP_FAIL;
   }
-  esp_err_t result = lantern_storage_save_wifi(ssid, password, code);
+  if (has_valid_code && lantern_storage_is_paired(s_config)) {
+    esp_err_t reset_result = lantern_storage_clear_device(s_config);
+    if (reset_result != ESP_OK) {
+      httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not reset the previous pairing");
+      return reset_result;
+    }
+    s_status.paired = false;
+  }
+  esp_err_t result = lantern_storage_save_wifi(selected_ssid, selected_password, code);
   if (result != ESP_OK) {
     httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not save settings");
     return result;
@@ -652,6 +686,7 @@ esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_versi
   int status = post_json("/api/device/v1/heartbeat", body, authorization, response);
   if (status != 200) {
     ESP_LOGW(TAG, "heartbeat HTTP %d: %.192s", status, response->data);
+    recover_rejected_credential(status);
     free(response);
     return ESP_FAIL;
   }
@@ -697,6 +732,7 @@ esp_err_t lantern_network_play_briefing(const char *kind, int battery_level) {
     audio->audio_bytes > 0 && !audio->playback_failed;
   if (!success) {
     ESP_LOGW(TAG, "briefing %s failed HTTP %d: %.192s", kind, status, audio->response.data);
+    recover_rejected_credential(status);
   } else {
     ESP_LOGI(TAG, "briefing %s played %u PCM bytes", kind, (unsigned)audio->audio_bytes);
   }
@@ -742,6 +778,7 @@ esp_err_t lantern_network_play_prompt(const char *kind) {
     audio->audio_bytes > 0 && !audio->playback_failed;
   if (!success) {
     ESP_LOGW(TAG, "prompt %s failed HTTP %d: %.192s", kind, status, audio->response.data);
+    recover_rejected_credential(status);
   } else {
     ESP_LOGI(TAG, "prompt %s played %u PCM bytes", kind, (unsigned)audio->audio_bytes);
   }
@@ -824,6 +861,7 @@ esp_err_t lantern_network_run_voice_command(const char *context, int battery_lev
   }
   if (result != ESP_OK || status != 200 || !audio->content_is_pcm ||
       !audio->audio_bytes || audio->playback_failed || !audio->command[0]) {
+    recover_rejected_credential(status);
     if (!audio->content_is_pcm && audio->response.length) {
       ESP_LOGW(TAG, "voice command HTTP %d: %.192s", status, audio->response.data);
     } else {

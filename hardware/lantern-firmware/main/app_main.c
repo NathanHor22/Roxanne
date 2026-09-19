@@ -210,7 +210,7 @@ static void show_ready(void) {
   s_state = LOCAL_READY;
   s_recovery = RECOVERY_NONE;
   s_state_entered_at = xTaskGetTickCount();
-  if (network.setup_portal_active && !network.wifi_connected) {
+  if (network.setup_portal_active && (!network.wifi_connected || !network.paired)) {
     lantern_display_show(LANTERN_SCREEN_SETUP, network.setup_ssid);
   } else if (network.wifi_connected && network.paired) {
     lantern_display_show(
@@ -238,6 +238,13 @@ static esp_err_t open_quick_consent(void) {
   lantern_wake_set_enabled(false);
   lantern_display_show(LANTERN_SCREEN_CONNECTING, "OPENING SESSION");
   if (lantern_network_begin_quick(&s_cloud_session) != ESP_OK) {
+    lantern_network_status_t network;
+    lantern_network_get_status(&network);
+    if (!network.paired) {
+      clear_active_session();
+      show_ready();
+      return ESP_FAIL;
+    }
     show_error(RECOVERY_SESSION_START, "SESSION START FAILED", "session_error");
     return ESP_FAIL;
   }
@@ -643,6 +650,9 @@ static void button_task(void *argument) {
   vTaskDelay(pdMS_TO_TICKS(800));
   bool was_pressed = false;
   bool reset_started = false;
+#if LANTERN_HAS_TOUCHSCREEN
+  bool touch_reset_announced = false;
+#endif
   TickType_t pressed_at = 0;
   TickType_t reset_at = 0;
   while (true) {
@@ -662,10 +672,27 @@ static void button_task(void *argument) {
     pressed = lantern_board_touch_read(&touch_x, &touch_y);
 #endif
     if (pressed && !was_pressed) pressed_at = xTaskGetTickCount();
+#if LANTERN_HAS_TOUCHSCREEN
+    if (pressed && was_pressed) {
+      uint32_t held_ms = (uint32_t)((xTaskGetTickCount() - pressed_at) * portTICK_PERIOD_MS);
+      if (held_ms >= 8000) {
+        lantern_display_show(LANTERN_SCREEN_SETUP, "RESETTING LANTERN");
+        lantern_storage_clear();
+        vTaskDelay(pdMS_TO_TICKS(500));
+        esp_restart();
+      } else if (held_ms >= 5000 && !touch_reset_announced) {
+        touch_reset_announced = true;
+        lantern_display_show(LANTERN_SCREEN_SETUP, "KEEP HOLDING TO RESET");
+      }
+    }
+#endif
     if (!pressed && was_pressed) {
       uint32_t held_ms = (uint32_t)((xTaskGetTickCount() - pressed_at) * portTICK_PERIOD_MS);
       if (held_ms >= 1200) handle_long_press();
       else if (held_ms >= 40) handle_short_press();
+#if LANTERN_HAS_TOUCHSCREEN
+      touch_reset_announced = false;
+#endif
     }
 
     if (up_pressed && down_pressed) {

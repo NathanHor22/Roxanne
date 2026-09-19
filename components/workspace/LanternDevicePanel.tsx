@@ -70,6 +70,7 @@ export function LanternDevicePanel({
   const [devices, setDevices] = useState<DeviceRecord[]>([]);
   const [loading, setLoading] = useState(mode === "live");
   const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [deviceNotice, setDeviceNotice] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [pairingExpiresAt, setPairingExpiresAt] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -124,6 +125,7 @@ export function LanternDevicePanel({
         throw new Error(payload.error || "Pairing could not begin.");
       setPairingCode(payload.pairing.code);
       setPairingExpiresAt(payload.pairing.expiresAt);
+      setDeviceNotice("Pairing code ready. Lantern will advertise its setup Wi-Fi until reconnection finishes.");
     } catch (cause) {
       setDeviceError(
         cause instanceof Error ? cause.message : "Pairing could not begin.",
@@ -150,6 +152,9 @@ export function LanternDevicePanel({
         throw new Error(payload.error || "Lantern could not be revoked.");
       setDevices((current) => current.filter((device) => device.id !== deviceId));
       setPairingCode(null);
+      setDeviceNotice(
+        "Access revoked. Keep Lantern powered on for up to 20 seconds while it opens setup mode, then create a new pairing code.",
+      );
     } catch (cause) {
       setDeviceError(
         cause instanceof Error ? cause.message : "Lantern could not be revoked.",
@@ -211,6 +216,7 @@ export function LanternDevicePanel({
               <KeyRound /> {working ? "Creating…" : "Create pairing code"}
             </button>
           )}
+          {deviceNotice && <p className={styles.deviceNotice} role="status">{deviceNotice}</p>}
           {deviceError && <p className={styles.deviceError} role="alert">{deviceError}</p>}
         </div>
 
@@ -231,14 +237,14 @@ export function LanternDevicePanel({
               <span>2</span>
               <div>
                 <strong>Join Lantern-XXXX</strong>
-                <p>On this laptop or your phone, temporarily join the Lantern setup Wi-Fi.</p>
+                <p>Wait up to 20 seconds after revoking. If it does not appear, hold the touchscreen for eight seconds to reset locally.</p>
               </div>
             </li>
             <li>
               <span>3</span>
               <div>
                 <strong>Open the setup page</strong>
-                <p>Enter your hotspot name, password, and the pairing code.</p>
+                <p>Enter the pairing code. Enter hotspot details on first setup, or leave them blank to keep the saved Wi-Fi.</p>
                 <a href={setupAddress} target="_blank" rel="noreferrer">
                   Open 192.168.4.1 <ExternalLink />
                 </a>
@@ -340,7 +346,7 @@ export function LanternDevicePanel({
       <footer className={styles.deviceDangerZone}>
         <div>
           <strong>Remove this Lantern</strong>
-          <p>Revoking access stops this device from uploading to your workspace.</p>
+          <p>Revoking access stops uploads and makes the device reopen pairing setup when it next contacts Lantern.</p>
         </div>
         <button disabled={working} onClick={() => void revokeDevice(primaryDevice.id)}>
           <Unplug /> {working ? "Removing…" : "Revoke device"}

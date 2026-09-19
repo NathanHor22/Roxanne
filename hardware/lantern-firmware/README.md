@@ -21,7 +21,7 @@ voice, networking, and dashboard behavior remain in the shared firmware. Each
 board gets its own build image; the original board does not need an SD card and
 continues to use its PSRAM streaming/retry strategy.
 
-Version `0.5.0-board-profiles` keeps the existing local WakeNet activation gate and
+Version `0.5.1-pairing-recovery` keeps the existing local WakeNet activation gate and
 buffered, low-latency speech playback while keeping one consistent
 centre-button fallback:
 
@@ -68,7 +68,10 @@ continue beyond 30 seconds through Agora, but this prototype uploads only the
 latest 30 seconds as replay audio. Full hour-long replay requires durable audio
 chunks and is still a separate reliability phase.
 
-Hold both volume buttons for three seconds to clear Wi-Fi and pairing settings.
+Hold both volume buttons for three seconds on Lantern Original to clear Wi-Fi
+and pairing settings. On touchscreen Lantern V2, hold the screen continuously
+for eight seconds. The screen shows **KEEP HOLDING TO RESET** before erasing the
+saved connection and reopening `Lantern-XXXX`.
 
 ## Wi-Fi and pairing
 
@@ -77,6 +80,11 @@ device network named `Lantern-XXXX` using password `lanternsetup`, then open
 `http://192.168.4.1`. Enter the 2.4 GHz phone hotspot name and password plus the
 one-time pairing code from the live dashboard. The setup page can also install
 a locally built `build/lantern.bin` into the inactive OTA slot.
+
+If the dashboard revokes a device, the next authenticated request clears only
+the rejected device credential and automatically reopens `Lantern-XXXX` while
+preserving the saved Wi-Fi. During re-pairing, submit the new pairing code and
+leave the Wi-Fi fields blank to reuse that connection.
 
 After setup, reconnect the laptop to normal internet. The ESP32 connects to the
 phone hotspot itself; the dashboard and ESP32 communicate through the deployed

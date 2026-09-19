@@ -16,6 +16,7 @@ esp_err_t lantern_storage_init(void);
 esp_err_t lantern_storage_load(lantern_config_t *config);
 esp_err_t lantern_storage_save_wifi(const char *ssid, const char *password, const char *pairing_code);
 esp_err_t lantern_storage_save_device(const char *device_id, const char *device_secret);
+esp_err_t lantern_storage_clear_device(lantern_config_t *config);
 esp_err_t lantern_storage_clear(void);
 bool lantern_storage_has_wifi(const lantern_config_t *config);
 bool lantern_storage_is_paired(const lantern_config_t *config);
