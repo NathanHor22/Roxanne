@@ -210,7 +210,9 @@ export function ConversationPanel({
                 </h3>
                 <p>
                   {conversation?.status === "failed"
-                    ? "This conversation could not be processed. Its details are still available."
+                    ? conversation.recordingId
+                      ? "This conversation could not be transcribed. Its original recording is still available."
+                      : "This conversation could not be processed. Its details are still available."
                     : "A linked conversation will bring the context for this meeting here."}
                 </p>
               </div>

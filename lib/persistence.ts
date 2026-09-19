@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Meeting } from "@/lib/types";
 import type { MeetingExtractionResult, TranscriptionResult } from "@/lib/meeting-schema";
 import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
@@ -42,6 +43,83 @@ export class PersistenceConfigurationError extends Error {
     super(message);
     this.name = "PersistenceConfigurationError";
   }
+}
+
+export interface PersistFailedHardwareMeetingInput {
+  ownerUserId: string;
+  clientReference: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  recordingId: string;
+  storagePath: string;
+  errorMessage: string;
+}
+
+/**
+ * Archive-first fallback for hardware captures. A failed AI pass must not
+ * discard or hide audio that the device uploaded successfully.
+ */
+export async function persistFailedHardwareMeeting(
+  client: SupabaseClient,
+  input: PersistFailedHardwareMeetingInput,
+): Promise<{ meetingId: string; signedRecordingUrl: string | null }> {
+  const { data: recording, error: recordingLookupError } = await client
+    .from("recordings")
+    .select("id")
+    .eq("id", input.recordingId)
+    .eq("user_id", input.ownerUserId)
+    .eq("storage_path", input.storagePath)
+    .maybeSingle();
+  if (recordingLookupError || !recording) {
+    throw new Error(
+      `Could not verify the archived recording: ${recordingLookupError?.message || "owner/path mismatch"}`,
+    );
+  }
+
+  const { error: recordingError } = await client
+    .from("recordings")
+    .update({
+      status: "failed",
+      error_message: input.errorMessage.slice(0, 1_000),
+    })
+    .eq("id", input.recordingId)
+    .eq("user_id", input.ownerUserId)
+    .eq("storage_path", input.storagePath);
+  if (recordingError) {
+    throw new Error(`Could not update archived recording metadata: ${recordingError.message}`);
+  }
+
+  const { data: meeting, error: meetingError } = await client
+    .from("meetings")
+    .upsert(
+      {
+        user_id: input.ownerUserId,
+        client_reference: input.clientReference,
+        title: input.title,
+        start_at: input.startAt,
+        end_at: input.endAt,
+        status: "failed",
+        source: "hardware",
+        recording_id: input.recordingId,
+      },
+      { onConflict: "user_id,client_reference" },
+    )
+    .select("id")
+    .single();
+  if (meetingError || !meeting) {
+    throw new Error(
+      `Could not preserve the archived conversation: ${meetingError?.message || "missing row"}`,
+    );
+  }
+
+  const signed = await client.storage
+    .from("recordings")
+    .createSignedUrl(input.storagePath, 3_600);
+  return {
+    meetingId: meeting.id as string,
+    signedRecordingUrl: signed.data?.signedUrl || null,
+  };
 }
 
 function extensionOf(name: string, type: string): string {

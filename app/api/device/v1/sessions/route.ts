@@ -54,17 +54,52 @@ export async function POST(request: Request) {
       );
     }
 
-    if (device.state !== "ready" && device.state !== "report_ready") {
-      return noStore(`Lantern cannot start while it is ${device.state}.`, 409);
-    }
-
-    const { data: active, error: activeError } = await client
+    let { data: active, error: activeError } = await client
       .from("lantern_sessions")
-      .select("id,state")
+      .select("id,state,state_version,machine,recording_id,processing_error")
       .eq("device_id", device.id)
       .is("ended_at", null)
       .maybeSingle();
     if (activeError) throw new Error(activeError.message);
+
+    // Releases sessions created by older deployments that archived audio but
+    // became stuck after the AI processing step failed.
+    let effectiveDeviceState = device.state;
+    if (
+      active?.recording_id &&
+      active.processing_error &&
+      (active.state === "finalising" || active.state === "processing")
+    ) {
+      const current = lanternMachineSchema.parse(active.machine);
+      const recoveredAt = new Date().toISOString();
+      const ready = advanceLantern(current, { type: "RESET", at: recoveredAt });
+      const { data: rows, error: recoveryError } = await client.rpc(
+        "apply_lantern_transition",
+        {
+          p_session_id: active.id,
+          p_user_id: device.userId,
+          p_device_id: device.id,
+          p_expected_version: Number(active.state_version),
+          p_state: ready.state,
+          p_state_version: ready.version,
+          p_machine: ready,
+          p_event_id: randomUUID(),
+          p_event_type: "RESET",
+          p_ended_at: recoveredAt,
+        },
+      );
+      if (recoveryError) throw new Error(recoveryError.message);
+      const recovery = Array.isArray(rows) ? rows[0] : rows;
+      if (!recovery?.applied) {
+        return noStore("Lantern recovery changed. Please retry.", 409);
+      }
+      active = null;
+      effectiveDeviceState = "ready";
+    }
+
+    if (effectiveDeviceState !== "ready" && effectiveDeviceState !== "report_ready") {
+      return noStore(`Lantern cannot start while it is ${effectiveDeviceState}.`, 409);
+    }
     if (active) {
       return noStore(
         `Lantern already has an active ${active.state} session.`,

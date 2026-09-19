@@ -12,7 +12,10 @@ import {
   transcriptionResultSchema,
   type TranscriptionResult,
 } from "@/lib/meeting-schema";
-import { persistProcessedMeeting } from "@/lib/persistence";
+import {
+  persistFailedHardwareMeeting,
+  persistProcessedMeeting,
+} from "@/lib/persistence";
 import { extractConversationInsights } from "@/lib/providers/meeting-extraction";
 import { transcribeWithOpenAI } from "@/lib/providers/openai-transcription";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -54,6 +57,97 @@ async function applyServerTransition(
   const transition = Array.isArray(data) ? data[0] : data;
   if (!transition?.applied) throw new Error("Lantern completion state changed.");
   return lanternMachineSchema.parse(transition.stored_machine || next);
+}
+
+async function completeArchivedRecording(
+  client: SupabaseClient,
+  device: AuthenticatedLantern,
+  input: {
+    sessionId: string;
+    completionEventId: string;
+    machine: LanternMachine;
+    startedAt: string;
+    captureEndedAt: string | null;
+    timezone: string;
+    recordingId: string;
+    storagePath: string;
+    processingError: string;
+  },
+) {
+  const clientReference = `hardware:${input.sessionId}`;
+  const clock = conversationClock(input.startedAt, input.timezone);
+  let endedAt = input.captureEndedAt || new Date().toISOString();
+  if (Date.parse(endedAt) <= Date.parse(clock.startedAt)) {
+    endedAt = new Date(Date.parse(clock.startedAt) + 1_000).toISOString();
+  }
+  const title = `${device.name} · ${clock.localDate} ${clock.localTime.slice(0, 5)}`;
+  const persisted = await persistFailedHardwareMeeting(client, {
+    ownerUserId: device.userId,
+    clientReference,
+    title,
+    startAt: clock.startedAt,
+    endAt: endedAt,
+    recordingId: input.recordingId,
+    storagePath: input.storagePath,
+    errorMessage: input.processingError,
+  });
+  const meeting: Meeting = {
+    id: clientReference,
+    title,
+    startAt: clock.startedAt,
+    endAt: endedAt,
+    status: "failed",
+    source: "hardware",
+    contacts: [],
+    recordingId: input.recordingId,
+    recordingUrl: persisted.signedRecordingUrl,
+    transcript: [],
+    insight: null,
+    followUps: [],
+  };
+
+  let processingMachine = input.machine;
+  if (processingMachine.state === "finalising") {
+    processingMachine = await applyServerTransition(
+      client,
+      device,
+      input.sessionId,
+      processingMachine,
+      "ARCHIVE_ACCEPTED",
+      input.completionEventId,
+    );
+  }
+  const { error: sessionError } = await client
+    .from("lantern_sessions")
+    .update({
+      meeting_id: persisted.meetingId,
+      processing_error: input.processingError.slice(0, 500),
+    })
+    .eq("id", input.sessionId)
+    .eq("device_id", device.id);
+  if (sessionError) throw new Error(sessionError.message);
+
+  const finishedMachine = await applyServerTransition(
+    client,
+    device,
+    input.sessionId,
+    processingMachine,
+    "PROCESSING_COMPLETE",
+    randomUUID(),
+  );
+  return NextResponse.json(
+    {
+      accepted: true,
+      duplicate: false,
+      conversationId: clientReference,
+      meetingId: persisted.meetingId,
+      clock,
+      meeting,
+      processingWarning: "The original recording is available, but Lantern could not create a transcript.",
+      session: finishedMachine,
+    },
+    { status: 201, headers: { "cache-control": "no-store" } },
+  );
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -173,7 +267,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         );
       }
     } catch (transcriptionError) {
-      if (!agoraTranscription) throw transcriptionError;
+      if (!agoraTranscription) {
+        const processingError = transcriptionError instanceof Error
+          ? transcriptionError.message
+          : "Lantern could not create a transcript.";
+        return completeArchivedRecording(client, device, {
+          sessionId,
+          completionEventId: input.eventId,
+          machine: processingMachine,
+          startedAt: processingMachine.recordingStartedAt || stored.started_at,
+          captureEndedAt: stored.capture_ended_at,
+          timezone: stored.conversation_timezone || env().APP_TIMEZONE,
+          recordingId: stored.recording_id,
+          storagePath: recording.storage_path,
+          processingError,
+        });
+      }
       console.warn(
         "[lantern-session-complete] final diarization unavailable; using Agora transcript",
       );

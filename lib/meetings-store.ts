@@ -3,6 +3,10 @@ import "server-only";
 import { z } from "zod";
 import type { Commitment, Contact, FollowUp, Meeting, MeetingInsight, TranscriptSegment } from "@/lib/types";
 import { demoMeetings } from "@/lib/demo-data";
+import {
+  archivedLanternSessionMeeting,
+  type ArchivedLanternSession,
+} from "@/lib/hardware-session-meeting";
 import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 type Row = Record<string, unknown>;
@@ -21,19 +25,37 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
   const userId = await resolveWorkspaceUserId(client);
   if (!userId) return { meetings: [], source: "supabase" };
 
-  const meetingsResult = await client
-    .from("meetings")
-    .select("*")
-    .eq("user_id", userId)
-    .order("start_at");
+  const [meetingsResult, archivedSessionsResult] = await Promise.all([
+    client
+      .from("meetings")
+      .select("*")
+      .eq("user_id", userId)
+      .order("start_at"),
+    client
+      .from("lantern_sessions")
+      .select("id,started_at,capture_ended_at,recording_id,processing_error")
+      .eq("user_id", userId)
+      .not("recording_id", "is", null)
+      .is("meeting_id", null)
+      .order("started_at"),
+  ]);
   if (meetingsResult.error) {
     throw new Error(`Could not load meetings: ${meetingsResult.error.message}`);
   }
-  if (!meetingsResult.data?.length) return { meetings: [], source: "supabase" };
-  const meetingIds = meetingsResult.data.map((row) => row.id);
+  if (archivedSessionsResult.error) {
+    throw new Error(`Could not load archived Lantern recordings: ${archivedSessionsResult.error.message}`);
+  }
+  const meetingRows = meetingsResult.data || [];
+  const archivedSessionRows = (archivedSessionsResult.data || []) as ArchivedLanternSession[];
+  if (!meetingRows.length && !archivedSessionRows.length) {
+    return { meetings: [], source: "supabase" };
+  }
+  const meetingIds = meetingRows.map((row) => row.id);
 
-  const [linksResult, recordingsResult, transcriptsResult, insightsResult, commitmentsResult, followUpsResult, actionsResult] = await Promise.all([
-    client.from("meeting_contacts").select("meeting_id,is_primary,contacts(*)").in("meeting_id", meetingIds),
+  const linksResult = meetingIds.length
+    ? await client.from("meeting_contacts").select("meeting_id,is_primary,contacts(*)").in("meeting_id", meetingIds)
+    : { data: [], error: null };
+  const [recordingsResult, transcriptsResult, insightsResult, commitmentsResult, followUpsResult, actionsResult] = await Promise.all([
     client.from("recordings").select("id,storage_path").eq("user_id", userId),
     client.from("transcripts").select("recording_id,segments").eq("user_id", userId),
     client.from("meeting_insights").select("*").eq("user_id", userId),
@@ -43,7 +65,7 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
   ]);
   const failure = [linksResult, recordingsResult, transcriptsResult, insightsResult, commitmentsResult, followUpsResult, actionsResult].find((result) => result.error);
   if (failure?.error) throw new Error(`Could not load meetings: ${failure.error.message}`);
-  const publicIdByDatabaseId = new Map(meetingsResult.data.map((row) => [row.id, row.client_reference || row.id]));
+  const publicIdByDatabaseId = new Map(meetingRows.map((row) => [row.id, row.client_reference || row.id]));
   // An event can exist even when a later local completion write failed.
   const actionByEvent = new Map((actionsResult.data || []).filter((row) => row.external_id).map((row) => [row.external_id, row]));
   const actionByFollowUp = new Map((actionsResult.data || []).filter((row) => row.follow_up_id).map((row) => [row.follow_up_id, row]));
@@ -100,7 +122,7 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
     contactsByMeeting.set(link.meeting_id, [...(contactsByMeeting.get(link.meeting_id) || []), mapped]);
   }
 
-  const meetings = meetingsResult.data.map((row) => {
+  const meetings: Meeting[] = meetingRows.map((row) => {
     const insightRow = insightByMeeting.get(row.id);
     const insight: MeetingInsight | null = insightRow ? {
       meetingType: String(insightRow.meeting_type || "meeting"), intent: String(insightRow.intent || ""), interestLevel: (insightRow.interest_level || "unknown") as MeetingInsight["interestLevel"],
@@ -130,5 +152,18 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
       })),
     } satisfies Meeting;
   });
+  const existingReferences = new Set(meetings.map((meeting) => meeting.id));
+  for (const session of archivedSessionRows) {
+    if (existingReferences.has(`hardware:${session.id}`)) continue;
+    const recording = recordingById.get(session.recording_id);
+    const path = recording?.storage_path;
+    meetings.push(
+      archivedLanternSessionMeeting(
+        session,
+        typeof path === "string" ? signedByPath.get(path) || null : null,
+      ),
+    );
+  }
+  meetings.sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
   return { meetings, source: "supabase" };
 }

@@ -184,7 +184,7 @@ export function ConversationDetail({
                 <p className={styles.verifyNote}><ShieldCheck /> Review these details before sending a follow-up.</p>
               </div>
             ) : (
-              <div className={styles.emptyCard}><UserRound /><strong>No person identified yet</strong><p>The transcript remains available for manual review.</p></div>
+              <div className={styles.emptyCard}><UserRound /><strong>No person identified yet</strong><p>{conversation.transcript?.length ? "The transcript remains available for manual review." : conversation.recordingId ? "The original recording remains available for manual review." : "No recording or transcript is available."}</p></div>
             )}
           </section>
 
@@ -201,7 +201,7 @@ export function ConversationDetail({
                 {insight.next && <div><strong>Recommended next step</strong><p>{insight.next}</p></div>}
               </div>
             ) : (
-              <div className={styles.emptyCard}><FileText /><strong>{conversation.status === "processing" ? "Preparing the brief" : "No brief available"}</strong><p>The original transcript is still available.</p></div>
+              <div className={styles.emptyCard}><FileText /><strong>{conversation.status === "processing" ? "Preparing the brief" : "No brief available"}</strong><p>{conversation.transcript?.length ? "The original transcript is still available." : conversation.recordingId ? "The original recording is still available." : "No recording or transcript is available."}</p></div>
             )}
           </section>
 
