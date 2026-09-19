@@ -4,7 +4,7 @@
 
 #include "sdkconfig.h"
 
-#define LANTERN_FIRMWARE_VERSION "0.5.1-pairing-recovery"
+#define LANTERN_FIRMWARE_VERSION "0.6.2-sd-inventory"
 #define LANTERN_API_BASE_URL "https://roxanne-two.vercel.app"
 
 #if CONFIG_LANTERN_BOARD_ZHENGCHEN_M1307

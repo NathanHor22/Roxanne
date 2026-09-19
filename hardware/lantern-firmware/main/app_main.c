@@ -18,6 +18,7 @@
 #include "lantern_board_io.h"
 #include "lantern_display.h"
 #include "lantern_network.h"
+#include "lantern_sd.h"
 #include "lantern_storage.h"
 #include "lantern_transcript.h"
 #include "lantern_wake.h"
@@ -68,6 +69,7 @@ static bool s_used_agora;
 static bool s_transcript_uploaded;
 static bool s_audio_uploaded;
 static bool s_wake_available;
+static bool s_sd_recording_active;
 
 #define VOICE_ACTIVITY_LEVEL 180
 #define VOICE_SILENCE_MS 650
@@ -126,6 +128,10 @@ static void stop_local_capture(void) {
   lantern_audio_set_streaming(false);
   lantern_agora_stop();
   s_agora_active = false;
+  if (s_sd_recording_active) {
+    lantern_sd_recording_abort();
+    s_sd_recording_active = false;
+  }
 }
 
 static void show_error(recovery_action_t recovery, const char *detail, const char *prompt) {
@@ -296,6 +302,11 @@ static esp_err_t accept_recording_consent(void) {
     return ESP_FAIL;
   }
 
+  s_sd_recording_active = lantern_sd_recording_begin(s_cloud_session.session_id) == ESP_OK;
+  if (!s_sd_recording_active) {
+    ESP_LOGW(TAG, "microSD archive unavailable; retaining the 30-second PSRAM fallback");
+  }
+
   s_state = LOCAL_RECORDING;
   s_recovery = RECOVERY_NONE;
   s_state_entered_at = xTaskGetTickCount();
@@ -381,6 +392,10 @@ static void upload_current_session(bool announce_upload) {
       return;
     }
     s_audio_uploaded = true;
+    if (lantern_sd_recording_ready() &&
+        lantern_sd_recording_confirm_uploaded() != ESP_OK) {
+      ESP_LOGW(TAG, "cloud accepted audio but the local SD copy could not be removed");
+    }
   }
 
   lantern_display_show(LANTERN_SCREEN_SAVING, "PROCESSING SUMMARY");
@@ -407,6 +422,13 @@ static void finalise_recording(void) {
   s_state = LOCAL_SAVING;
   s_state_entered_at = xTaskGetTickCount();
   lantern_audio_set_recording(false);
+  if (s_sd_recording_active) {
+    lantern_display_show(LANTERN_SCREEN_SAVING, "FINALISING SD ARCHIVE");
+    if (lantern_sd_recording_finish() != ESP_OK) {
+      ESP_LOGW(TAG, "microSD finalization failed; uploading the 30-second PSRAM fallback");
+    }
+    s_sd_recording_active = false;
+  }
   lantern_display_show(LANTERN_SCREEN_SAVING, "FINALISING SPEECH");
   // Leave the live microphone path open briefly so Agora can finalize the last
   // sentence. The local archive ends exactly at the centre-button press.
@@ -774,8 +796,14 @@ void app_main(void) {
   update_battery_level();
   ESP_ERROR_CHECK(lantern_storage_init());
   ESP_ERROR_CHECK(lantern_storage_load(&s_config));
+  lantern_sd_status_t sd_status;
+  esp_err_t sd_result = lantern_sd_init(&sd_status);
+  if (sd_result != ESP_OK && sd_result != ESP_ERR_NOT_SUPPORTED) {
+    ESP_LOGW(TAG, "continuing without microSD archive: %s", esp_err_to_name(sd_result));
+  }
   ESP_ERROR_CHECK(lantern_display_init());
   ESP_ERROR_CHECK(lantern_audio_init());
+  lantern_audio_set_archive_callback(lantern_sd_recording_write);
   if (lantern_wake_init() == ESP_OK) {
     s_wake_available = true;
     lantern_audio_set_monitor_callback(lantern_wake_feed);

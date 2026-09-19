@@ -452,14 +452,16 @@ Exit gate:
 
 ### Phase 4 — Durable capture and replay without production providers
 
-Pilot status: a bounded 29-second WAV can be uploaded to private storage and
-replayed from the resulting conversation. Chunked 90-minute capture remains.
+Pilot status: Lantern V2 writes bounded-memory PCM directly to FAT32 microSD,
+finalizes a WAV on Stop, and uploads it in idempotent 512 KB chunks to private
+storage. The current 25 MB raw-WAV contract covers about 13 minutes 39 seconds;
+encoded 90-minute capture remains.
 
 Steps:
 
-1. Stream ordered test audio to a local or staging capture service.
-2. Add PSRAM retry buffering, acknowledgements and reconnect handling.
-3. Assemble chunks into one seekable private recording.
+1. Persist chunk acknowledgements so upload resumes after a full power cycle.
+2. Keep the PSRAM retry buffer and record explicit capture gaps.
+3. Add a seekable encoded format for hour-long recordings.
 4. Record capture gaps explicitly.
 5. Link the audio to an existing Lantern conversation and replay component.
 6. Test at 5, 30 and 90 minutes.

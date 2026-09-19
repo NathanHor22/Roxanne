@@ -26,6 +26,7 @@
 
 #include "lantern_board.h"
 #include "lantern_audio.h"
+#include "lantern_sd.h"
 #include "lantern_transcript.h"
 
 #define WIFI_CONNECTED_BIT BIT0
@@ -37,8 +38,32 @@ static lantern_config_t *s_config;
 static lantern_network_callback_t s_callback;
 static lantern_network_status_t s_status;
 static httpd_handle_t s_server;
+static bool s_wifi_started;
 
 static esp_err_t start_setup_portal(void);
+
+static void stop_setup_portal(void) {
+  if (s_server) {
+    httpd_stop(s_server);
+    s_server = NULL;
+  }
+  s_status.setup_portal_active = false;
+  s_status.setup_ssid[0] = '\0';
+  ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_mode(WIFI_MODE_STA));
+}
+
+static void configure_setup_radio(void) {
+  // Keep the pairing network compatible with older phones and laptops. The
+  // SSID is a setup/recovery path, so range and discoverability matter more
+  // than peak throughput.
+  ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_protocol(
+    WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
+  ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20));
+  if (s_wifi_started) {
+    // 80 quarter-dBm units maps to the ESP32-S3's supported 20 dBm setting.
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_max_tx_power(80));
+  }
+}
 
 typedef struct {
   char data[RESPONSE_CAPACITY];
@@ -210,6 +235,75 @@ static int post_binary(const char *path, const char *content_type, const void *b
   return status;
 }
 
+static int post_file_chunk(const char *path, FILE *file, size_t offset,
+                           size_t chunk_length, size_t total_length,
+                           const char *authorization, const char *event_id,
+                           response_buffer_t *response) {
+  if (!file || !chunk_length || offset + chunk_length > total_length) return -1;
+  char url[256], content_range[80];
+  snprintf(url, sizeof(url), "%s%s", LANTERN_API_BASE_URL, path);
+  snprintf(content_range, sizeof(content_range), "bytes %u-%u/%u",
+    (unsigned)offset, (unsigned)(offset + chunk_length - 1), (unsigned)total_length);
+  memset(response, 0, sizeof(*response));
+  esp_http_client_config_t config = {
+    .url = url,
+    .timeout_ms = 60000,
+    .crt_bundle_attach = esp_crt_bundle_attach,
+    .buffer_size_tx = 4096,
+  };
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (!client) return -1;
+  esp_http_client_set_method(client, HTTP_METHOD_POST);
+  esp_http_client_set_header(client, "Content-Type", "audio/wav");
+  esp_http_client_set_header(client, "Content-Range", content_range);
+  esp_http_client_set_header(client, "Authorization", authorization);
+  esp_http_client_set_header(client, "X-Lantern-Event-Id", event_id);
+
+  int status = -1;
+  uint8_t *buffer = heap_caps_malloc(8192, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!buffer || fseek(file, (long)offset, SEEK_SET) != 0 ||
+      esp_http_client_open(client, (int)chunk_length) != ESP_OK) {
+    free(buffer);
+    esp_http_client_cleanup(client);
+    return -1;
+  }
+  size_t remaining = chunk_length;
+  bool failed = false;
+  while (remaining) {
+    size_t wanted = remaining < 8192 ? remaining : 8192;
+    size_t read = fread(buffer, 1, wanted, file);
+    if (read != wanted) {
+      failed = true;
+      break;
+    }
+    size_t sent = 0;
+    while (sent < read) {
+      int written = esp_http_client_write(
+        client, (const char *)buffer + sent, (int)(read - sent));
+      if (written <= 0) {
+        failed = true;
+        break;
+      }
+      sent += (size_t)written;
+    }
+    if (failed) break;
+    remaining -= read;
+  }
+  free(buffer);
+  if (!failed && esp_http_client_fetch_headers(client) >= 0) {
+    int received = esp_http_client_read_response(
+      client, response->data, sizeof(response->data) - 1);
+    if (received >= 0) {
+      response->length = (size_t)received;
+      response->data[response->length] = '\0';
+      status = esp_http_client_get_status_code(client);
+    }
+  }
+  esp_http_client_close(client);
+  esp_http_client_cleanup(client);
+  return status;
+}
+
 static void device_authorization(char output[140]) {
   snprintf(output, 140, "Device %s.%s", s_config->device_id, s_config->device_secret);
 }
@@ -303,6 +397,17 @@ static esp_err_t claim_device(void) {
   if (!response) return ESP_ERR_NO_MEM;
   int status = post_json("/api/device/v1/claim", body, NULL, response);
   if (status != 201) {
+    if (status == 404 || status == 410) {
+      esp_err_t clear = lantern_storage_clear_pairing_code(s_config);
+      if (clear == ESP_OK) {
+        set_error("Pairing code expired; create a new code");
+      } else {
+        set_error("Could not clear expired pairing code");
+      }
+      ESP_LOGW(TAG, "claim response: %.256s", response->data);
+      free(response);
+      return ESP_FAIL;
+    }
     char message[96];
     snprintf(message, sizeof(message), "Pairing failed HTTP %d", status);
     set_error(message);
@@ -332,6 +437,7 @@ static esp_err_t claim_device(void) {
   }
   s_status.paired = true;
   s_status.last_error[0] = '\0';
+  stop_setup_portal();
   ESP_LOGI(TAG, "device paired successfully");
   notify();
   return ESP_OK;
@@ -546,8 +652,13 @@ static esp_err_t start_setup_portal(void) {
   ap.ap.channel = 1;
   ap.ap.max_connection = 2;
   ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
+  ap.ap.ssid_hidden = 0;
+  ap.ap.beacon_interval = 100;
+  ap.ap.pmf_cfg.capable = true;
+  ap.ap.pmf_cfg.required = false;
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
   ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
+  configure_setup_radio();
 
   httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
   // The setup AP accepts at most two clients. Keeping HTTPD's default seven
@@ -637,6 +748,7 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event, NULL));
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event, NULL));
   bool has_wifi = lantern_storage_has_wifi(config);
+  bool needs_setup = !lantern_storage_is_paired(config);
   esp_err_t portal_result = ESP_OK;
   if (has_wifi) {
     wifi_config_t station = {0};
@@ -645,8 +757,13 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
     memcpy(station.sta.ssid, config->wifi_ssid, ssid_length);
     memcpy(station.sta.password, config->wifi_password, password_length);
     station.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(needs_setup ? WIFI_MODE_APSTA : WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &station));
+    if (needs_setup) {
+      // Keep one stable, actionable setup screen while the saved network joins
+      // and any newly submitted pairing code is claimed in the background.
+      portal_result = start_setup_portal();
+    }
   } else {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     // Reserve the HTTP task before esp_wifi_start consumes the remaining
@@ -654,6 +771,8 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
     portal_result = start_setup_portal();
   }
   ESP_ERROR_CHECK(esp_wifi_start());
+  s_wifi_started = true;
+  if (s_status.setup_portal_active) configure_setup_radio();
   // Voice commands and streamed PCM are latency-sensitive. Modem power save
   // can defer hotspot packets until the next beacon and cause audible gaps.
   esp_wifi_set_ps(WIFI_PS_NONE);
@@ -1049,6 +1168,54 @@ esp_err_t lantern_network_upload_transcript(lantern_cloud_session_t *session) {
 
 esp_err_t lantern_network_upload_audio(lantern_cloud_session_t *session) {
   if (!session || !session->session_id[0]) return ESP_ERR_INVALID_ARG;
+  char path[160], authorization[140], event_id[37];
+  snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/audio", session->session_id);
+  device_authorization(authorization);
+  if (!session->audio_event_id[0]) uuid_v4(session->audio_event_id);
+  snprintf(event_id, sizeof(event_id), "%s", session->audio_event_id);
+
+  if (lantern_sd_recording_ready()) {
+    const char *recording_path = lantern_sd_recording_path();
+    size_t total = lantern_sd_recording_size();
+    FILE *file = recording_path ? fopen(recording_path, "rb") : NULL;
+    if (!file || !total) {
+      if (file) fclose(file);
+      return ESP_FAIL;
+    }
+    const size_t chunk_capacity = 512 * 1024;
+    response_buffer_t *response = response_buffer_create();
+    if (!response) {
+      fclose(file);
+      return ESP_ERR_NO_MEM;
+    }
+    for (size_t offset = 0; offset < total;) {
+      size_t chunk = total - offset;
+      if (chunk > chunk_capacity) chunk = chunk_capacity;
+      int status = post_file_chunk(path, file, offset, chunk, total,
+        authorization, event_id, response);
+      bool final_chunk = offset + chunk == total;
+      if (status == 200) {
+        // A 200 on a chunk means this event was already fully attached. This
+        // makes retrying from byte zero safe after a lost final response.
+        ESP_LOGI(TAG, "SD WAV upload already acknowledged by cloud");
+        fclose(file);
+        free(response);
+        return ESP_OK;
+      }
+      if ((!final_chunk && status != 202) || (final_chunk && status != 201)) {
+        provider_error("SD audio chunk", status, response);
+        fclose(file);
+        free(response);
+        return ESP_FAIL;
+      }
+      offset += chunk;
+      ESP_LOGI(TAG, "SD WAV upload %u/%u bytes", (unsigned)offset, (unsigned)total);
+    }
+    fclose(file);
+    free(response);
+    return ESP_OK;
+  }
+
   size_t samples = lantern_audio_buffered_samples();
   if (!samples) return ESP_ERR_INVALID_STATE;
   size_t data_bytes = samples * sizeof(int16_t);
@@ -1073,11 +1240,6 @@ esp_err_t lantern_network_upload_audio(lantern_cloud_session_t *session) {
     free(wav);
     return ESP_FAIL;
   }
-  char path[160], authorization[140], event_id[37];
-  snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/audio", session->session_id);
-  device_authorization(authorization);
-  if (!session->audio_event_id[0]) uuid_v4(session->audio_event_id);
-  snprintf(event_id, sizeof(event_id), "%s", session->audio_event_id);
   response_buffer_t *response = response_buffer_create();
   if (!response) {
     free(wav);

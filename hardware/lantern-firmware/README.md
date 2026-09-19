@@ -7,21 +7,23 @@ and button pin map.
 
 The second profile is **Lantern V2**, the LCDWiki ES3C28P. It uses the board's
 240 x 320 ILI9341 display, FT6336G touchscreen, ES8311 microphone/audio codec,
-native USB, and 16 MB flash. A battery and microSD card are not required to
-flash or demonstrate the USB-powered prototype. Touching the screen provides
-the same primary control as the centre button on Lantern Original.
+native USB, 16 MB flash, and an SDIO microSD slot. A battery and microSD card
+are not required to flash the USB-powered prototype. Touching the screen
+provides the same primary control as the centre button on Lantern Original.
 
-The current V2 image deliberately reports USB power as 100% and keeps replay
-fallback in PSRAM. Its battery ADC and SDIO pins are reserved in the board
-profile, but battery telemetry and microSD recording remain disabled until
-those parts are fitted and tested.
+The current V2 image deliberately reports USB power as 100%. It automatically
+mounts a FAT16/FAT32 microSD card without formatting it, streams the complete
+16 kHz mono PCM meeting into a temporary file, finalizes a WAV on Stop, and
+uploads it in acknowledged 512 KB chunks. The 30-second PSRAM archive remains
+the fallback when no compatible card is mounted. Battery telemetry remains a
+separate hardware step.
 
 Hardware-specific pins and capabilities live under `main/boards`. Session,
 voice, networking, and dashboard behavior remain in the shared firmware. Each
 board gets its own build image; the original board does not need an SD card and
 continues to use its PSRAM streaming/retry strategy.
 
-Version `0.5.1-pairing-recovery` keeps the existing local WakeNet activation gate and
+Version `0.6.0-sd-recording` keeps the existing local WakeNet activation gate and
 buffered, low-latency speech playback while keeping one consistent
 centre-button fallback:
 
@@ -50,7 +52,7 @@ activation cannot provide consent for the other people in the conversation.
 - Malaysia server time stamped when capture begins
 - live 16 kHz publishing and caption staging through the Agora IoT SDK
 - automatic local WAV fallback if the device cannot join Agora
-- private WAV upload, final OpenAI transcription, structured meeting summary,
+- private chunked WAV upload, final OpenAI transcription, structured meeting summary,
   and dashboard follow-up approval generation
 - direct spoken daily status reports from a long press while ready
 - operation-specific saving, completion, status, and error screens
@@ -63,10 +65,16 @@ The bundled prototype WakeNet model recognises "Computer." The firmware keeps
 the model selector isolated so a separately trained "Lantern" WakeNet model can
 replace it later; changing the displayed name cannot retrain a wake model.
 
-The board keeps a rolling 30-second WAV retry archive in PSRAM. A meeting may
-continue beyond 30 seconds through Agora, but this prototype uploads only the
-latest 30 seconds as replay audio. Full hour-long replay requires durable audio
-chunks and is still a separate reliability phase.
+Lantern V2 records the complete meeting to microSD while keeping the rolling
+30-second PSRAM retry archive. The current raw-WAV server contract accepts up
+to 25 MB, which is about 13 minutes 39 seconds at 16 kHz mono 16-bit PCM. The
+five-minute prototype target uses about 9.6 MB. Hour-long replay will require
+an encoded on-device format plus resumable upload state across power cycles.
+
+The firmware never formats an inserted card. Use FAT32 for the current ESP-IDF
+build. A card inserted after boot is mounted automatically when the next
+recording starts. A finalized WAV stays under `/lantern` until the backend has
+accepted and attached every chunk; failed uploads leave the local copy intact.
 
 Hold both volume buttons for three seconds on Lantern Original to clear Wi-Fi
 and pairing settings. On touchscreen Lantern V2, hold the screen continuously
@@ -152,7 +160,7 @@ invitation from the dashboard.
 4. Lantern asks for recording consent and shows **SAY YES OR NO**.
 5. Say "yes." Lantern confirms consent and changes to **RECORDING** with an
    elapsed timer and **PRESS CENTRE TO STOP**.
-6. Speak for 10 to 20 seconds. Include a clear agreement such as: "Mr Chung,
+6. Speak for at least 60 seconds when testing the SD path. Include a clear agreement such as: "Mr Chung,
    let's meet tomorrow at 1 PM Malaysia time for 30 minutes."
 7. Short-press the centre button. The display moves through finalising,
    uploading audio, and processing summary.
@@ -179,7 +187,7 @@ transcription, final diarized transcription, Malaysian code-switching
 extraction, and device speech. Exa enriches public company context in Lantern
 Relay; it does not identify people or speakers.
 
-Before a field pilot, add acknowledged audio chunk uploads, reconnect/resume,
-Agora token renewal, durable incremental transcripts, and explicit gap
-records. Production firmware also needs encrypted NVS, flash encryption,
+Before a field pilot, add persisted cross-reboot upload resumption, encoded
+hour-long capture, Agora token renewal, durable incremental transcripts, and
+explicit gap records. Production firmware also needs encrypted NVS, flash encryption,
 secure boot, signed OTA updates, and rollback validation.

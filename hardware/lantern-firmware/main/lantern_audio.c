@@ -33,6 +33,7 @@ static volatile bool s_streaming;
 static volatile uint32_t s_level;
 static lantern_audio_frame_callback_t s_frame_callback;
 static lantern_audio_frame_callback_t s_monitor_callback;
+static lantern_audio_frame_callback_t s_archive_callback;
 static SemaphoreHandle_t s_speaker_lock;
 static SemaphoreHandle_t s_pcm_finished;
 static StreamBufferHandle_t s_pcm_stream;
@@ -229,6 +230,8 @@ static void microphone_task(void *argument) {
       }
     }
     s_level = samples ? (uint32_t)(absolute_total / samples) : 0;
+    lantern_audio_frame_callback_t archive = s_archive_callback;
+    if (s_recording && archive && samples) archive(converted, samples);
     lantern_audio_frame_callback_t monitor = s_monitor_callback;
     if (monitor && !s_speaker_active && samples) monitor(converted, samples);
     lantern_audio_frame_callback_t callback = s_frame_callback;
@@ -431,6 +434,10 @@ void lantern_audio_set_frame_callback(lantern_audio_frame_callback_t callback) {
 
 void lantern_audio_set_monitor_callback(lantern_audio_frame_callback_t callback) {
   s_monitor_callback = callback;
+}
+
+void lantern_audio_set_archive_callback(lantern_audio_frame_callback_t callback) {
+  s_archive_callback = callback;
 }
 
 bool lantern_audio_is_recording(void) { return s_recording; }

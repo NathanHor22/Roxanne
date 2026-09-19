@@ -17,6 +17,7 @@ void lantern_audio_set_recording(bool recording);
 void lantern_audio_set_streaming(bool streaming);
 void lantern_audio_set_frame_callback(lantern_audio_frame_callback_t callback);
 void lantern_audio_set_monitor_callback(lantern_audio_frame_callback_t callback);
+void lantern_audio_set_archive_callback(lantern_audio_frame_callback_t callback);
 bool lantern_audio_is_recording(void);
 bool lantern_audio_is_speaker_active(void);
 uint32_t lantern_audio_level(void);

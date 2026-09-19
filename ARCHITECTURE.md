@@ -402,11 +402,11 @@ adapters have no production environment dependency.
 
 The following are deliberately deferred:
 
-- Hour-plus wearable replay with provider token renewal, acknowledged audio
-  chunks, reconnect/resume, incremental durable transcript storage, and
-  explicit gap records. Agora can continue the live meeting after the local
-  buffer rolls over, but the current uploaded WAV contains only the latest 30
-  seconds.
+- Hour-plus wearable replay with an encoded on-device format, provider token
+  renewal, cross-reboot upload resumption, incremental durable transcript
+  storage, and explicit gap records. Lantern V2 now writes a complete PCM WAV
+  to FAT32 microSD and uploads it in idempotent 512 KB chunks; the current 25 MB
+  WAV contract covers about 13 minutes 39 seconds.
 - A field-quality custom wake-word model. The prototype deliberately uses the
   centre button while idle; its long-press daily Status Report flow is active.
   All external actions still require approval in the dashboard.

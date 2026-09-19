@@ -71,6 +71,18 @@ esp_err_t lantern_storage_save_device(const char *device_id, const char *device_
   return result;
 }
 
+esp_err_t lantern_storage_clear_pairing_code(lantern_config_t *config) {
+  if (!config) return ESP_ERR_INVALID_ARG;
+  nvs_handle_t handle;
+  ESP_RETURN_ON_ERROR(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &handle), "storage", "open");
+  esp_err_t result = nvs_erase_key(handle, "pair_code");
+  if (result == ESP_ERR_NVS_NOT_FOUND) result = ESP_OK;
+  if (result == ESP_OK) result = nvs_commit(handle);
+  nvs_close(handle);
+  if (result == ESP_OK) config->pairing_code[0] = '\0';
+  return result;
+}
+
 esp_err_t lantern_storage_clear_device(lantern_config_t *config) {
   if (!config) return ESP_ERR_INVALID_ARG;
   nvs_handle_t handle;

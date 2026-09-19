@@ -8,6 +8,7 @@ idf_component_register(
     "lantern_board_io.c"
     "lantern_display.c"
     "lantern_network.c"
+    "lantern_sd.c"
     "lantern_storage.c"
     "lantern_transcript.c"
     "lantern_wake.c"
@@ -22,12 +23,14 @@ idf_component_register(
     esp_http_server
     esp_lcd
     esp_netif
+    fatfs
     esp_wifi
     espressif__esp-sr
     espressif__esp_codec_dev
     json
     mbedtls
     nvs_flash
+    sdmmc
 )
 
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-u xTaskCreateRestrictedPinnedToCore")

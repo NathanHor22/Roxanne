@@ -5,6 +5,11 @@ import { parseAgoraCaptionBatch } from "../lib/agora-caption";
 import { conversationClock } from "../lib/conversation-clock";
 import { env } from "../lib/env";
 import {
+  DEVICE_AUDIO_CHUNK_BYTES,
+  deviceAudioPartName,
+  parseDeviceContentRange,
+} from "../lib/device-audio-chunks";
+import {
   buildAgoraLanternTransport,
   startAgoraLanternTranscription,
 } from "../lib/providers/agora-stt";
@@ -175,4 +180,18 @@ test("Lantern WAV validator accepts the device's canonical recording", () => {
     dataBytes: 32_000,
     durationSeconds: 1,
   });
+});
+
+test("Lantern SD upload ranges are strict and deterministically named", () => {
+  assert.deepEqual(parseDeviceContentRange(`bytes 0-${DEVICE_AUDIO_CHUNK_BYTES - 1}/9600044`), {
+    start: 0,
+    end: DEVICE_AUDIO_CHUNK_BYTES - 1,
+    total: 9_600_044,
+    length: DEVICE_AUDIO_CHUNK_BYTES,
+  });
+  assert.equal(deviceAudioPartName(524_288), "0000524288.part");
+  assert.throws(
+    () => parseDeviceContentRange("bytes 100-99/1000"),
+    /Content-Range is invalid/u,
+  );
 });
