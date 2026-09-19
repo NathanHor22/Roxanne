@@ -70,6 +70,8 @@ static bool s_transcript_uploaded;
 static bool s_audio_uploaded;
 static bool s_wake_available;
 static bool s_sd_recording_active;
+static bool s_sd_archive_required;
+static unsigned s_recording_duration_seconds;
 
 #define VOICE_ACTIVITY_LEVEL 180
 #define VOICE_SILENCE_MS 650
@@ -149,6 +151,8 @@ static void clear_active_session(void) {
   s_used_agora = false;
   s_transcript_uploaded = false;
   s_audio_uploaded = false;
+  s_sd_archive_required = false;
+  s_recording_duration_seconds = 0;
 }
 
 #if LANTERN_BATTERY_INSTALLED
@@ -303,6 +307,8 @@ static esp_err_t accept_recording_consent(void) {
   }
 
   s_sd_recording_active = lantern_sd_recording_begin(s_cloud_session.session_id) == ESP_OK;
+  s_sd_archive_required = s_sd_recording_active;
+  s_recording_duration_seconds = 0;
   if (!s_sd_recording_active) {
     ESP_LOGW(TAG, "microSD archive unavailable; retaining the 30-second PSRAM fallback");
   }
@@ -353,7 +359,9 @@ static void start_spoken_consent(bool announce_request) {
 }
 
 static void session_complete(bool processing_pending) {
-  unsigned buffered_seconds = lantern_audio_buffered_seconds();
+  unsigned captured_seconds = s_recording_duration_seconds
+    ? s_recording_duration_seconds
+    : lantern_audio_buffered_seconds();
   s_state = LOCAL_COMPLETE;
   s_recovery = RECOVERY_NONE;
   lantern_display_show(
@@ -364,7 +372,7 @@ static void session_complete(bool processing_pending) {
     lantern_audio_chime(2);
   }
   s_state_entered_at = xTaskGetTickCount();
-  ESP_LOGI(TAG, "session upload complete; local archive contains %u seconds", buffered_seconds);
+  ESP_LOGI(TAG, "session upload complete; full archive contains %u seconds", captured_seconds);
   clear_active_session();
 }
 
@@ -386,6 +394,11 @@ static void upload_current_session(bool announce_upload) {
   }
 
   if (!s_audio_uploaded) {
+    if (s_sd_archive_required && !lantern_sd_recording_ready()) {
+      ESP_LOGE(TAG, "refusing to replace an SD-backed meeting with the 30-second fallback");
+      show_error(RECOVERY_UPLOAD, "FULL SD AUDIO NOT READY", "upload_error");
+      return;
+    }
     lantern_display_show(LANTERN_SCREEN_SAVING, "UPLOADING AUDIO");
     if (lantern_network_upload_audio(&s_cloud_session) != ESP_OK) {
       show_error(RECOVERY_UPLOAD, "AUDIO UPLOAD PAUSED", "upload_error");
@@ -425,9 +438,24 @@ static void finalise_recording(void) {
   if (s_sd_recording_active) {
     lantern_display_show(LANTERN_SCREEN_SAVING, "FINALISING SD ARCHIVE");
     if (lantern_sd_recording_finish() != ESP_OK) {
-      ESP_LOGW(TAG, "microSD finalization failed; uploading the 30-second PSRAM fallback");
+      s_sd_recording_active = false;
+      ESP_LOGE(TAG, "microSD finalization failed; the truncated PSRAM fallback will not be uploaded");
+      ESP_ERROR_CHECK_WITHOUT_ABORT(lantern_network_abort_session(&s_cloud_session));
+      clear_active_session();
+      show_error(RECOVERY_NONE, "SD ARCHIVE FAILED", "upload_error");
+      return;
     }
     s_sd_recording_active = false;
+    size_t archive_bytes = lantern_sd_recording_size();
+    if (archive_bytes > 44) {
+      s_recording_duration_seconds = (unsigned)(
+        (archive_bytes - 44) /
+        (LANTERN_MIC_SAMPLE_RATE * sizeof(int16_t)));
+    }
+    ESP_LOGI(TAG, "complete SD archive ready: %u bytes, %u seconds",
+      (unsigned)archive_bytes, s_recording_duration_seconds);
+  } else {
+    s_recording_duration_seconds = lantern_audio_buffered_seconds();
   }
   lantern_display_show(LANTERN_SCREEN_SAVING, "FINALISING SPEECH");
   // Leave the live microphone path open briefly so Agora can finalize the last
