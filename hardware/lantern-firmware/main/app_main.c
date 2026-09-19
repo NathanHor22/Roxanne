@@ -15,6 +15,7 @@
 #include "lantern_agora.h"
 #include "lantern_audio.h"
 #include "lantern_board.h"
+#include "lantern_board_io.h"
 #include "lantern_display.h"
 #include "lantern_network.h"
 #include "lantern_storage.h"
@@ -49,7 +50,9 @@ static const char *TAG = "lantern";
 static lantern_config_t s_config;
 static local_state_t s_state = LOCAL_READY;
 static recovery_action_t s_recovery = RECOVERY_NONE;
+#if LANTERN_BATTERY_INSTALLED
 static adc_oneshot_unit_handle_t s_adc;
+#endif
 static int s_battery_level = 50;
 static TickType_t s_state_entered_at;
 static TickType_t s_last_summary_retry_at;
@@ -112,7 +115,8 @@ static void show_recording_progress(void) {
   if (elapsed == s_last_recording_second) return;
   s_last_recording_second = elapsed;
   char detail[40];
-  snprintf(detail, sizeof(detail), "%02u:%02u PRESS CENTRE TO STOP", elapsed / 60, elapsed % 60);
+  snprintf(detail, sizeof(detail), "%02u:%02u %s", elapsed / 60, elapsed % 60,
+    LANTERN_HAS_TOUCHSCREEN ? "TAP SCREEN TO STOP" : "PRESS CENTRE TO STOP");
   lantern_display_show(LANTERN_SCREEN_RECORDING, detail);
 }
 
@@ -141,6 +145,7 @@ static void clear_active_session(void) {
   s_audio_uploaded = false;
 }
 
+#if LANTERN_BATTERY_INSTALLED
 static int battery_from_adc(int raw) {
   const int adc_points[] = {2030, 2134, 2252, 2370, 2488, 2606};
   const int levels[] = {0, 20, 40, 60, 80, 100};
@@ -156,31 +161,46 @@ static int battery_from_adc(int raw) {
   }
   return 100;
 }
+#endif
 
 static void power_and_battery_init(void) {
+#if LANTERN_HAS_POWER_HOLD
   gpio_config_t output = {
     .pin_bit_mask = 1ULL << LANTERN_POWER_HOLD_GPIO,
     .mode = GPIO_MODE_OUTPUT,
   };
   ESP_ERROR_CHECK(gpio_config(&output));
   gpio_set_level(LANTERN_POWER_HOLD_GPIO, 1);
+#endif
+#if LANTERN_HAS_CHARGING_SIGNAL
   gpio_config_t charging = {
     .pin_bit_mask = 1ULL << LANTERN_CHARGING_GPIO,
     .mode = GPIO_MODE_INPUT,
   };
   ESP_ERROR_CHECK(gpio_config(&charging));
+#endif
 
+#if LANTERN_BATTERY_INSTALLED
   adc_oneshot_unit_init_cfg_t init = { .unit_id = ADC_UNIT_1, .ulp_mode = ADC_ULP_MODE_DISABLE };
   ESP_ERROR_CHECK(adc_oneshot_new_unit(&init, &s_adc));
   adc_oneshot_chan_cfg_t channel = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
-  ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc, ADC_CHANNEL_7, &channel));
+  ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc, LANTERN_BATTERY_ADC_CHANNEL, &channel));
+#else
+  // The first V2 showcase is USB powered. Avoid turning the unconnected
+  // battery-divider pin into random dashboard telemetry.
+  s_battery_level = 100;
+#endif
 }
 
 static void update_battery_level(void) {
+#if LANTERN_BATTERY_INSTALLED
   int raw = 0;
-  if (adc_oneshot_read(s_adc, ADC_CHANNEL_7, &raw) == ESP_OK) {
+  if (adc_oneshot_read(s_adc, LANTERN_BATTERY_ADC_CHANNEL, &raw) == ESP_OK) {
     s_battery_level = battery_from_adc(raw);
   }
+#else
+  s_battery_level = 100;
+#endif
 }
 
 static void show_ready(void) {
@@ -195,7 +215,9 @@ static void show_ready(void) {
   } else if (network.wifi_connected && network.paired) {
     lantern_display_show(
       LANTERN_SCREEN_READY,
-      s_wake_available ? "SAY COMPUTER OR PRESS" : "PRESS CENTRE TO START");
+      s_wake_available
+        ? (LANTERN_HAS_TOUCHSCREEN ? "SAY COMPUTER OR TAP" : "SAY COMPUTER OR PRESS")
+        : (LANTERN_HAS_TOUCHSCREEN ? "TAP SCREEN TO START" : "PRESS CENTRE TO START"));
     if (s_wake_available) lantern_wake_set_enabled(true);
   } else if (network.wifi_connected) {
     lantern_display_show(LANTERN_SCREEN_READY, "PAIR IN DASHBOARD");
@@ -605,6 +627,7 @@ static void handle_long_press(void) {
 
 static void button_task(void *argument) {
   (void)argument;
+#if LANTERN_HAS_PHYSICAL_BUTTONS
   gpio_config_t buttons = {
     .pin_bit_mask = (1ULL << LANTERN_BUTTON_MAIN_GPIO) |
                     (1ULL << LANTERN_BUTTON_UP_GPIO) |
@@ -613,9 +636,12 @@ static void button_task(void *argument) {
     .pull_up_en = GPIO_PULLUP_ENABLE,
   };
   ESP_ERROR_CHECK(gpio_config(&buttons));
+#elif LANTERN_HAS_TOUCHSCREEN
+  ESP_ERROR_CHECK(lantern_board_touch_init());
+#endif
   // Opening the CH340 serial port briefly drives BOOT. Ignore that transition.
   vTaskDelay(pdMS_TO_TICKS(800));
-  bool was_pressed = gpio_get_level(LANTERN_BUTTON_MAIN_GPIO) == 0;
+  bool was_pressed = false;
   bool reset_started = false;
   TickType_t pressed_at = 0;
   TickType_t reset_at = 0;
@@ -624,9 +650,17 @@ static void button_task(void *argument) {
       ESP_LOGI(TAG, "WakeNet activation accepted; opening command window");
       capture_wake_command();
     }
-    bool pressed = gpio_get_level(LANTERN_BUTTON_MAIN_GPIO) == 0;
-    bool up_pressed = gpio_get_level(LANTERN_BUTTON_UP_GPIO) == 0;
-    bool down_pressed = gpio_get_level(LANTERN_BUTTON_DOWN_GPIO) == 0;
+    bool pressed = false;
+    bool up_pressed = false;
+    bool down_pressed = false;
+#if LANTERN_HAS_PHYSICAL_BUTTONS
+    pressed = gpio_get_level(LANTERN_BUTTON_MAIN_GPIO) == 0;
+    up_pressed = gpio_get_level(LANTERN_BUTTON_UP_GPIO) == 0;
+    down_pressed = gpio_get_level(LANTERN_BUTTON_DOWN_GPIO) == 0;
+#elif LANTERN_HAS_TOUCHSCREEN
+    uint16_t touch_x = 0, touch_y = 0;
+    pressed = lantern_board_touch_read(&touch_x, &touch_y);
+#endif
     if (pressed && !was_pressed) pressed_at = xTaskGetTickCount();
     if (!pressed && was_pressed) {
       uint32_t held_ms = (uint32_t)((xTaskGetTickCount() - pressed_at) * portTICK_PERIOD_MS);
@@ -681,8 +715,12 @@ static void telemetry_task(void *argument) {
 
     update_battery_level();
     if (++seconds % 5 == 0) {
+      int charging = 0;
+#if LANTERN_HAS_CHARGING_SIGNAL
+      charging = gpio_get_level(LANTERN_CHARGING_GPIO);
+#endif
       ESP_LOGI(TAG, "health battery=%d%% charging=%d mic_level=%u heap=%u psram=%u state=%d",
-        s_battery_level, gpio_get_level(LANTERN_CHARGING_GPIO),
+        s_battery_level, charging,
         (unsigned)lantern_audio_level(), (unsigned)esp_get_free_heap_size(),
         (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM), s_state);
     }
@@ -701,7 +739,9 @@ static void telemetry_task(void *argument) {
 }
 
 void app_main(void) {
-  ESP_LOGI(TAG, "Lantern %s booting", LANTERN_FIRMWARE_VERSION);
+  const lantern_board_profile_t *board = lantern_board_profile();
+  ESP_LOGI(TAG, "Lantern %s booting on %s (%s, storage=%s)",
+    LANTERN_FIRMWARE_VERSION, board->id, board->model, board->storage_kind);
   s_state_entered_at = xTaskGetTickCount();
   power_and_battery_init();
   update_battery_level();

@@ -1,10 +1,27 @@
 # Lantern firmware
 
-This is the active firmware for the ZHENGCHEN 1.54-inch M1307/ML307
-ESP32-S3 board. It uses the board manufacturer's proven display, microphone,
-speaker, battery, and button pin map.
+This is the shared Lantern ESP32-S3 firmware. The default and currently tested
+profile is **Lantern Original**, the ZHENGCHEN 1.54-inch M1307/ML307 board. It
+uses the board manufacturer's proven display, microphone, speaker, battery,
+and button pin map.
 
-Version `0.4.3-session-recovery` adds a local WakeNet activation gate and
+The second profile is **Lantern V2**, the LCDWiki ES3C28P. It uses the board's
+240 x 320 ILI9341 display, FT6336G touchscreen, ES8311 microphone/audio codec,
+native USB, and 16 MB flash. A battery and microSD card are not required to
+flash or demonstrate the USB-powered prototype. Touching the screen provides
+the same primary control as the centre button on Lantern Original.
+
+The current V2 image deliberately reports USB power as 100% and keeps replay
+fallback in PSRAM. Its battery ADC and SDIO pins are reserved in the board
+profile, but battery telemetry and microSD recording remain disabled until
+those parts are fitted and tested.
+
+Hardware-specific pins and capabilities live under `main/boards`. Session,
+voice, networking, and dashboard behavior remain in the shared firmware. Each
+board gets its own build image; the original board does not need an SD card and
+continues to use its PSRAM streaming/retry strategy.
+
+Version `0.5.0-board-profiles` keeps the existing local WakeNet activation gate and
 buffered, low-latency speech playback while keeping one consistent
 centre-button fallback:
 
@@ -80,6 +97,17 @@ powershell -ExecutionPolicy Bypass -File .\setup-agora-sdk.ps1
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\flash.ps1 -Port COM5
 ```
+
+Build and flash Lantern V2 as an independent image:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-v2.ps1
+powershell -ExecutionPolicy Bypass -File .\flash-v2.ps1 -Port COM10 -Monitor
+```
+
+The V2 build uses `sdkconfig.v2`, `build-v2`, and native USB logging. It does
+not overwrite the original board's `sdkconfig` or `build` outputs. The first
+V2 flash writes the bootloader, partition table, app, and WakeNet model.
 
 This CH340K board may not enter the ROM loader through DTR/RTS. If automatic
 flashing fails:

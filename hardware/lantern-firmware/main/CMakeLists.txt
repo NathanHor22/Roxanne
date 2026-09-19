@@ -4,6 +4,8 @@ idf_component_register(
     "freertos_compat.c"
     "lantern_agora.c"
     "lantern_audio.c"
+    "lantern_board.c"
+    "lantern_board_io.c"
     "lantern_display.c"
     "lantern_network.c"
     "lantern_storage.c"
@@ -22,6 +24,7 @@ idf_component_register(
     esp_netif
     esp_wifi
     espressif__esp-sr
+    espressif__esp_codec_dev
     json
     mbedtls
     nvs_flash

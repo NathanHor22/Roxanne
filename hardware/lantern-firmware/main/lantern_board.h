@@ -1,35 +1,28 @@
 #pragma once
 
-#include "driver/gpio.h"
+#include <stdbool.h>
 
-#define LANTERN_FIRMWARE_VERSION "0.4.3-session-recovery"
-#define LANTERN_MODEL "ZHENGCHEN-1.54-M1307"
+#include "sdkconfig.h"
+
+#define LANTERN_FIRMWARE_VERSION "0.5.0-board-profiles"
 #define LANTERN_API_BASE_URL "https://roxanne-two.vercel.app"
 
-#define LANTERN_POWER_HOLD_GPIO GPIO_NUM_2
-#define LANTERN_CHARGING_GPIO GPIO_NUM_9
+#if CONFIG_LANTERN_BOARD_ZHENGCHEN_M1307
+#include "boards/lantern_original.h"
+#elif CONFIG_LANTERN_BOARD_ES3C28P
+#include "boards/lantern_v2_es3c28p.h"
+#else
+#error "Select a supported Lantern board profile in menuconfig."
+#endif
 
-#define LANTERN_BUTTON_MAIN_GPIO GPIO_NUM_0
-#define LANTERN_BUTTON_UP_GPIO GPIO_NUM_10
-#define LANTERN_BUTTON_DOWN_GPIO GPIO_NUM_39
+typedef struct {
+  const char *id;
+  const char *model;
+  const char *storage_kind;
+  bool has_sd_card;
+  bool has_touchscreen;
+  bool has_physical_buttons;
+  bool has_battery_monitor;
+} lantern_board_profile_t;
 
-#define LANTERN_MIC_WS_GPIO GPIO_NUM_4
-#define LANTERN_MIC_SCK_GPIO GPIO_NUM_5
-#define LANTERN_MIC_DATA_GPIO GPIO_NUM_6
-#define LANTERN_MIC_SAMPLE_RATE 16000
-
-#define LANTERN_SPK_DATA_GPIO GPIO_NUM_7
-#define LANTERN_SPK_BCLK_GPIO GPIO_NUM_15
-#define LANTERN_SPK_LRCK_GPIO GPIO_NUM_16
-#define LANTERN_SPK_SAMPLE_RATE 24000
-
-#define LANTERN_DISPLAY_MOSI_GPIO GPIO_NUM_41
-#define LANTERN_DISPLAY_SCLK_GPIO GPIO_NUM_42
-#define LANTERN_DISPLAY_RESET_GPIO GPIO_NUM_45
-#define LANTERN_DISPLAY_DC_GPIO GPIO_NUM_40
-#define LANTERN_DISPLAY_CS_GPIO GPIO_NUM_21
-#define LANTERN_DISPLAY_BACKLIGHT_GPIO GPIO_NUM_20
-#define LANTERN_DISPLAY_WIDTH 240
-#define LANTERN_DISPLAY_HEIGHT 240
-
-#define LANTERN_SETUP_AP_PASSWORD "lanternsetup"
+const lantern_board_profile_t *lantern_board_profile(void);

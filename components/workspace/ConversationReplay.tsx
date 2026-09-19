@@ -204,13 +204,13 @@ export function ConversationReplay({
           </span>
           <div>
             <span className={styles.eyebrow}>ORIGINAL RECORDING</span>
-            <h3>The full conversation</h3>
+            <h3>Captured conversation</h3>
             <p>{conversation.title}</p>
           </div>
         </header>
         <p className={styles.intro}>
-          Hear it again, in your own time. Revisit the details beyond the
-          summary.
+          Listen to the original audio saved by Lantern and revisit details
+          beyond the summary.
         </p>
         {source.url && (
           <>

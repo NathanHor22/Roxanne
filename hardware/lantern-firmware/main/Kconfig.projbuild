@@ -1,0 +1,19 @@
+menu "Lantern hardware"
+
+choice LANTERN_BOARD
+    prompt "Lantern board profile"
+    default LANTERN_BOARD_ZHENGCHEN_M1307
+    help
+        Select the physical board this firmware image targets. Application,
+        session, voice, and network code is shared; only the hardware profile
+        supplies pins and capabilities.
+
+config LANTERN_BOARD_ZHENGCHEN_M1307
+    bool "Lantern Original (ZHENGCHEN 1.54-inch M1307)"
+
+config LANTERN_BOARD_ES3C28P
+    bool "Lantern V2 (LCDWiki ES3C28P 2.8-inch touch)"
+
+endchoice
+
+endmenu

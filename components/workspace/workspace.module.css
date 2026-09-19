@@ -1538,6 +1538,25 @@
   align-items: center;
   margin: 0;
 }
+.collectionControls {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.filterSelect select {
+  min-height: 37px;
+  padding: 8px 29px 8px 10px;
+  border: 1px solid #dfe6da;
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: #52645b;
+  font-size: 12px;
+}
+.filterSelect select:focus {
+  border-color: #8cb483;
+  box-shadow: 0 0 0 2px #e4efdc;
+}
 .search {
   display: flex;
   align-items: center;
@@ -2453,6 +2472,9 @@
     align-items: flex-start;
     flex-direction: column;
   }
+  .collectionControls {
+    width: 100%;
+  }
   .search {
     width: 100%;
     min-width: 0;
@@ -2826,6 +2848,13 @@
   }
   .conversationRow > svg {
     width: 13px;
+  }
+  .collectionControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .filterSelect select {
+    width: 100%;
   }
   .drawerBody {
     padding: 24px 23px 35px;

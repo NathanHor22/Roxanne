@@ -21,13 +21,90 @@
 #include "lantern_board.h"
 
 static const char *TAG = "lantern_display";
+#if LANTERN_DISPLAY_DRIVER_ST7789
 static esp_lcd_panel_handle_t s_panel;
+#endif
+static esp_lcd_panel_io_handle_t s_panel_io;
 static uint16_t *s_pixels;
 static uint16_t *s_transfer_pixels;
 static SemaphoreHandle_t s_lock;
 static SemaphoreHandle_t s_transfer_done;
 
 #define TRANSFER_ROWS 16
+
+#if LANTERN_DISPLAY_DRIVER_ILI9341
+static esp_err_t ili9341_command(uint8_t command, const uint8_t *parameters, size_t length) {
+  return esp_lcd_panel_io_tx_param(s_panel_io, command, parameters, length);
+}
+
+static esp_err_t ili9341_init(void) {
+  static const uint8_t power_b[] = {0x00, 0xc1, 0x30};
+  static const uint8_t power_seq[] = {0x64, 0x03, 0x12, 0x81};
+  static const uint8_t timing_a[] = {0x85, 0x00, 0x78};
+  static const uint8_t power_a[] = {0x39, 0x2c, 0x00, 0x34, 0x02};
+  static const uint8_t pump[] = {0x20};
+  static const uint8_t timing_b[] = {0x00, 0x00};
+  static const uint8_t power_1[] = {0x23};
+  static const uint8_t power_2[] = {0x10};
+  static const uint8_t vcom_1[] = {0x3e, 0x28};
+  static const uint8_t vcom_2[] = {0x86};
+  static const uint8_t memory_access[] = {0x48};
+  static const uint8_t pixel_format[] = {0x55};
+  static const uint8_t frame_rate[] = {0x00, 0x18};
+  static const uint8_t display_function[] = {0x08, 0x82, 0x27};
+  static const uint8_t gamma_disable[] = {0x00};
+  static const uint8_t gamma_curve[] = {0x01};
+  static const uint8_t gamma_positive[] = {
+    0x0f, 0x31, 0x2b, 0x0c, 0x0e, 0x08, 0x4e, 0xf1,
+    0x37, 0x07, 0x10, 0x03, 0x0e, 0x09, 0x00,
+  };
+  static const uint8_t gamma_negative[] = {
+    0x00, 0x0e, 0x14, 0x03, 0x11, 0x07, 0x31, 0xc1,
+    0x48, 0x08, 0x0f, 0x0c, 0x31, 0x36, 0x0f,
+  };
+
+  ESP_RETURN_ON_ERROR(ili9341_command(0x01, NULL, 0), TAG, "ILI9341 reset failed");
+  vTaskDelay(pdMS_TO_TICKS(150));
+  ESP_RETURN_ON_ERROR(ili9341_command(0xcf, power_b, sizeof(power_b)), TAG, "ILI9341 power B failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xed, power_seq, sizeof(power_seq)), TAG, "ILI9341 power sequence failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xe8, timing_a, sizeof(timing_a)), TAG, "ILI9341 timing A failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xcb, power_a, sizeof(power_a)), TAG, "ILI9341 power A failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xf7, pump, sizeof(pump)), TAG, "ILI9341 pump failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xea, timing_b, sizeof(timing_b)), TAG, "ILI9341 timing B failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xc0, power_1, sizeof(power_1)), TAG, "ILI9341 power 1 failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xc1, power_2, sizeof(power_2)), TAG, "ILI9341 power 2 failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xc5, vcom_1, sizeof(vcom_1)), TAG, "ILI9341 VCOM 1 failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xc7, vcom_2, sizeof(vcom_2)), TAG, "ILI9341 VCOM 2 failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0x36, memory_access, sizeof(memory_access)), TAG, "ILI9341 orientation failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0x3a, pixel_format, sizeof(pixel_format)), TAG, "ILI9341 pixel format failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xb1, frame_rate, sizeof(frame_rate)), TAG, "ILI9341 frame rate failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xb6, display_function, sizeof(display_function)), TAG, "ILI9341 function failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xf2, gamma_disable, sizeof(gamma_disable)), TAG, "ILI9341 gamma mode failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0x26, gamma_curve, sizeof(gamma_curve)), TAG, "ILI9341 gamma curve failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xe0, gamma_positive, sizeof(gamma_positive)), TAG, "ILI9341 positive gamma failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0xe1, gamma_negative, sizeof(gamma_negative)), TAG, "ILI9341 negative gamma failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0x11, NULL, 0), TAG, "ILI9341 sleep exit failed");
+  vTaskDelay(pdMS_TO_TICKS(120));
+  // The ES3C28P IPS panel is wired for inverted colors. This matches the
+  // manufacturer's BSP (`BSP_LCD_INVERTED = true`).
+  ESP_RETURN_ON_ERROR(ili9341_command(0x21, NULL, 0), TAG, "ILI9341 inversion failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0x29, NULL, 0), TAG, "ILI9341 display on failed");
+  vTaskDelay(pdMS_TO_TICKS(20));
+  return ESP_OK;
+}
+
+static esp_err_t ili9341_draw_bitmap(int y, int rows, const uint16_t *pixels) {
+  const uint8_t columns[] = {0x00, 0x00, 0x00, LANTERN_DISPLAY_WIDTH - 1};
+  const uint8_t pages[] = {
+    (uint8_t)(y >> 8), (uint8_t)y,
+    (uint8_t)((y + rows - 1) >> 8), (uint8_t)(y + rows - 1),
+  };
+  ESP_RETURN_ON_ERROR(ili9341_command(0x2a, columns, sizeof(columns)), TAG, "ILI9341 column failed");
+  ESP_RETURN_ON_ERROR(ili9341_command(0x2b, pages, sizeof(pages)), TAG, "ILI9341 page failed");
+  return esp_lcd_panel_io_tx_color(
+    s_panel_io, 0x2c, pixels, (size_t)rows * LANTERN_DISPLAY_WIDTH * sizeof(uint16_t));
+}
+#endif
 
 static bool transfer_finished(esp_lcd_panel_io_handle_t panel_io,
                               esp_lcd_panel_io_event_data_t *event,
@@ -144,7 +221,7 @@ esp_err_t lantern_display_init(void) {
 
   spi_bus_config_t bus = {
     .mosi_io_num = LANTERN_DISPLAY_MOSI_GPIO,
-    .miso_io_num = GPIO_NUM_NC,
+    .miso_io_num = LANTERN_DISPLAY_MISO_GPIO,
     .sclk_io_num = LANTERN_DISPLAY_SCLK_GPIO,
     .quadwp_io_num = GPIO_NUM_NC,
     .quadhd_io_num = GPIO_NUM_NC,
@@ -152,11 +229,14 @@ esp_err_t lantern_display_init(void) {
   };
   ESP_RETURN_ON_ERROR(spi_bus_initialize(SPI3_HOST, &bus, SPI_DMA_CH_AUTO), TAG, "SPI init failed");
 
-  esp_lcd_panel_io_handle_t panel_io = NULL;
   esp_lcd_panel_io_spi_config_t io = {
     .cs_gpio_num = LANTERN_DISPLAY_CS_GPIO,
     .dc_gpio_num = LANTERN_DISPLAY_DC_GPIO,
+#if LANTERN_DISPLAY_DRIVER_ILI9341
+    .spi_mode = 0,
+#else
     .spi_mode = 3,
+#endif
     .pclk_hz = 40 * 1000 * 1000,
     .trans_queue_depth = 1,
     .on_color_trans_done = transfer_finished,
@@ -164,10 +244,11 @@ esp_err_t lantern_display_init(void) {
     .lcd_param_bits = 8,
   };
   ESP_RETURN_ON_ERROR(
-    esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI3_HOST, &io, &panel_io),
+    esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI3_HOST, &io, &s_panel_io),
     TAG,
     "panel IO failed");
 
+#if LANTERN_DISPLAY_DRIVER_ST7789
   esp_lcd_panel_dev_config_t panel_config = {
     .reset_gpio_num = LANTERN_DISPLAY_RESET_GPIO,
     .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
@@ -176,13 +257,16 @@ esp_err_t lantern_display_init(void) {
     .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
     .bits_per_pixel = 16,
   };
-  ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7789(panel_io, &panel_config, &s_panel), TAG, "panel failed");
+  ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7789(s_panel_io, &panel_config, &s_panel), TAG, "panel failed");
   ESP_ERROR_CHECK(esp_lcd_panel_reset(s_panel));
   ESP_ERROR_CHECK(esp_lcd_panel_init(s_panel));
   ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, false));
   ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, false, false));
   ESP_ERROR_CHECK(esp_lcd_panel_invert_color(s_panel, true));
   ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
+#elif LANTERN_DISPLAY_DRIVER_ILI9341
+  ESP_RETURN_ON_ERROR(ili9341_init(), TAG, "ILI9341 init failed");
+#endif
 
   s_pixels = heap_caps_malloc(
     LANTERN_DISPLAY_WIDTH * LANTERN_DISPLAY_HEIGHT * sizeof(uint16_t),
@@ -202,18 +286,29 @@ esp_err_t lantern_display_init(void) {
   if (!s_lock || !s_transfer_done) return ESP_ERR_NO_MEM;
   gpio_set_level(LANTERN_DISPLAY_BACKLIGHT_GPIO, 1);
   lantern_display_show(LANTERN_SCREEN_BOOTING, "HARDWARE CHECK");
-  ESP_LOGI(TAG, "ST7789 ready at 240x240");
+  ESP_LOGI(TAG, "%s ready at %dx%d",
+    LANTERN_DISPLAY_DRIVER_ILI9341 ? "ILI9341" : "ST7789",
+    LANTERN_DISPLAY_WIDTH, LANTERN_DISPLAY_HEIGHT);
   return ESP_OK;
 }
 
 void lantern_display_show(lantern_screen_t screen, const char *detail) {
-  if (!s_pixels || !s_panel || !s_lock) return;
+  if (!s_pixels || !s_panel_io || !s_lock) return;
   if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(1000)) != pdTRUE) return;
 
+#if LANTERN_DISPLAY_DRIVER_ILI9341
+  // Lantern V2 uses a clearly green face so the larger display reads as a
+  // product interface instead of the panel's white factory/blank state.
+  const uint16_t background = rgb565(0, 112, 54);
+  const uint16_t green = rgb565(96, 255, 148);
+  const uint16_t dim_green = rgb565(0, 62, 31);
+  const uint16_t foreground = rgb565(174, 255, 202);
+#else
   const uint16_t background = rgb565(2, 8, 7);
   const uint16_t green = rgb565(48, 255, 136);
   const uint16_t dim_green = rgb565(18, 92, 58);
-  const uint16_t white = rgb565(226, 244, 235);
+  const uint16_t foreground = rgb565(226, 244, 235);
+#endif
   const uint16_t amber = rgb565(255, 184, 72);
   const uint16_t red = rgb565(255, 78, 86);
   uint16_t accent = green;
@@ -236,24 +331,35 @@ void lantern_display_show(lantern_screen_t screen, const char *detail) {
   }
 
   fill(background);
-  ring(120, 92, 51, 9, dim_green);
-  ring(120, 92, 38, 5, accent);
-  rect(86, 48, 68, 8, accent);
-  rect(86, 128, 68, 8, accent);
-  centered_text(12, title, 3, white);
-  centered_text(162, status, 2, accent);
-  if (detail && detail[0]) centered_text(202, detail, 1, white);
+  const int ring_y = LANTERN_DISPLAY_HEIGHT > 240 ? 118 : 92;
+  const int status_y = LANTERN_DISPLAY_HEIGHT > 240 ? 220 : 162;
+  const int detail_y = LANTERN_DISPLAY_HEIGHT > 240 ? 274 : 202;
+  ring(120, ring_y, 51, 9, dim_green);
+  ring(120, ring_y, 38, 5, accent);
+  rect(86, ring_y - 44, 68, 8, accent);
+  rect(86, ring_y + 36, 68, 8, accent);
+  centered_text(12, title, 3, foreground);
+  centered_text(status_y, status, 2, accent);
+  if (detail && detail[0]) centered_text(detail_y, detail, 1, foreground);
 
   while (xSemaphoreTake(s_transfer_done, 0) == pdTRUE) {}
   for (int y = 0; y < LANTERN_DISPLAY_HEIGHT; y += TRANSFER_ROWS) {
     int rows = LANTERN_DISPLAY_HEIGHT - y;
     if (rows > TRANSFER_ROWS) rows = TRANSFER_ROWS;
-    memcpy(
-      s_transfer_pixels,
-      s_pixels + y * LANTERN_DISPLAY_WIDTH,
-      (size_t)rows * LANTERN_DISPLAY_WIDTH * sizeof(uint16_t));
+    const size_t pixel_count = (size_t)rows * LANTERN_DISPLAY_WIDTH;
+#if LANTERN_DISPLAY_DRIVER_ILI9341
+    // The manufacturer BSP uses big-endian RGB565 transfers for this panel.
+    for (size_t index = 0; index < pixel_count; ++index) {
+      uint16_t value = s_pixels[y * LANTERN_DISPLAY_WIDTH + index];
+      s_transfer_pixels[index] = (uint16_t)((value << 8) | (value >> 8));
+    }
+    esp_err_t result = ili9341_draw_bitmap(y, rows, s_transfer_pixels);
+#else
+    memcpy(s_transfer_pixels, s_pixels + y * LANTERN_DISPLAY_WIDTH,
+      pixel_count * sizeof(uint16_t));
     esp_err_t result = esp_lcd_panel_draw_bitmap(
       s_panel, 0, y, LANTERN_DISPLAY_WIDTH, y + rows, s_transfer_pixels);
+#endif
     if (result != ESP_OK) {
       ESP_LOGE(TAG, "draw failed: %s", esp_err_to_name(result));
       break;

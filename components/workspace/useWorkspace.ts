@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Meeting, ScheduleDetails } from "@/lib/types";
+import type { Contact, Meeting, ScheduleDetails } from "@/lib/types";
 import {
   approveSample,
   liveApprovalRequest,
@@ -283,6 +283,56 @@ export function useWorkspace(initialMode: WorkspaceMode) {
     }
   };
 
+  const patchContact = async (
+    id: string,
+    changes: Pick<Contact, "name" | "company" | "role" | "email">,
+  ) => {
+    if (actionLock.current) return false;
+    actionLock.current = true;
+    if (mode === "live") generation.current++;
+    setWorking(`contact:${id}`);
+    setError(null);
+    try {
+      let saved: Contact = { id, ...changes };
+      if (mode === "live") {
+        if (id.startsWith("sample:"))
+          throw new Error("Sample contacts cannot update your workspace.");
+        const response = await fetch(`/api/contacts/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(changes),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          contact?: Contact;
+          error?: string;
+        };
+        if (!response.ok || !payload.contact)
+          throw new Error(payload.error || "The contact could not be updated.");
+        saved = payload.contact;
+      }
+      setMeetings((current) =>
+        current.map((meeting) => ({
+          ...meeting,
+          contacts: meeting.contacts.map((contact) =>
+            contact.id === id ? { ...contact, ...saved } : contact,
+          ),
+        })),
+      );
+      setNotice("Contact details updated.");
+      return true;
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The contact could not be updated.",
+      );
+      return false;
+    } finally {
+      actionLock.current = false;
+      setWorking(null);
+    }
+  };
+
   return {
     mode,
     meetings,
@@ -294,6 +344,7 @@ export function useWorkspace(initialMode: WorkspaceMode) {
     working,
     approve,
     patchFollowUp,
+    patchContact,
     loadSample,
     loadLive,
     setError,

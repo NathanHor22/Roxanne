@@ -13,11 +13,12 @@
 #include "freertos/task.h"
 
 #include "lantern_board.h"
+#include "lantern_board_io.h"
 
 #define AUDIO_READ_SAMPLES 320
 #define AUDIO_WRITE_SAMPLES 240
 #define PCM_STREAM_BUFFER_BYTES (64 * 1024)
-#define PCM_PREFILL_BYTES (LANTERN_SPK_SAMPLE_RATE * sizeof(int16_t) / 8)
+#define PCM_PREFILL_BYTES (LANTERN_TTS_SAMPLE_RATE * sizeof(int16_t) / 8)
 #define RETRY_BUFFER_SECONDS 30
 #define RETRY_BUFFER_SAMPLES (LANTERN_MIC_SAMPLE_RATE * RETRY_BUFFER_SECONDS)
 
@@ -43,8 +44,27 @@ static volatile bool s_pcm_input_finished;
 static volatile bool s_pcm_failed;
 static volatile bool s_speaker_active;
 
+#if LANTERN_AUDIO_SHARED_BUS
+typedef int16_t i2s_output_sample_t;
+static i2s_output_sample_t output_sample(int16_t sample) { return sample; }
+#define I2S_OUTPUT_CHANNELS 1
+#else
+typedef int32_t i2s_output_sample_t;
+static i2s_output_sample_t output_sample(int16_t sample) { return (int32_t)sample * 32768; }
+#define I2S_OUTPUT_CHANNELS 1
+#endif
+
 static esp_err_t speaker_start_silent(void) {
-  int32_t silence[AUDIO_WRITE_SAMPLES] = {0};
+  i2s_output_sample_t silence[AUDIO_WRITE_SAMPLES * I2S_OUTPUT_CHANNELS] = {0};
+#if LANTERN_AUDIO_SHARED_BUS
+  // Keep both directions of the codec's full-duplex clock domain running.
+  // Muting is handled by the external amplifier instead of stopping TX.
+  size_t bytes_written = 0;
+  esp_err_t result = i2s_channel_write(
+    s_speaker, silence, sizeof(silence), &bytes_written, pdMS_TO_TICKS(100));
+  if (result == ESP_OK) lantern_board_speaker_enable(true);
+  return result;
+#else
   size_t bytes_loaded = 0;
   ESP_RETURN_ON_ERROR(
     i2s_channel_preload_data(s_speaker, silence, sizeof(silence), &bytes_loaded),
@@ -53,23 +73,29 @@ static esp_err_t speaker_start_silent(void) {
     ESP_LOGW(TAG, "speaker silence preload accepted %u of %u bytes",
       (unsigned)bytes_loaded, (unsigned)sizeof(silence));
   }
-  return i2s_channel_enable(s_speaker);
+  esp_err_t result = i2s_channel_enable(s_speaker);
+  if (result == ESP_OK) lantern_board_speaker_enable(true);
+  return result;
+#endif
 }
 
 static void speaker_stop_silent(void) {
-  int32_t silence[AUDIO_WRITE_SAMPLES] = {0};
+  i2s_output_sample_t silence[AUDIO_WRITE_SAMPLES * I2S_OUTPUT_CHANNELS] = {0};
   size_t bytes_written = 0;
   if (i2s_channel_write(s_speaker, silence, sizeof(silence), &bytes_written,
       pdMS_TO_TICKS(100)) == ESP_OK) {
     vTaskDelay(pdMS_TO_TICKS(20));
   }
+  lantern_board_speaker_enable(false);
+#if !LANTERN_AUDIO_SHARED_BUS
   ESP_ERROR_CHECK_WITHOUT_ABORT(i2s_channel_disable(s_speaker));
+#endif
 }
 
 static void pcm_playback_task(void *argument) {
   (void)argument;
   uint8_t input[AUDIO_WRITE_SAMPLES * sizeof(int16_t)];
-  int32_t output[AUDIO_WRITE_SAMPLES];
+  i2s_output_sample_t output[AUDIO_WRITE_SAMPLES * I2S_OUTPUT_CHANNELS];
   while (true) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     bool speaker_started = false;
@@ -110,17 +136,25 @@ static void pcm_playback_task(void *argument) {
       }
       size_t received = xStreamBufferReceive(s_pcm_stream, input, wanted, 0);
       received &= ~(size_t)1;
-      size_t sample_count = received / sizeof(int16_t);
+      size_t source_count = received / sizeof(int16_t);
+      size_t sample_count = source_count * LANTERN_SPK_SAMPLE_RATE / LANTERN_TTS_SAMPLE_RATE;
+      if (!sample_count && source_count) sample_count = 1;
       for (size_t index = 0; index < sample_count; ++index) {
-        int16_t sample = (int16_t)((uint16_t)input[index * 2] |
-          ((uint16_t)input[index * 2 + 1] << 8));
-        output[index] = (int32_t)sample * 32768;
+        size_t source_index = index * LANTERN_TTS_SAMPLE_RATE / LANTERN_SPK_SAMPLE_RATE;
+        if (source_index >= source_count) source_index = source_count - 1;
+        int16_t sample = (int16_t)((uint16_t)input[source_index * 2] |
+          ((uint16_t)input[source_index * 2 + 1] << 8));
+        for (size_t channel = 0; channel < I2S_OUTPUT_CHANNELS; ++channel) {
+          output[index * I2S_OUTPUT_CHANNELS + channel] = output_sample(sample);
+        }
       }
       size_t bytes_written = 0;
+      const size_t output_bytes =
+        sample_count * I2S_OUTPUT_CHANNELS * sizeof(output[0]);
       esp_err_t result = i2s_channel_write(
-        s_speaker, output, sample_count * sizeof(output[0]), &bytes_written,
+        s_speaker, output, output_bytes, &bytes_written,
         pdMS_TO_TICKS(250));
-      if (result != ESP_OK || bytes_written != sample_count * sizeof(output[0])) {
+      if (result != ESP_OK || bytes_written != output_bytes) {
         s_pcm_failed = true;
         break;
       }
@@ -141,21 +175,48 @@ static int16_t buffered_sample(size_t chronological_index) {
 
 static void microphone_task(void *argument) {
   (void)argument;
+  bool capture_logged = false;
+#if LANTERN_AUDIO_SHARED_BUS
+  int16_t raw[AUDIO_READ_SAMPLES];
+#else
   int32_t raw[AUDIO_READ_SAMPLES];
+#endif
   int16_t converted[AUDIO_READ_SAMPLES];
   while (true) {
     size_t bytes_read = 0;
     esp_err_t result = i2s_channel_read(
       s_microphone, raw, sizeof(raw), &bytes_read, pdMS_TO_TICKS(250));
-    if (result != ESP_OK || !bytes_read) continue;
+    if (result != ESP_OK || !bytes_read) {
+      if (!capture_logged) {
+        ESP_LOGW(TAG, "first microphone read failed: %s, bytes=%u",
+          esp_err_to_name(result), (unsigned)bytes_read);
+        capture_logged = true;
+      }
+      continue;
+    }
     size_t samples = bytes_read / sizeof(raw[0]);
+    if (!capture_logged) {
+      int32_t minimum = raw[0];
+      int32_t maximum = raw[0];
+      for (size_t index = 1; index < samples; ++index) {
+        if (raw[index] < minimum) minimum = raw[index];
+        if (raw[index] > maximum) maximum = raw[index];
+      }
+      ESP_LOGI(TAG, "first microphone frame: bytes=%u samples=%u min=%ld max=%ld",
+        (unsigned)bytes_read, (unsigned)samples, (long)minimum, (long)maximum);
+      capture_logged = true;
+    }
     uint64_t absolute_total = 0;
     for (size_t index = 0; index < samples; ++index) {
       // The microphone delivers left-aligned 24-bit samples in a 32-bit I2S
       // slot. A 12-bit shift over-amplified room noise and clipped speech,
       // leaving the AFE VAD permanently in its speech state. Preserve two bits
       // of useful gain while restoring enough headroom for speech/silence.
+#if LANTERN_AUDIO_SHARED_BUS
+      int32_t value = raw[index];
+#else
       int32_t value = raw[index] >> 14;
+#endif
       if (value > INT16_MAX) value = INT16_MAX;
       if (value < INT16_MIN) value = INT16_MIN;
       int16_t sample = (int16_t)value;
@@ -193,6 +254,40 @@ esp_err_t lantern_audio_init(void) {
   speaker_channel.dma_desc_num = 6;
   speaker_channel.dma_frame_num = 240;
   speaker_channel.auto_clear = true;
+#if LANTERN_AUDIO_SHARED_BUS
+  ESP_RETURN_ON_ERROR(
+    i2s_new_channel(&speaker_channel, &s_speaker, &s_microphone), TAG, "shared audio channel");
+  i2s_std_config_t speaker = {
+    .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(LANTERN_SPK_SAMPLE_RATE),
+    .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+    .gpio_cfg = {
+      .mclk = LANTERN_SPK_MCLK_GPIO,
+      .bclk = LANTERN_SPK_BCLK_GPIO,
+      .ws = LANTERN_SPK_LRCK_GPIO,
+      .dout = LANTERN_SPK_DATA_GPIO,
+      .din = LANTERN_MIC_DATA_GPIO,
+      .invert_flags = { false, false, false },
+    },
+  };
+  speaker.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
+  speaker.slot_cfg.slot_mask = I2S_STD_SLOT_LEFT;
+  ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_speaker, &speaker), TAG, "speaker mode");
+
+  i2s_std_config_t microphone = speaker;
+  microphone.gpio_cfg.dout = LANTERN_SPK_DATA_GPIO;
+  microphone.gpio_cfg.din = LANTERN_MIC_DATA_GPIO;
+  ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_microphone, &microphone), TAG, "microphone mode");
+  i2s_output_sample_t startup_silence[AUDIO_WRITE_SAMPLES * I2S_OUTPUT_CHANNELS] = {0};
+  size_t startup_bytes = 0;
+  ESP_RETURN_ON_ERROR(
+    i2s_channel_preload_data(s_speaker, startup_silence, sizeof(startup_silence), &startup_bytes),
+    TAG, "shared audio preload");
+  ESP_RETURN_ON_ERROR(i2s_channel_enable(s_speaker), TAG, "shared speaker clock enable");
+  ESP_RETURN_ON_ERROR(i2s_channel_enable(s_microphone), TAG, "microphone enable");
+  ESP_RETURN_ON_ERROR(
+    lantern_board_audio_codec_init(s_speaker, s_microphone), TAG, "ES8311 init");
+  lantern_board_speaker_enable(false);
+#else
   ESP_RETURN_ON_ERROR(i2s_new_channel(&speaker_channel, &s_speaker, NULL), TAG, "speaker channel");
   i2s_std_config_t speaker = {
     .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(LANTERN_SPK_SAMPLE_RATE),
@@ -228,6 +323,7 @@ esp_err_t lantern_audio_init(void) {
   microphone.slot_cfg.slot_mask = I2S_STD_SLOT_LEFT;
   ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_microphone, &microphone), TAG, "microphone mode");
   ESP_RETURN_ON_ERROR(i2s_channel_enable(s_microphone), TAG, "microphone enable");
+#endif
 
   s_retry_buffer = heap_caps_malloc(RETRY_BUFFER_SAMPLES * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (!s_retry_buffer) return ESP_ERR_NO_MEM;
@@ -238,7 +334,8 @@ esp_err_t lantern_audio_init(void) {
   // Agora's synchronous PCM encode/send path runs inside this callback task
   // and needs substantially more stack than the I2S capture loop alone.
   xTaskCreatePinnedToCore(microphone_task, "lantern_mic", 12288, NULL, 6, NULL, 1);
-  ESP_LOGI(TAG, "I2S microphone and speaker ready; meeting retry buffer allocated");
+  ESP_LOGI(TAG, "I2S microphone and speaker ready (%d kHz capture, %d kHz output); meeting retry buffer allocated",
+    LANTERN_MIC_SAMPLE_RATE / 1000, LANTERN_SPK_SAMPLE_RATE / 1000);
   return ESP_OK;
 }
 
@@ -250,14 +347,16 @@ void lantern_audio_chime(unsigned count) {
     xSemaphoreGive(s_speaker_lock);
     return;
   }
-  int32_t samples[AUDIO_WRITE_SAMPLES];
+  i2s_output_sample_t samples[AUDIO_WRITE_SAMPLES * I2S_OUTPUT_CHANNELS];
   for (unsigned tone = 0; tone < count; ++tone) {
     for (int chunk = 0; chunk < 12; ++chunk) {
       for (size_t index = 0; index < AUDIO_WRITE_SAMPLES; ++index) {
         int phase = (int)((index + chunk * AUDIO_WRITE_SAMPLES) % 48);
         int triangle = phase < 24 ? phase : 48 - phase;
-        int32_t value = (triangle - 12) * 420;
-        samples[index] = value * 32768;
+        int16_t value = (int16_t)((triangle - 12) * 420);
+        for (size_t channel = 0; channel < I2S_OUTPUT_CHANNELS; ++channel) {
+          samples[index * I2S_OUTPUT_CHANNELS + channel] = output_sample(value);
+        }
       }
       size_t bytes_written = 0;
       i2s_channel_write(s_speaker, samples, sizeof(samples), &bytes_written, pdMS_TO_TICKS(100));
@@ -281,7 +380,7 @@ esp_err_t lantern_audio_pcm_begin(void) {
   s_pcm_failed = false;
   s_speaker_active = true;
   xTaskNotifyGive(s_pcm_task);
-  ESP_LOGI(TAG, "24 kHz buffered PCM playback opened");
+  ESP_LOGI(TAG, "%d kHz buffered PCM playback opened", LANTERN_TTS_SAMPLE_RATE / 1000);
   return ESP_OK;
 }
 
@@ -357,22 +456,27 @@ unsigned lantern_audio_play_latest(unsigned max_seconds) {
   size_t maximum = (size_t)max_seconds * LANTERN_MIC_SAMPLE_RATE;
   if (input_count > maximum) input_count = maximum;
   size_t first = s_sample_count - input_count;
-  size_t output_count = input_count * 3 / 2;
+  size_t output_count = input_count * LANTERN_SPK_SAMPLE_RATE / LANTERN_MIC_SAMPLE_RATE;
   if (xSemaphoreTake(s_speaker_lock, pdMS_TO_TICKS(500)) != pdTRUE) return 0;
   if (speaker_start_silent() != ESP_OK) {
     xSemaphoreGive(s_speaker_lock);
     return 0;
   }
-  int32_t output[AUDIO_WRITE_SAMPLES];
+  i2s_output_sample_t output[AUDIO_WRITE_SAMPLES * I2S_OUTPUT_CHANNELS];
   for (size_t output_offset = 0; output_offset < output_count;) {
     size_t chunk = output_count - output_offset;
     if (chunk > AUDIO_WRITE_SAMPLES) chunk = AUDIO_WRITE_SAMPLES;
     for (size_t index = 0; index < chunk; ++index) {
-      size_t input_index = first + ((output_offset + index) * 2 / 3);
-      output[index] = (int32_t)buffered_sample(input_index) * 32768;
+      size_t input_index = first +
+        ((output_offset + index) * LANTERN_MIC_SAMPLE_RATE / LANTERN_SPK_SAMPLE_RATE);
+      i2s_output_sample_t sample = output_sample(buffered_sample(input_index));
+      for (size_t channel = 0; channel < I2S_OUTPUT_CHANNELS; ++channel) {
+        output[index * I2S_OUTPUT_CHANNELS + channel] = sample;
+      }
     }
     size_t bytes_written = 0;
-    i2s_channel_write(s_speaker, output, chunk * sizeof(output[0]), &bytes_written, pdMS_TO_TICKS(200));
+    i2s_channel_write(s_speaker, output,
+      chunk * I2S_OUTPUT_CHANNELS * sizeof(output[0]), &bytes_written, pdMS_TO_TICKS(200));
     output_offset += chunk;
   }
   speaker_stop_silent();

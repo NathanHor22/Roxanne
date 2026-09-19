@@ -51,6 +51,7 @@ import {
 import { ApprovalDialog } from "./ApprovalDialog";
 import { RecordingDialog } from "./RecordingDialog";
 import { LanternDevicePanel } from "./LanternDevicePanel";
+import { ConversationDetail } from "./ConversationDetail";
 import styles from "./workspace.module.css";
 
 export type WorkspaceView =
@@ -70,6 +71,7 @@ type WorkspaceProps = {
   account: WorkspaceAccount | null;
   initialMode: WorkspaceMode;
   initialView?: WorkspaceView;
+  initialConversationId?: string;
 };
 
 const viewPath: Record<WorkspaceView, string> = {
@@ -94,6 +96,7 @@ export function Workspace({
   account,
   initialMode,
   initialView = "overview",
+  initialConversationId,
 }: WorkspaceProps) {
   const router = useRouter();
   const workspace = useWorkspace(initialMode);
@@ -119,6 +122,9 @@ export function Workspace({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<MeetingApproval | null>(null);
   const [search, setSearch] = useState("");
+  const [conversationFilter, setConversationFilter] = useState<
+    "all" | "follow-up" | "ready" | "processing"
+  >("all");
   const [personId, setPersonId] = useState<string | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<"pending" | "dismissed">(
     "pending",
@@ -165,6 +171,9 @@ export function Workspace({
   );
   const selectedMeeting =
     meetings.find((meeting) => meeting.id === selectedId) || null;
+  const detailConversation = initialConversationId
+    ? conversations.find((meeting) => meeting.id === initialConversationId) || null
+    : null;
   const grid = getMonthGrid(visibleMonth, { today });
   const monthLabel = new Intl.DateTimeFormat("en-MY", {
     month: "long",
@@ -176,6 +185,14 @@ export function Workspace({
     (conversation) =>
       (!personId ||
         conversation.contacts.some((contact) => contact.id === personId)) &&
+      (conversationFilter === "all" ||
+        (conversationFilter === "follow-up" &&
+          (conversation.followUps || []).some(
+            (followUp) =>
+              followUp.status !== "completed" &&
+              followUp.status !== "dismissed",
+          )) ||
+        conversation.status === conversationFilter) &&
       `${conversation.title} ${conversation.contacts.map((contact) => `${contact.name} ${contact.company}`).join(" ")} ${conversation.insight?.keyPoints.join(" ")}`
         .toLowerCase()
         .includes(normalizedSearch),
@@ -205,6 +222,7 @@ export function Workspace({
   const navigate = (next: WorkspaceView) => {
     setView(next);
     setSearch("");
+    setConversationFilter("all");
     setPersonId(null);
     if (mode === "live") {
       router.push(viewPath[next]);
@@ -229,7 +247,14 @@ export function Workspace({
     }
     return created;
   };
-  const openConversation = (id: string) => setSelectedId(id);
+  const openConversation = (id: string) => {
+    const meeting = meetings.find((entry) => entry.id === id);
+    if (mode === "live" && meeting && isConversation(meeting)) {
+      router.push(`/dashboard/conversations/${encodeURIComponent(id)}`);
+      return;
+    }
+    setSelectedId(id);
+  };
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
@@ -387,6 +412,8 @@ export function Workspace({
               <p className={styles.eyebrow}>
                 {view === "overview"
                   ? "TODAY IN LANTERN"
+                  : view === "conversations" && initialConversationId
+                    ? "CONVERSATION REVIEW"
                   : view === "calendar"
                   ? "A LITTLE CONTEXT. A BETTER FOLLOW-UP."
                   : view === "device"
@@ -398,6 +425,8 @@ export function Workspace({
                   ? mode === "sample"
                     ? "A clear view of every follow-up."
                     : `Welcome back, ${accountName.split(" ")[0]}.`
+                  : view === "conversations" && initialConversationId
+                    ? "Replay, verify, follow through."
                   : view === "calendar"
                   ? "Your conversations, connected."
                   : view === "conversations"
@@ -411,6 +440,8 @@ export function Workspace({
               <p>
                 {view === "overview"
                   ? "Review what needs you, then get back to your clients."
+                  : view === "conversations" && initialConversationId
+                    ? "Use the original recording as your reference and correct anything that needs your judgment."
                   : view === "calendar"
                   ? "What’s coming up, what you agreed, and everything worth remembering."
                   : view === "conversations"
@@ -422,7 +453,7 @@ export function Workspace({
                       : "Manage your account, calendar connection, language, and privacy."}
               </p>
             </div>
-            {view !== "settings" && view !== "device" && (
+            {view !== "settings" && view !== "device" && !initialConversationId && (
               <button
                 className={styles.secondaryButton}
                 onClick={() =>
@@ -456,7 +487,7 @@ export function Workspace({
               </button>
             </div>
           )}
-          {error && (
+          {error && !initialConversationId && (
             <div className={styles.errorBanner} role="alert">
               <span>{error}</span>
               <button
@@ -1138,7 +1169,41 @@ export function Workspace({
                 </>
               )}
 
-              {view === "conversations" && (
+              {view === "conversations" && initialConversationId && (
+                detailConversation ? (
+                  <ConversationDetail
+                    conversation={detailConversation}
+                    mode={mode}
+                    working={working}
+                    error={error}
+                    onBack={() => router.push(viewPath.conversations)}
+                    onTask={(id, completed) =>
+                      void workspace.patchFollowUp(id, {
+                        status: completed ? "completed" : "pending",
+                      })
+                    }
+                    onEditApproval={setEditing}
+                    onApprove={(approval) => void approve(approval)}
+                    onUpdateContact={workspace.patchContact}
+                  />
+                ) : (
+                  <section className={styles.collection}>
+                    <div className={styles.emptyInline}>
+                      <Headphones />
+                      <h3>Conversation not found</h3>
+                      <p>It may have been removed or may belong to another workspace.</p>
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() => router.push(viewPath.conversations)}
+                      >
+                        Back to conversations
+                      </button>
+                    </div>
+                  </section>
+                )
+              )}
+
+              {view === "conversations" && !initialConversationId && (
                 <section className={styles.collection}>
                   <div className={styles.collectionToolbar}>
                     <h2>
@@ -1150,15 +1215,34 @@ export function Workspace({
                         {visibleConversations.length}
                       </span>
                     </h2>
-                    <label className={styles.search}>
-                      <Search />
-                      <input
-                        aria-label="Search conversations"
-                        placeholder="Search people, companies, or details"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                      />
-                    </label>
+                    <div className={styles.collectionControls}>
+                      <label className={styles.search}>
+                        <Search />
+                        <input
+                          aria-label="Search conversations"
+                          placeholder="Search people, companies, or details"
+                          value={search}
+                          onChange={(event) => setSearch(event.target.value)}
+                        />
+                      </label>
+                      <label className={styles.filterSelect}>
+                        <span className="visually-hidden">Filter conversations</span>
+                        <select
+                          aria-label="Filter conversations"
+                          value={conversationFilter}
+                          onChange={(event) =>
+                            setConversationFilter(
+                              event.target.value as typeof conversationFilter,
+                            )
+                          }
+                        >
+                          <option value="all">All conversations</option>
+                          <option value="follow-up">Needs follow-up</option>
+                          <option value="ready">Recap ready</option>
+                          <option value="processing">Processing</option>
+                        </select>
+                      </label>
+                    </div>
                   </div>
                   {visibleConversations.map((conversation) => (
                     <button
@@ -1193,9 +1277,15 @@ export function Workspace({
                         </small>
                       </span>
                       <span className={styles.typePill}>
-                        {conversation.status === "ready"
-                          ? "Recap ready"
-                          : conversation.status}
+                        {(conversation.followUps || []).some(
+                          (followUp) =>
+                            followUp.status !== "completed" &&
+                            followUp.status !== "dismissed",
+                        )
+                          ? "Follow-up"
+                          : conversation.status === "ready"
+                            ? "Recap ready"
+                            : conversation.status}
                       </span>
                       <ArrowUpRight />
                     </button>

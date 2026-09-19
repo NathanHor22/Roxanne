@@ -37,7 +37,9 @@ Thumbs.db
 /hardware/firmware/main/secrets.h
 /hardware/firmware/sdkconfig
 /hardware/lantern-firmware/build/
+/hardware/lantern-firmware/build-v2/
 /hardware/lantern-firmware/.ccache/
 /hardware/lantern-firmware/managed_components/
 /hardware/lantern-firmware/sdkconfig
+/hardware/lantern-firmware/sdkconfig.v2
 /hardware/backups/

@@ -6,9 +6,11 @@ import { Workspace, type WorkspaceView } from "./Workspace";
 export async function WorkspaceRoute({
   mode,
   view,
+  conversationId,
 }: {
   mode: WorkspaceMode;
   view: WorkspaceView;
+  conversationId?: string;
 }) {
   const user = await getAuthenticatedLanternUser();
   const account = user?.email
@@ -20,7 +22,12 @@ export async function WorkspaceRoute({
 
   return (
     <LanguageProvider>
-      <Workspace account={account} initialMode={mode} initialView={view} />
+      <Workspace
+        account={account}
+        initialMode={mode}
+        initialView={view}
+        initialConversationId={conversationId}
+      />
     </LanguageProvider>
   );
 }
