@@ -306,12 +306,23 @@ static esp_err_t accept_recording_consent(void) {
     return ESP_FAIL;
   }
 
-  s_sd_recording_active = lantern_sd_recording_begin(s_cloud_session.session_id) == ESP_OK;
+  esp_err_t sd_start = lantern_sd_recording_begin(s_cloud_session.session_id);
+  s_sd_recording_active = sd_start == ESP_OK;
   s_sd_archive_required = s_sd_recording_active;
   s_recording_duration_seconds = 0;
+#if LANTERN_HAS_SD_CARD
   if (!s_sd_recording_active) {
-    ESP_LOGW(TAG, "microSD archive unavailable; retaining the 30-second PSRAM fallback");
+    ESP_LOGE(TAG, "microSD archive is required on this board: %s", esp_err_to_name(sd_start));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(lantern_network_abort_session(&s_cloud_session));
+    clear_active_session();
+    show_error(RECOVERY_NONE, "SD CARD REQUIRED", "upload_error");
+    return ESP_FAIL;
   }
+#else
+  if (!s_sd_recording_active) {
+    ESP_LOGW(TAG, "microSD unavailable on this board; retaining the 30-second PSRAM archive");
+  }
+#endif
 
   s_state = LOCAL_RECORDING;
   s_recovery = RECOVERY_NONE;
@@ -405,19 +416,23 @@ static void upload_current_session(bool announce_upload) {
       return;
     }
     s_audio_uploaded = true;
-    if (lantern_sd_recording_ready() &&
-        lantern_sd_recording_confirm_uploaded() != ESP_OK) {
-      ESP_LOGW(TAG, "cloud accepted audio but the local SD copy could not be removed");
-    }
   }
 
   lantern_display_show(LANTERN_SCREEN_SAVING, "PROCESSING SUMMARY");
-  if (lantern_network_complete_session(&s_cloud_session) != ESP_OK) {
+  bool transcript_ready = false;
+  if (lantern_network_complete_session(&s_cloud_session, &transcript_ready) != ESP_OK) {
     s_pending_completion = s_cloud_session;
     s_summary_retry_pending = true;
     s_last_summary_retry_at = xTaskGetTickCount();
     session_complete(true);
     return;
+  }
+  if (transcript_ready && lantern_sd_recording_ready()) {
+    if (lantern_sd_recording_confirm_uploaded() != ESP_OK) {
+      ESP_LOGW(TAG, "processed cloud WAV is ready but the local SD copy could not be removed");
+    }
+  } else if (lantern_sd_recording_ready()) {
+    ESP_LOGW(TAG, "transcript unavailable; preserving the complete WAV on microSD");
   }
   session_complete(false);
 }
@@ -432,6 +447,7 @@ static void continue_after_stop(void) {
 }
 
 static void finalise_recording(void) {
+  unsigned expected_seconds = elapsed_state_seconds();
   s_state = LOCAL_SAVING;
   s_state_entered_at = xTaskGetTickCount();
   lantern_audio_set_recording(false);
@@ -454,6 +470,14 @@ static void finalise_recording(void) {
     }
     ESP_LOGI(TAG, "complete SD archive ready: %u bytes, %u seconds",
       (unsigned)archive_bytes, s_recording_duration_seconds);
+    if (expected_seconds > 5 && s_recording_duration_seconds + 2 < expected_seconds) {
+      ESP_LOGE(TAG, "SD archive duration mismatch: recorded=%u expected=%u; preserving local WAV",
+        s_recording_duration_seconds, expected_seconds);
+      ESP_ERROR_CHECK_WITHOUT_ABORT(lantern_network_abort_session(&s_cloud_session));
+      clear_active_session();
+      show_error(RECOVERY_NONE, "SD RECORDING INCOMPLETE", "upload_error");
+      return;
+    }
   } else {
     s_recording_duration_seconds = lantern_audio_buffered_seconds();
   }
@@ -539,11 +563,20 @@ static void retry_pending_summary(bool user_requested) {
   if (!s_summary_retry_pending || s_summary_retrying) return;
   s_summary_retrying = true;
   if (user_requested) lantern_display_show(LANTERN_SCREEN_SAVING, "RETRYING SUMMARY");
-  esp_err_t result = lantern_network_complete_session(&s_pending_completion);
+  bool transcript_ready = false;
+  esp_err_t result = lantern_network_complete_session(
+    &s_pending_completion, &transcript_ready);
   s_last_summary_retry_at = xTaskGetTickCount();
   if (result == ESP_OK) {
     s_summary_retry_pending = false;
     memset(&s_pending_completion, 0, sizeof(s_pending_completion));
+    if (transcript_ready && lantern_sd_recording_ready()) {
+      if (lantern_sd_recording_confirm_uploaded() != ESP_OK) {
+        ESP_LOGW(TAG, "processed cloud WAV is ready but the local SD copy could not be removed");
+      }
+    } else if (lantern_sd_recording_ready()) {
+      ESP_LOGW(TAG, "transcript unavailable; preserving the complete WAV on microSD");
+    }
     ESP_LOGI(TAG, "background summary retry completed");
     if (user_requested) {
       lantern_display_show(LANTERN_SCREEN_COMPLETE, "SUMMARY READY");

@@ -74,7 +74,10 @@ an encoded on-device format plus resumable upload state across power cycles.
 The firmware never formats an inserted card. Use FAT32 for the current ESP-IDF
 build. A card inserted after boot is mounted automatically when the next
 recording starts. A finalized WAV stays under `/lantern` until the backend has
-accepted and attached every chunk; failed uploads leave the local copy intact.
+accepted every chunk and successfully created the transcript. Failed uploads
+or failed transcription leave the complete local WAV intact for recovery. The
+cloud WAV is attached to Replay before transcription begins, so processing
+failures do not hide or replace the recording.
 
 Hold both volume buttons for three seconds on Lantern Original to clear Wi-Fi
 and pairing settings. On touchscreen Lantern V2, hold the screen continuously

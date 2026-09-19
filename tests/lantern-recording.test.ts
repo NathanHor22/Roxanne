@@ -182,6 +182,27 @@ test("Lantern WAV validator accepts the device's canonical recording", () => {
   });
 });
 
+test("Lantern WAV validation preserves a complete five-minute archive", () => {
+  const samples = 16_000 * 60 * 5;
+  const bytes = new Uint8Array(44 + samples * 2);
+  const view = new DataView(bytes.buffer);
+  bytes.set(new TextEncoder().encode("RIFF"), 0);
+  view.setUint32(4, bytes.length - 8, true);
+  bytes.set(new TextEncoder().encode("WAVEfmt "), 8);
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, 16_000, true);
+  view.setUint32(28, 32_000, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  bytes.set(new TextEncoder().encode("data"), 36);
+  view.setUint32(40, samples * 2, true);
+
+  assert.equal(bytes.length, 9_600_044);
+  assert.equal(parseLanternWav(bytes).durationSeconds, 300);
+});
+
 test("Lantern SD upload ranges are strict and deterministically named", () => {
   assert.deepEqual(parseDeviceContentRange(`bytes 0-${DEVICE_AUDIO_CHUNK_BYTES - 1}/9600044`), {
     start: 0,

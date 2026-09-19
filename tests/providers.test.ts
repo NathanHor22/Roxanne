@@ -353,6 +353,26 @@ test("OpenAI fallback rebuilds empty aggregate text from diarized segments", asy
   assert.equal(result.segments.length, 2);
 });
 
+test("OpenAI retries the complete WAV when diarization reports no speech", async () => {
+  const models: string[] = [];
+  const result = await transcribeWithOpenAI(new Blob(["complete-wav"]), {
+    apiKey: "openai-key",
+    fetchImpl: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      assert.ok(init?.body instanceof FormData);
+      models.push(String(init.body.get("model")));
+      return models.length === 1
+        ? new Response(JSON.stringify({ text: "", segments: [] }), { status: 200 })
+        : new Response(JSON.stringify({ text: "Full meeting transcript." }), { status: 200 });
+    }) as typeof fetch,
+  });
+
+  assert.deepEqual(models, ["gpt-4o-transcribe-diarize", "gpt-transcribe"]);
+  assert.equal(result.text, "Full meeting transcript.");
+  assert.deepEqual(result.segments, [
+    { speaker: "Conversation", text: "Full meeting transcript." },
+  ]);
+});
+
 test("OpenAI fallback reports a safe provider error code", async () => {
   const fetchImpl = (async () =>
     new Response(

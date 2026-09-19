@@ -129,7 +129,6 @@ export async function transcribeWithOpenAI(
     ...TRANSCRIPTION_FALLBACK_MODELS.filter((model) => model !== requestedModel),
   ];
 
-  let body = "";
   try {
     for (const [index, model] of models.entries()) {
       let response: Response;
@@ -149,69 +148,77 @@ export async function transcribeWithOpenAI(
         );
       }
 
-      body = await response.text();
-      if (response.ok) break;
+      const body = await response.text();
 
-      const providerCode = readProviderErrorCode(body);
-      const canTryAnotherModel =
-        index < models.length - 1 &&
-        response.status === 403 &&
-        providerCode === "model_not_found";
-      if (canTryAnotherModel) continue;
+      if (!response.ok) {
+        const providerCode = readProviderErrorCode(body);
+        const canTryAnotherModel =
+          index < models.length - 1 &&
+          response.status === 403 &&
+          providerCode === "model_not_found";
+        if (canTryAnotherModel) continue;
 
-      throw new OpenAITranscriptionProviderError(
-        `OpenAI transcription failed with HTTP ${response.status}${
-          providerCode ? ` (${providerCode})` : ""
-        }.`,
-        { status: response.status, providerCode },
-      );
+        throw new OpenAITranscriptionProviderError(
+          `OpenAI transcription failed with HTTP ${response.status}${
+            providerCode ? ` (${providerCode})` : ""
+          }.`,
+          { status: response.status, providerCode },
+        );
+      }
+
+      let decoded: unknown;
+      try {
+        decoded = JSON.parse(body);
+      } catch (error) {
+        throw new OpenAITranscriptionProviderError(
+          "OpenAI returned a non-JSON transcription response.",
+          { cause: error },
+        );
+      }
+      const parsed = openAIResponseSchema.safeParse(decoded);
+      if (!parsed.success) {
+        throw new OpenAITranscriptionProviderError(
+          "OpenAI returned an invalid diarized transcription response.",
+          { cause: parsed.error },
+        );
+      }
+
+      const segments = (parsed.data.segments ?? [])
+        .filter((segment) => segment.text.trim())
+        .map((segment) => ({
+          ...(segment.id ? { id: segment.id } : {}),
+          speaker: `Speaker ${segment.speaker}`,
+          text: segment.text.trim(),
+          startSeconds: segment.start,
+          endSeconds: segment.end,
+        }));
+      const text =
+        parsed.data.text.trim() ||
+        segments.map((segment) => segment.text).join(" ").trim();
+      // Diarization can occasionally return a successful but empty response
+      // for valid speech. Retry the same complete WAV with the standard
+      // transcription models before declaring the archive silent.
+      if (!text && index < models.length - 1) continue;
+      if (!text) {
+        throw new OpenAITranscriptionProviderError(
+          "OpenAI did not detect speech in this recording.",
+        );
+      }
+
+      return transcriptionResultSchema.parse({
+        text,
+        segments: segments.length
+          ? segments
+          : [{ speaker: "Conversation", text }],
+        language: "multilingual",
+        provider: "openai",
+      });
     }
   } finally {
     clearTimeout(timer);
     options.signal?.removeEventListener("abort", abortFromCaller);
   }
-
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(body);
-  } catch (error) {
-    throw new OpenAITranscriptionProviderError(
-      "OpenAI returned a non-JSON transcription response.",
-      { cause: error },
-    );
-  }
-  const parsed = openAIResponseSchema.safeParse(decoded);
-  if (!parsed.success) {
-    throw new OpenAITranscriptionProviderError(
-      "OpenAI returned an invalid diarized transcription response.",
-      { cause: parsed.error },
-    );
-  }
-
-  const segments = (parsed.data.segments ?? [])
-    .filter((segment) => segment.text.trim())
-    .map((segment) => ({
-      ...(segment.id ? { id: segment.id } : {}),
-      speaker: `Speaker ${segment.speaker}`,
-      text: segment.text.trim(),
-      startSeconds: segment.start,
-      endSeconds: segment.end,
-    }));
-  const text =
-    parsed.data.text.trim() ||
-    segments.map((segment) => segment.text).join(" ").trim();
-  if (!text) {
-    throw new OpenAITranscriptionProviderError(
-      "OpenAI did not detect speech in this recording.",
-    );
-  }
-
-  return transcriptionResultSchema.parse({
-    text,
-    segments: segments.length
-      ? segments
-      : [{ speaker: "Conversation", text }],
-    language: "multilingual",
-    provider: "openai",
-  });
+  throw new OpenAITranscriptionProviderError(
+    "OpenAI did not detect speech in this recording.",
+  );
 }

@@ -1278,8 +1278,10 @@ esp_err_t lantern_network_upload_audio(lantern_cloud_session_t *session) {
   return ESP_OK;
 }
 
-esp_err_t lantern_network_complete_session(lantern_cloud_session_t *session) {
+esp_err_t lantern_network_complete_session(
+    lantern_cloud_session_t *session, bool *transcript_ready) {
   if (!session || !session->session_id[0]) return ESP_ERR_INVALID_ARG;
+  if (transcript_ready) *transcript_ready = false;
   char path[160], authorization[140], body[80];
   if (!session->completion_event_id[0]) uuid_v4(session->completion_event_id);
   snprintf(path, sizeof(path), "/api/device/v1/sessions/%s/complete", session->session_id);
@@ -1294,6 +1296,16 @@ esp_err_t lantern_network_complete_session(lantern_cloud_session_t *session) {
     return ESP_FAIL;
   }
   bool valid = parse_session_response(response->data, session, NULL);
+  cJSON *root = valid ? cJSON_Parse(response->data) : NULL;
+  cJSON *meeting = root ? cJSON_GetObjectItemCaseSensitive(root, "meeting") : NULL;
+  cJSON *meeting_status = cJSON_IsObject(meeting)
+    ? cJSON_GetObjectItemCaseSensitive(meeting, "status")
+    : NULL;
+  if (transcript_ready && cJSON_IsString(meeting_status) &&
+      strcmp(meeting_status->valuestring, "ready") == 0) {
+    *transcript_ready = true;
+  }
+  cJSON_Delete(root);
   free(response);
   return valid ? ESP_OK : ESP_FAIL;
 }

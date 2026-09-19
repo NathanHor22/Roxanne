@@ -60,4 +60,6 @@ esp_err_t lantern_network_stop_recording(lantern_cloud_session_t *session);
 esp_err_t lantern_network_abort_session(lantern_cloud_session_t *session);
 esp_err_t lantern_network_upload_transcript(lantern_cloud_session_t *session);
 esp_err_t lantern_network_upload_audio(lantern_cloud_session_t *session);
-esp_err_t lantern_network_complete_session(lantern_cloud_session_t *session);
+esp_err_t lantern_network_complete_session(
+  lantern_cloud_session_t *session,
+  bool *transcript_ready);
