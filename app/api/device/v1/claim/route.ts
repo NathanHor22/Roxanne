@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import {
@@ -21,6 +22,127 @@ const requestSchema = z
   })
   .strict();
 
+type ClaimedLantern = {
+  device_id: string;
+  owner_id: string;
+  device_name: string;
+};
+
+async function claimWithQualifiedQueries(
+  client: SupabaseClient,
+  input: z.infer<typeof requestSchema>,
+  codeHash: string,
+  deviceId: string,
+  credentialHash: string,
+): Promise<ClaimedLantern | null> {
+  const claimedAt = new Date().toISOString();
+  const { data: pairing, error: pairingError } = await client
+    .from("device_pairings")
+    .update({ claimed_at: claimedAt })
+    .eq("code_hash", codeHash)
+    .is("claimed_at", null)
+    .gt("expires_at", claimedAt)
+    .select("id,user_id,device_name")
+    .maybeSingle();
+  if (pairingError) throw new Error(pairingError.message);
+  if (!pairing) return null;
+
+  let completed = false;
+  try {
+    const { data: existing, error: existingError } = await client
+      .from("devices")
+      .select("id,user_id,revoked_at,credential_hash")
+      .eq("hardware_id", input.hardwareId)
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
+    if (existing && existing.user_id !== pairing.user_id) {
+      throw new Error("Lantern hardware is already paired to another owner.");
+    }
+    if (existing && existing.revoked_at === null && existing.credential_hash) {
+      throw new Error("Lantern hardware is already paired; revoke it before pairing again.");
+    }
+
+    let claimedDevice: { id: string; name: string } | null = null;
+    if (existing) {
+      const now = new Date().toISOString();
+      const { error: sessionError } = await client
+        .from("lantern_sessions")
+        .update({ ended_at: now, updated_at: now })
+        .eq("device_id", existing.id)
+        .is("ended_at", null);
+      if (sessionError) throw new Error(sessionError.message);
+
+      const { data, error } = await client
+        .from("devices")
+        .update({
+          name: pairing.device_name,
+          model: input.model,
+          firmware_version: input.firmwareVersion,
+          credential_hash: credentialHash,
+          paired_at: now,
+          revoked_at: null,
+          status: "online",
+          device_state: "ready",
+          state_version: 0,
+          last_error: null,
+          last_seen_at: now,
+          updated_at: now,
+        })
+        .eq("id", existing.id)
+        .select("id,name")
+        .single();
+      if (error || !data) throw new Error(error?.message || "Device reclaim failed.");
+      claimedDevice = data;
+    } else {
+      const now = new Date().toISOString();
+      const { data, error } = await client
+        .from("devices")
+        .insert({
+          id: deviceId,
+          user_id: pairing.user_id,
+          name: pairing.device_name,
+          hardware_id: input.hardwareId,
+          model: input.model,
+          firmware_version: input.firmwareVersion,
+          credential_hash: credentialHash,
+          paired_at: now,
+          status: "online",
+          device_state: "ready",
+          last_seen_at: now,
+        })
+        .select("id,name")
+        .single();
+      if (error || !data) throw new Error(error?.message || "Device registration failed.");
+      claimedDevice = data;
+    }
+
+    const { data: finished, error: finishError } = await client
+      .from("device_pairings")
+      .update({ claimed_device_id: claimedDevice.id })
+      .eq("id", pairing.id)
+      .eq("claimed_at", claimedAt)
+      .select("id")
+      .single();
+    if (finishError || !finished) {
+      throw new Error(finishError?.message || "Pairing completion failed.");
+    }
+    completed = true;
+    return {
+      device_id: claimedDevice.id,
+      owner_id: pairing.user_id,
+      device_name: claimedDevice.name,
+    };
+  } finally {
+    if (!completed) {
+      await client
+        .from("device_pairings")
+        .update({ claimed_at: null, claimed_device_id: null })
+        .eq("id", pairing.id)
+        .eq("claimed_at", claimedAt);
+    }
+  }
+}
+
 export async function POST(request: Request) {
   const client = getServerSupabase();
   if (!client) {
@@ -35,16 +157,31 @@ export async function POST(request: Request) {
     const code = normalizePairingCode(input.pairingCode);
     const deviceId = randomUUID();
     const deviceSecret = createDeviceSecret();
+    const codeHash = hashLanternSecret(code);
+    const credentialHash = hashLanternSecret(deviceSecret);
     const { data, error } = await client.rpc("claim_lantern_pairing", {
-      p_code_hash: hashLanternSecret(code),
+      p_code_hash: codeHash,
       p_device_id: deviceId,
       p_hardware_id: input.hardwareId,
       p_model: input.model,
       p_firmware_version: input.firmwareVersion,
-      p_credential_hash: hashLanternSecret(deviceSecret),
+      p_credential_hash: credentialHash,
     });
-    if (error) throw new Error(error.message);
-    const claimed = Array.isArray(data) ? data[0] : data;
+    const claimed = error
+      ? /column reference ["']device_id["'] is ambiguous/i.test(error.message)
+        ? await claimWithQualifiedQueries(
+            client,
+            input,
+            codeHash,
+            deviceId,
+            credentialHash,
+          )
+        : (() => {
+            throw new Error(error.message);
+          })()
+      : Array.isArray(data)
+        ? data[0]
+        : data;
     if (!claimed?.device_id) {
       return NextResponse.json(
         { error: "The pairing code is invalid or has expired." },
@@ -81,4 +218,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
