@@ -183,7 +183,10 @@ static esp_err_t audio_http_event(esp_http_client_event_t *event) {
   return ESP_OK;
 }
 
-static int post_json(const char *path, const char *body, const char *authorization, response_buffer_t *response) {
+static int post_json_with_timeout(const char *path, const char *body,
+                                  const char *authorization,
+                                  response_buffer_t *response,
+                                  int timeout_ms) {
   char url[256];
   snprintf(url, sizeof(url), "%s%s", LANTERN_API_BASE_URL, path);
   memset(response, 0, sizeof(*response));
@@ -191,7 +194,7 @@ static int post_json(const char *path, const char *body, const char *authorizati
     .url = url,
     .event_handler = http_event,
     .user_data = response,
-    .timeout_ms = 20000,
+    .timeout_ms = timeout_ms,
     .crt_bundle_attach = esp_crt_bundle_attach,
   };
   esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -205,6 +208,11 @@ static int post_json(const char *path, const char *body, const char *authorizati
   if (result != ESP_OK) ESP_LOGW(TAG, "POST %s failed: %s", path, esp_err_to_name(result));
   esp_http_client_cleanup(client);
   return status;
+}
+
+static int post_json(const char *path, const char *body, const char *authorization,
+                     response_buffer_t *response) {
+  return post_json_with_timeout(path, body, authorization, response, 20000);
 }
 
 static int post_binary(const char *path, const char *content_type, const void *body,
@@ -1289,7 +1297,10 @@ esp_err_t lantern_network_complete_session(
   device_authorization(authorization);
   response_buffer_t *response = response_buffer_create();
   if (!response) return ESP_ERR_NO_MEM;
-  int status = post_json(path, body, authorization, response);
+  // Full meeting transcription can legitimately take longer than the normal
+  // control-plane timeout. The endpoint is idempotent, and Vercel allows this
+  // route up to 120 seconds.
+  int status = post_json_with_timeout(path, body, authorization, response, 125000);
   if (status != 201 && status != 200) {
     provider_error("Meeting processing", status, response);
     free(response);

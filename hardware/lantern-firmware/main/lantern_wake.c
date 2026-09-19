@@ -17,7 +17,6 @@ static size_t s_frame_samples;
 static size_t s_frame_filled;
 static volatile bool s_enabled;
 static volatile bool s_detected;
-static bool s_has_processed_frame;
 
 esp_err_t lantern_wake_init(void) {
   s_models = esp_srmodel_init("model");
@@ -88,11 +87,10 @@ void lantern_wake_set_enabled(bool enabled) {
   if (enabled && !s_enabled) {
     s_frame_filled = 0;
     s_detected = false;
-    // WakeNet9's direct-input clean routine assumes its feature queues have
-    // already been populated. Calling it immediately after create() dereferences
-    // an empty queue and reboots the ESP32-S3. The first enable starts from a
-    // new model; subsequent enables can safely clear prior recognition state.
-    if (s_has_processed_frame) s_wakenet->clean(s_model_data);
+    // WakeNet9's clean() is not safe for this direct-input model after a
+    // detection. It dereferences an empty internal convolution queue and
+    // reboots the ESP32-S3. Dropping the partial input frame is sufficient to
+    // re-arm detection while retaining the model's allocated state.
   }
   s_enabled = enabled;
   if (!enabled) {
@@ -124,7 +122,6 @@ void lantern_wake_feed(const int16_t *samples, size_t count) {
 
     if (s_frame_filled != s_frame_samples) continue;
     s_frame_filled = 0;
-    s_has_processed_frame = true;
     wakenet_state_t result = s_wakenet->detect(s_model_data, s_frame);
     if (result == WAKENET_DETECTED) {
       s_enabled = false;

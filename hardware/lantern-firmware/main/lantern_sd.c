@@ -133,6 +133,36 @@ static void unmount_card(void) {
 
 static esp_err_t ensure_writer(void);
 
+// The V2 image intentionally uses the small-footprint FAT configuration,
+// which only accepts DOS 8.3 filenames. Cloud session IDs are UUIDs, so using
+// the full ID as the local filename makes fopen() fail with EINVAL even though
+// the card mounted successfully. Derive an eight-character stem and probe a
+// suffix so an older, unconfirmed recording is never overwritten.
+static esp_err_t choose_recording_paths(const char *session_id) {
+  uint32_t hash = 2166136261u;
+  for (const unsigned char *cursor = (const unsigned char *)session_id; *cursor; ++cursor) {
+    hash ^= *cursor;
+    hash *= 16777619u;
+  }
+
+  for (unsigned attempt = 0; attempt < 256; ++attempt) {
+    char stem[9];
+    snprintf(stem, sizeof(stem), "%06lx%02x",
+      (unsigned long)(hash & 0x00ffffffu), attempt);
+    snprintf(s_temporary_path, sizeof(s_temporary_path),
+      SD_RECORDING_DIRECTORY "/%s.tmp", stem);
+    snprintf(s_recording_path, sizeof(s_recording_path),
+      SD_RECORDING_DIRECTORY "/%s.wav", stem);
+    if (access(s_temporary_path, F_OK) != 0 && access(s_recording_path, F_OK) != 0) {
+      return ESP_OK;
+    }
+  }
+
+  s_temporary_path[0] = '\0';
+  s_recording_path[0] = '\0';
+  return ESP_ERR_NOT_FOUND;
+}
+
 static esp_err_t mount_card(void) {
   if (s_status.mounted) {
     refresh_space();
@@ -309,16 +339,20 @@ esp_err_t lantern_sd_recording_begin(const char *session_id) {
 #else
   if (!session_id || !session_id[0] || s_file) return ESP_ERR_INVALID_STATE;
   if (mount_card() != ESP_OK) return ESP_FAIL;
-  snprintf(s_temporary_path, sizeof(s_temporary_path),
-    SD_RECORDING_DIRECTORY "/%.36s.tmp", session_id);
-  snprintf(s_recording_path, sizeof(s_recording_path),
-    SD_RECORDING_DIRECTORY "/%.36s.wav", session_id);
-  remove(s_temporary_path);
+  esp_err_t path_result = choose_recording_paths(session_id);
+  if (path_result != ESP_OK) {
+    ESP_LOGE(TAG, "no unused FAT 8.3 recording filename is available");
+    return path_result;
+  }
   s_file = fopen(s_temporary_path, "wb+");
   if (!s_file) {
-    ESP_LOGW(TAG, "opening recording failed; remounting card once (errno=%d)", errno);
+    ESP_LOGW(TAG, "opening recording %s failed; remounting card once (errno=%d)",
+      s_temporary_path, errno);
     unmount_card();
-    if (mount_card() == ESP_OK) s_file = fopen(s_temporary_path, "wb+");
+    if (mount_card() == ESP_OK) {
+      path_result = choose_recording_paths(session_id);
+      if (path_result == ESP_OK) s_file = fopen(s_temporary_path, "wb+");
+    }
   }
   if (!s_file) return ESP_FAIL;
   uint8_t placeholder[44] = {0};
