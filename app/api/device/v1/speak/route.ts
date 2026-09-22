@@ -21,7 +21,7 @@ function errorResponse(message: string, status: number) {
 
 export async function POST(request: Request) {
   const client = getServerSupabase();
-  if (!client) return errorResponse("Lantern service is unavailable.", 503);
+  if (!client) return errorResponse("Quipus service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return errorResponse("Device credential is invalid or revoked.", 403);
 
@@ -52,8 +52,8 @@ export async function POST(request: Request) {
   } catch (cause) {
     console.error("[lantern-device-speak]", cause);
     if (cause instanceof z.ZodError || cause instanceof SyntaxError) {
-      return errorResponse("Lantern speech request is invalid.", 400);
+      return errorResponse("Quipus speech request is invalid.", 400);
     }
-    return errorResponse("Lantern speech request failed.", 502);
+    return errorResponse("Quipus speech request failed.", 502);
   }
 }

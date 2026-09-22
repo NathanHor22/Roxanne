@@ -24,7 +24,7 @@ export async function GET() {
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
     Boolean(client),
-    "Supabase is required to load Lantern devices.",
+    "Supabase is required to load Quipus devices.",
   );
   if (readinessError) return readinessError;
   if (!client) {
@@ -65,7 +65,7 @@ export async function GET() {
             ? lanternSchemaUpgradeMessage
             : error instanceof Error
             ? error.message
-            : "Lantern devices could not be loaded.",
+            : "Quipus devices could not be loaded.",
       },
       {
         status: schemaOutdated ? 503 : 500,

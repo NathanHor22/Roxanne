@@ -14,7 +14,8 @@ export async function GET() {
   if (client) {
     const userId = await resolveWorkspaceUserId(client).catch(() => null);
     if (userId) {
-      const { data } = await client.from("provider_connections").select("provider").eq("user_id", userId).eq("provider", "google").maybeSingle();
+      const { data, error } = await client.from("provider_connections").select("provider").eq("user_id", userId).eq("provider", "google").maybeSingle();
+      if (error) return NextResponse.json({ error: "Connection status is temporarily unavailable." }, { status: 503, headers: { "cache-control": "no-store" } });
       if (data) integrations.google = true;
     }
   }

@@ -32,7 +32,7 @@ export function normalizePairingCode(value: string): string {
     normalized.length !== PAIRING_CODE_LENGTH ||
     [...normalized].some((character) => !PAIRING_ALPHABET.includes(character))
   ) {
-    throw new Error("Enter the 10-character Lantern pairing code.");
+    throw new Error("Enter the 10-character Quipus pairing code.");
   }
   return normalized;
 }

@@ -13,6 +13,7 @@ void lantern_audio_chime(unsigned count);
 esp_err_t lantern_audio_pcm_begin(void);
 esp_err_t lantern_audio_pcm_write(const void *data, size_t length);
 void lantern_audio_pcm_end(void);
+void lantern_audio_pcm_cancel(void);
 void lantern_audio_set_recording(bool recording);
 void lantern_audio_set_streaming(bool streaming);
 void lantern_audio_set_frame_callback(lantern_audio_frame_callback_t callback);

@@ -23,7 +23,7 @@ export const runtime = "nodejs";
 
 const requestSchema = z
   .object({
-    name: z.string().trim().min(1).max(100).default("Nathan's Lantern"),
+    name: z.string().trim().min(1).max(100).default("Nathan's Quipus"),
   })
   .strict();
 
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
     Boolean(client),
-    "Supabase is required to pair Lantern.",
+    "Supabase is required to pair Quipus.",
   );
   if (readinessError) return readinessError;
 
@@ -41,12 +41,12 @@ export async function POST(request: Request) {
     const input = requestSchema.parse(await request.json().catch(() => ({})));
     if (!client) {
       return NextResponse.json(
-        { error: "Connect Supabase before pairing Lantern." },
+        { error: "Connect Supabase before pairing Quipus." },
         { status: 503, headers: { "cache-control": "no-store" } },
       );
     }
     const userId = await resolveWorkspaceUserId(client);
-    if (!userId) throw new Error("The Lantern workspace is unavailable.");
+    if (!userId) throw new Error("The Quipus workspace is unavailable.");
 
     const code = createPairingCode();
     const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
           schemaOutdated
             ? lanternSchemaUpgradeMessage
             : error instanceof z.ZodError
-            ? "Lantern pairing details are invalid."
+            ? "Quipus pairing details are invalid."
             : error instanceof Error
               ? error.message
               : "Pairing could not begin.",

@@ -1,4 +1,10 @@
-# Lantern hardware and device protocol
+# Quipus hardware and device protocol
+
+Current release: [Quipus 0.8.0](docs/quipus-release.md), installed on the LCDWIKI
+ES3C28P touchscreen V2 on 22 September 2026. Both board profiles still build.
+Use the [firmware guide](hardware/lantern-firmware/README.md) for current controls.
+The bring-up notes below are historical evidence and retain their original names,
+ports and version numbers; they are not instructions to flash the current board.
 
 Production base URL:
 

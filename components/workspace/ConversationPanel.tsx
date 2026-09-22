@@ -5,6 +5,7 @@ import { FileText, Headphones, MessageSquare, X } from "lucide-react";
 import type { Meeting } from "@/lib/types";
 import { sourceConversation } from "@/lib/workspace/model";
 import styles from "./workspace.module.css";
+import { useWorkspaceTime } from "./WorkspaceTime";
 import {
   ConversationReplay,
   type PlaybackProgress,
@@ -50,6 +51,7 @@ export function ConversationPanel({
   working: string | null;
   error: string | null;
 }) {
+  const { dateLabel, timeLabel } = useWorkspaceTime();
   const dialog = useRef<HTMLDialogElement>(null);
   const playbackProgress = useRef(new Map<string, PlaybackProgress>());
   const [tab, setTab] = useState<"recap" | "replay">("recap");
@@ -289,7 +291,7 @@ export function ConversationPanel({
             )}
             {meeting.sourceConversationId && (
               <p className={styles.privateNote}>
-                This brief is private to your Lantern workspace.
+                This brief is private to your Quipus workspace.
               </p>
             )}
           </div>

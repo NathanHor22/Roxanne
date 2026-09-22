@@ -23,6 +23,7 @@ idf_component_register(
     esp_http_server
     esp_lcd
     esp_netif
+    esp_timer
     fatfs
     esp_wifi
     espressif__esp-sr

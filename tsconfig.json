@@ -37,6 +37,10 @@
   ],
   "exclude": [
     "node_modules",
-    "worker"
+    "worker",
+    "tmp",
+    "output",
+    ".tools",
+    "hardware"
   ]
 }

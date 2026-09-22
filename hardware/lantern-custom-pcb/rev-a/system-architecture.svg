@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="755" height="260" preserveAspectRatio="xMinYMin meet" viewBox="0 0 755 260" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="755" height="260"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-260)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="155" width="145" height="82" rx="6" ry="6" style="stroke: rgb(79%,85%,82%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="12" y="217" style="font-family: Helvetica-Bold; font-size: 11px;fill: rgb(7%,40%,29%); stroke:none;" transform="translate(0,434) scale(1,-1)">4 microphones</text>
+			<text x="12" y="200" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,400) scale(1,-1)">Fixed acoustic positions</text>
+			<text x="12" y="187" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,374) scale(1,-1)">All four captured together</text>
+			<rect x="205" y="155" width="185" height="82" rx="6" ry="6" style="stroke: rgb(79%,85%,82%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="217" y="217" style="font-family: Helvetica-Bold; font-size: 11px;fill: rgb(7%,40%,29%); stroke:none;" transform="translate(0,434) scale(1,-1)">Audio processor</text>
+			<text x="217" y="200" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,400) scale(1,-1)">XVF3800 preferred</text>
+			<text x="217" y="187" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,374) scale(1,-1)">Room capture + voice commands</text>
+			<rect x="455" y="155" width="145" height="82" rx="6" ry="6" style="stroke: rgb(79%,85%,82%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="467" y="217" style="font-family: Helvetica-Bold; font-size: 11px;fill: rgb(7%,40%,29%); stroke:none;" transform="translate(0,434) scale(1,-1)">ESP32-S3</text>
+			<text x="467" y="200" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,400) scale(1,-1)">Recording + controls</text>
+			<text x="467" y="187" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,374) scale(1,-1)">Wi-Fi + account pairing</text>
+			<rect x="652" y="155" width="102" height="82" rx="6" ry="6" style="stroke: rgb(79%,85%,82%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="664" y="217" style="font-family: Helvetica-Bold; font-size: 11px;fill: rgb(7%,40%,29%); stroke:none;" transform="translate(0,434) scale(1,-1)">microSD</text>
+			<text x="664" y="200" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,400) scale(1,-1)">Complete audio</text>
+			<text x="664" y="187" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,374) scale(1,-1)">Upload retry</text>
+			<path d="M 145,197 L 205,197 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="205 197, 198 193, 198 201" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<text x="166.112" y="203.0" style="font-family: Times-Roman; font-size: 8px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,406) scale(1,-1)">audio</text>
+			<path d="M 390,197 L 455,197 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="455 197, 448 193, 448 201" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<text x="416.944" y="203.0" style="font-family: Times-Roman; font-size: 8px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,406) scale(1,-1)">I2S</text>
+			<path d="M 600,197 L 652,197 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="652 197, 645 193, 645 201" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<text x="611.108" y="203.0" style="font-family: Times-Roman; font-size: 8px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,406) scale(1,-1)">SDMMC</text>
+			<rect x="205" y="15" width="185" height="65" rx="6" ry="6" style="stroke: rgb(79%,85%,82%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="217" y="60" style="font-family: Helvetica-Bold; font-size: 11px;fill: rgb(7%,40%,29%); stroke:none;" transform="translate(0,120) scale(1,-1)">Codec / amplifier</text>
+			<text x="217" y="43" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,86) scale(1,-1)">One side-facing speaker</text>
+			<rect x="455" y="15" width="145" height="65" rx="6" ry="6" style="stroke: rgb(79%,85%,82%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="467" y="60" style="font-family: Helvetica-Bold; font-size: 11px;fill: rgb(7%,40%,29%); stroke:none;" transform="translate(0,120) scale(1,-1)">Display + buttons</text>
+			<text x="467" y="43" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,86) scale(1,-1)">Small front screen</text>
+			<rect x="652" y="15" width="102" height="65" rx="6" ry="6" style="stroke: rgb(79%,85%,82%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="664" y="60" style="font-family: Helvetica-Bold; font-size: 11px;fill: rgb(7%,40%,29%); stroke:none;" transform="translate(0,120) scale(1,-1)">Cloud</text>
+			<text x="664" y="43" style="font-family: Helvetica; font-size: 9px;fill: rgb(9%,16%,14%); stroke:none;" transform="translate(0,86) scale(1,-1)">Per-user records</text>
+			<path d="M 297,155 L 297,80 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="297 80, 293 87, 301 87" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<text x="305" y="112" style="font-family: Times-Roman; font-size: 8px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,224) scale(1,-1)">playback</text>
+			<path d="M 527,155 L 527,80 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="527 80, 523 87, 531 87" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<path d="M 600,165 L 704,80 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="704 80, 697 76, 697 84" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<text x="642.444" y="113.5" style="font-family: Times-Roman; font-size: 8px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,227) scale(1,-1)">Wi-Fi</text>
+			<path d="M 482,155 L 482,119 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<path d="M 482,119 L 355,119 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="355 119, 362 115, 362 123" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<path d="M 355,119 L 355,155 Z" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1.5;"/>
+			<polygon points="355 155, 351 148, 359 148" style="stroke: rgb(7%,40%,29%); stroke-linecap: butt; stroke-width: 1; fill: rgb(7%,40%,29%); fill-rule: evenodd;"/>
+			<text x="380" y="99" style="font-family: Times-Roman; font-size: 8px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,198) scale(1,-1)">Playback + echo reference</text>
+			<text x="0" y="126" style="font-family: Helvetica-Bold; font-size: 9px;fill: rgb(55%,34%,7%); stroke:none;" transform="translate(0,252) scale(1,-1)">3-5 m: validation target</text>
+			<text x="0" y="111" style="font-family: Times-Roman; font-size: 8px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,222) scale(1,-1)">Table placement; clear sound holes.</text>
+		</g>
+	</g>
+</svg>

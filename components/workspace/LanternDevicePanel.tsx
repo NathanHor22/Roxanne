@@ -115,7 +115,7 @@ export function LanternDevicePanel({
       const response = await fetch("/api/devices/pairing", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "My Lantern" }),
+        body: JSON.stringify({ name: "My Quipus" }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         pairing?: { code: string; expiresAt: string };
@@ -125,7 +125,7 @@ export function LanternDevicePanel({
         throw new Error(payload.error || "Pairing could not begin.");
       setPairingCode(payload.pairing.code);
       setPairingExpiresAt(payload.pairing.expiresAt);
-      setDeviceNotice("Pairing code ready. Lantern will advertise its setup Wi-Fi until reconnection finishes.");
+      setDeviceNotice("Pairing code ready. Quipus will advertise its setup Wi-Fi until reconnection finishes.");
     } catch (cause) {
       setDeviceError(
         cause instanceof Error ? cause.message : "Pairing could not begin.",
@@ -149,15 +149,15 @@ export function LanternDevicePanel({
         error?: string;
       };
       if (!response.ok || !payload.revoked)
-        throw new Error(payload.error || "Lantern could not be revoked.");
+        throw new Error(payload.error || "Quipus could not be revoked.");
       setDevices((current) => current.filter((device) => device.id !== deviceId));
       setPairingCode(null);
       setDeviceNotice(
-        "Access revoked. Keep Lantern powered on for up to 20 seconds while it opens setup mode, then create a new pairing code.",
+        "Access revoked. Keep Quipus powered on for up to 20 seconds while it opens setup mode, then create a new pairing code.",
       );
     } catch (cause) {
       setDeviceError(
-        cause instanceof Error ? cause.message : "Lantern could not be revoked.",
+        cause instanceof Error ? cause.message : "Quipus could not be revoked.",
       );
     } finally {
       setWorking(false);
@@ -174,20 +174,20 @@ export function LanternDevicePanel({
     return (
       <section className={styles.deviceLoading} aria-live="polite">
         <LoaderCircle />
-        <p>Checking your Lantern…</p>
+        <p>Checking your Quipus…</p>
       </section>
     );
   }
 
   if (mode === "sample" || !primaryDevice) {
     return (
-      <section className={styles.pairingLayout} aria-label="Lantern setup">
+      <section className={styles.pairingLayout} aria-label="Quipus setup">
         <div className={styles.pairingIntro}>
           <span className={styles.pairingIcon}><Radio /></span>
-          <span className={styles.kicker}>PAIR YOUR LANTERN</span>
+          <span className={styles.kicker}>PAIR YOUR QUIPUS</span>
           <h2>Connect the recorder once.</h2>
           <p>
-            Lantern will remember the workspace and upload completed conversations
+            Quipus will remember the workspace and upload completed conversations
             whenever it can reach your 2.4 GHz hotspot.
           </p>
           {mode === "sample" ? (
@@ -236,7 +236,7 @@ export function LanternDevicePanel({
             <li>
               <span>2</span>
               <div>
-                <strong>Join Lantern-XXXX</strong>
+                <strong>Join Quipus-XXXX (Lantern-XXXX on older firmware)</strong>
                 <p>Wait up to 20 seconds after revoking. If it does not appear, hold the touchscreen for eight seconds to reset locally.</p>
               </div>
             </li>
@@ -259,7 +259,7 @@ export function LanternDevicePanel({
             </li>
           </ol>
           <footer>
-            <ShieldCheck /> Your hotspot password stays on the Lantern.
+            <ShieldCheck /> Your hotspot password stays on the Quipus.
           </footer>
         </div>
       </section>
@@ -269,14 +269,14 @@ export function LanternDevicePanel({
   const deviceHealthy = primaryDevice.status === "online" && !primaryDevice.last_error;
 
   return (
-    <section className={styles.healthLayout} aria-label="Lantern device health">
+    <section className={styles.healthLayout} aria-label="Quipus device health">
       <header className={styles.healthHero}>
         <div className={styles.deviceIdentity}>
           <span className={styles.connectedRing}><Radio /></span>
           <div>
             <span className={styles.kicker}>PAIRED DEVICE</span>
             <h2>{primaryDevice.name}</h2>
-            <p>{primaryDevice.model || "ESP32-S3 Lantern"} · {lastSeen}</p>
+            <p>{primaryDevice.model || "ESP32-S3 Quipus"} · {lastSeen}</p>
           </div>
         </div>
         <span className={deviceHealthy ? styles.onlineBadge : styles.attentionBadge}>
@@ -290,7 +290,7 @@ export function LanternDevicePanel({
       <div className={styles.healthStats}>
         <article>
           <BatteryMedium />
-          <span><strong>{primaryDevice.battery_level ?? "—"}%</strong><small>Battery</small></span>
+          <span><strong>{primaryDevice.battery_level === null ? "Not measured" : `${primaryDevice.battery_level}%`}</strong><small>Battery</small></span>
         </article>
         <article>
           <Signal />
@@ -339,14 +339,14 @@ export function LanternDevicePanel({
           <a className={styles.wifiAction} href={setupAddress} target="_blank" rel="noreferrer">
             <Wifi /> Reconfigure Wi-Fi <ExternalLink />
           </a>
-          <p>Join the Lantern-XXXX setup network before opening the Wi-Fi page.</p>
+          <p>Join the Quipus-XXXX (Lantern-XXXX on older firmware) setup network before opening the Wi-Fi page.</p>
         </aside>
       </div>
 
       <footer className={styles.deviceDangerZone}>
         <div>
-          <strong>Remove this Lantern</strong>
-          <p>Revoking access stops uploads and makes the device reopen pairing setup when it next contacts Lantern.</p>
+          <strong>Remove this Quipus</strong>
+          <p>Revoking access stops uploads and makes the device reopen pairing setup when it next contacts Quipus.</p>
         </div>
         <button disabled={working} onClick={() => void revokeDevice(primaryDevice.id)}>
           <Unplug /> {working ? "Removing…" : "Revoke device"}

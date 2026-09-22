@@ -23,7 +23,7 @@ function noStore(error: string, status: number) {
 
 export async function POST(request: Request) {
   const client = getServerSupabase();
-  if (!client) return noStore("Lantern service is unavailable.", 503);
+  if (!client) return noStore("Quipus service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return noStore("Device credential is invalid or revoked.", 403);
 
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
         .select("id")
         .maybeSingle();
       if (updateError) throw new Error(updateError.message);
-      if (!updated) return noStore("Lantern state changed. Hold to retry.", 409);
+      if (!updated) return noStore("Quipus state changed. Hold to retry.", 409);
       return NextResponse.json(
         { session: ready, duplicate: false },
         { headers: { "cache-control": "no-store" } },
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
     const current = lanternMachineSchema.parse(active.machine);
     if (Number(active.state_version) !== current.version) {
-      return noStore("Lantern session state is stale. Hold to retry.", 409);
+      return noStore("Quipus session state is stale. Hold to retry.", 409);
     }
     const ready = advanceLantern(current, { type: "RESET", at: resetAt });
     const { data: transitionRows, error: transitionError } = await client.rpc(
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
       ? transitionRows[0]
       : transitionRows;
     if (!transition?.applied) {
-      return noStore("Lantern session changed. Hold to retry.", 409);
+      return noStore("Quipus session changed. Hold to retry.", 409);
     }
 
     if (active.agora_stt_agent_id) {
@@ -143,8 +143,8 @@ export async function POST(request: Request) {
     console.error("[lantern-explicit-restart]", error);
     return noStore(
       error instanceof z.ZodError
-        ? "Lantern restart request is invalid."
-        : "Lantern session could not restart.",
+        ? "Quipus restart request is invalid."
+        : "Quipus session could not restart.",
       error instanceof z.ZodError ? 400 : 500,
     );
   }

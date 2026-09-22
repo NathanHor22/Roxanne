@@ -35,7 +35,7 @@ export async function requireAuthenticatedSession(): Promise<NextResponse | null
   if (mode === "disabled") return null;
   if (mode === "misconfigured") {
     return noStoreError(
-      "Lantern authentication is not configured correctly.",
+      "Quipus authentication is not configured correctly.",
       503,
     );
   }

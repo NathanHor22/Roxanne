@@ -10,6 +10,7 @@ import {
   advanceLantern,
   createLanternMachine,
   lanternMachineSchema,
+  RECORDING_CONSENT_WINDOW_MS,
 } from "@/lib/lantern-state";
 import { getServerSupabase } from "@/lib/supabase/server";
 
@@ -31,7 +32,7 @@ function noStore(error: string, status: number) {
 
 export async function POST(request: Request) {
   const client = getServerSupabase();
-  if (!client) return noStore("Lantern service is unavailable.", 503);
+  if (!client) return noStore("Quipus service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return noStore("Device credential is invalid or revoked.", 403);
 
@@ -91,18 +92,18 @@ export async function POST(request: Request) {
       if (recoveryError) throw new Error(recoveryError.message);
       const recovery = Array.isArray(rows) ? rows[0] : rows;
       if (!recovery?.applied) {
-        return noStore("Lantern recovery changed. Please retry.", 409);
+        return noStore("Quipus recovery changed. Please retry.", 409);
       }
       active = null;
       effectiveDeviceState = "ready";
     }
 
     if (effectiveDeviceState !== "ready" && effectiveDeviceState !== "report_ready") {
-      return noStore(`Lantern cannot start while it is ${effectiveDeviceState}.`, 409);
+      return noStore(`Quipus cannot start while it is ${effectiveDeviceState}.`, 409);
     }
     if (active) {
       return noStore(
-        `Lantern already has an active ${active.state} session.`,
+        `Quipus already has an active ${active.state} session.`,
         409,
       );
     }
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
             at: now.toISOString(),
             sessionId,
             promptId: randomUUID(),
-            promptExpiresAt: new Date(now.getTime() + 30_000).toISOString(),
+            promptExpiresAt: new Date(now.getTime() + RECORDING_CONSENT_WINDOW_MS).toISOString(),
           })
         : advanceLantern(createLanternMachine("ready"), {
             type: "BEGIN_STATUS",
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
     });
     if (sessionError) {
       if (sessionError.code === "23505") {
-        return noStore("Lantern already has an active session.", 409);
+        return noStore("Quipus already has an active session.", 409);
       }
       throw new Error(sessionError.message);
     }
@@ -163,8 +164,8 @@ export async function POST(request: Request) {
     console.error("[lantern-session-start]", error);
     return noStore(
       error instanceof z.ZodError
-        ? "Lantern session request is invalid."
-        : "Lantern session could not start.",
+        ? "Quipus session request is invalid."
+        : "Quipus session could not start.",
       error instanceof z.ZodError ? 400 : 500,
     );
   }

@@ -1,0 +1,9 @@
+{
+  "valid_solids": 134,
+  "watertight_meshes": 134,
+  "limits": [
+    "Component packages/enclosures are simplified envelopes.",
+    "No routed copper, footprint validation, case fit or acoustic test.",
+    "Array support locations and connector mates are provisional."
+  ]
+}

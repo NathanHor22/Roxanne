@@ -1,5 +1,5 @@
 {
-  "name": "lantern",
+  "name": "quipus",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -32,6 +32,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",

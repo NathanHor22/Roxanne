@@ -14,6 +14,19 @@ function required(env: NodeJS.ProcessEnv, key: string): string {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
+  if (env.LANTERN_APP_URL || env.PROCESSING_WORKER_SECRET) {
+    if (!env.LANTERN_APP_URL || !env.PROCESSING_WORKER_SECRET || env.PROCESSING_WORKER_SECRET.length < 32) {
+      throw new Error("Set LANTERN_APP_URL and a PROCESSING_WORKER_SECRET of at least 32 characters together.");
+    }
+    const app = new URL(env.LANTERN_APP_URL);
+    if (app.protocol !== "https:" || app.username || app.password) throw new Error("LANTERN_APP_URL must be an HTTPS application URL.");
+  }
+  if (env.MEDIA_STORAGE_ORIGIN) {
+    const storage = new URL(env.MEDIA_STORAGE_ORIGIN);
+    if (storage.protocol !== "https:" || storage.username || storage.password || storage.pathname !== "/" || storage.search || storage.hash) {
+      throw new Error("MEDIA_STORAGE_ORIGIN must be the HTTPS Supabase project origin, without a path.");
+    }
+  }
   const databaseUrl = required(env, "DATABASE_URL");
   const relayToken = required(env, "WHATSAPP_RELAY_TOKEN");
   if (Buffer.byteLength(relayToken, "utf8") < 24) {

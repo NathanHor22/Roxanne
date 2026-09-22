@@ -45,31 +45,31 @@ async function assembleUploadParts(
     limit: 100,
     sortBy: { column: "name", order: "asc" },
   });
-  if (error) throw new Error(`Could not inspect Lantern audio chunks: ${error.message}`);
+  if (error) throw new Error(`Could not inspect Quipus audio chunks: ${error.message}`);
   const entries = (data || [])
     .map((entry) => ({ entry, offset: Number.parseInt(entry.name.split(".", 1)[0] || "", 10) }))
     .filter(({ entry, offset }) => entry.name.endsWith(".part") && Number.isSafeInteger(offset))
     .sort((left, right) => left.offset - right.offset);
-  if (!entries.length) throw new Error("Lantern audio chunks are missing.");
+  if (!entries.length) throw new Error("Quipus audio chunks are missing.");
 
   const chunks: Buffer[] = [];
   let nextOffset = 0;
   for (const { entry, offset } of entries) {
-    if (offset !== nextOffset) throw new Error(`Lantern audio is missing byte ${nextOffset}.`);
+    if (offset !== nextOffset) throw new Error(`Quipus audio is missing byte ${nextOffset}.`);
     const { data: part, error: downloadError } = await client.storage
       .from("recordings")
       .download(`${prefix}/${entry.name}`);
     if (downloadError || !part) {
-      throw new Error(`Could not read Lantern audio chunk: ${downloadError?.message || entry.name}`);
+      throw new Error(`Could not read Quipus audio chunk: ${downloadError?.message || entry.name}`);
     }
     const bytes = Buffer.from(await part.arrayBuffer());
     if (!bytes.length || nextOffset + bytes.length > expectedBytes) {
-      throw new Error("Lantern audio chunk length is invalid.");
+      throw new Error("Quipus audio chunk length is invalid.");
     }
     chunks.push(bytes);
     nextOffset += bytes.length;
   }
-  if (nextOffset !== expectedBytes) throw new Error(`Lantern audio is missing byte ${nextOffset}.`);
+  if (nextOffset !== expectedBytes) throw new Error(`Quipus audio is missing byte ${nextOffset}.`);
   return new Uint8Array(Buffer.concat(chunks, expectedBytes));
 }
 
@@ -93,7 +93,7 @@ async function attachAudio(
     const { error: uploadError } = await client.storage
       .from("recordings")
       .upload(uploadedPath, bytes, { contentType: "audio/wav", upsert: false });
-    if (uploadError) throw new Error(`Could not store Lantern audio: ${uploadError.message}`);
+    if (uploadError) throw new Error(`Could not store Quipus audio: ${uploadError.message}`);
     objectStored = true;
     const { error: rowError } = await client.from("recordings").insert({
       id: recordingId,
@@ -108,7 +108,7 @@ async function attachAudio(
         bytes: bytes.length,
       },
     });
-    if (rowError) throw new Error(`Could not save Lantern recording: ${rowError.message}`);
+    if (rowError) throw new Error(`Could not save Quipus recording: ${rowError.message}`);
     rowStored = true;
     const { data: attached, error: sessionError } = await client
       .from("lantern_sessions")
@@ -139,7 +139,7 @@ async function attachAudio(
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const client = getServerSupabase();
-  if (!client) return response("Lantern service is unavailable.", 503);
+  if (!client) return response("Quipus service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return response("Device credential is invalid or revoked.", 403);
 
@@ -150,12 +150,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         request.headers.get("x-roxanne-event-id"),
     );
     if (request.headers.get("content-type")?.split(";", 1)[0] !== "audio/wav") {
-      return response("Lantern audio must be a WAV file.", 415);
+      return response("Quipus audio must be a WAV file.", 415);
     }
     const contentRange = parseDeviceContentRange(request.headers.get("content-range"));
     const declaredLength = Number(request.headers.get("content-length") || 0);
     if (declaredLength > (contentRange ? DEVICE_AUDIO_CHUNK_BYTES : MAX_DEVICE_WAV_BYTES)) {
-      return response("Lantern WAV payload is too large.", 413);
+      return response("Quipus WAV payload is too large.", 413);
     }
 
     const { data: stored, error: lookupError } = await client
@@ -166,7 +166,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       .eq("user_id", device.userId)
       .maybeSingle();
     if (lookupError) throw new Error(lookupError.message);
-    if (!stored) return response("Lantern session was not found.", 404);
+    if (!stored) return response("Quipus session was not found.", 404);
     if (stored.audio_event_id === eventId && stored.recording_id) {
       return NextResponse.json(
         { accepted: true, duplicate: true, complete: true, recordingId: stored.recording_id },
@@ -182,9 +182,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const bytes = new Uint8Array(await request.arrayBuffer());
-    if (!bytes.length) return response("Lantern audio payload is empty.", 400);
+    if (!bytes.length) return response("Quipus audio payload is empty.", 400);
     if (!contentRange) {
-      if (bytes.length > MAX_DEVICE_WAV_BYTES) return response("Lantern WAV is too large.", 413);
+      if (bytes.length > MAX_DEVICE_WAV_BYTES) return response("Quipus WAV is too large.", 413);
       const attached = await attachAudio(
         client, device, id, eventId, machine.recordingStartedAt, bytes,
       );
@@ -197,7 +197,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (contentRange.total > MAX_DEVICE_WAV_BYTES ||
         contentRange.length > DEVICE_AUDIO_CHUNK_BYTES ||
         contentRange.length !== bytes.length) {
-      return response("Lantern audio chunk is outside the accepted range.", 413);
+      return response("Quipus audio chunk is outside the accepted range.", 413);
     }
     const prefix = uploadPrefix(device, id, eventId);
     const partPath = `${prefix}/${deviceAudioPartName(contentRange.start)}`;
@@ -205,7 +205,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       contentType: "audio/wav",
       upsert: true,
     });
-    if (partError) throw new Error(`Could not store Lantern audio chunk: ${partError.message}`);
+    if (partError) throw new Error(`Could not store Quipus audio chunk: ${partError.message}`);
 
     if (contentRange.end + 1 < contentRange.total) {
       return NextResponse.json(
@@ -226,7 +226,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   } catch (cause) {
     console.error("[lantern-audio-upload]", cause);
     if (cause instanceof z.ZodError) return response("Audio request is invalid.", 400);
-    const message = cause instanceof Error ? cause.message : "Lantern audio could not be saved.";
+    const message = cause instanceof Error ? cause.message : "Quipus audio could not be saved.";
     if (message.includes("Content-Range")) return response(message, 400);
     return response(message, 422);
   }

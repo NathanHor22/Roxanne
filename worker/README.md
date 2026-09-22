@@ -24,8 +24,22 @@ to Vercel: serverless instances cannot reliably retain a WhatsApp Web socket.
    the same WhatsApp session.
 8. Set Vercel `WHATSAPP_RELAY_URL` to the Railway public URL.
 
-The only permitted phone is hard-coded as `601154444038`. Both pairing and
-sending reject any other destination.
+Pairing and the legacy `/send` route remain bound to `601154444038`.
+The authenticated `/send-report` route also supports a client number after the
+application records explicit per-meeting sharing approval. Its bearer token is
+a server credential; never expose it to a browser or a device.
+
+For complete audio reports, set `MEDIA_STORAGE_ORIGIN` to the Supabase project
+origin (for example `https://project.supabase.co`). Only signed WAV URLs under
+that origin's private `recordings` bucket are accepted; redirects are refused.
+Transcript text is delivered as a UTF-8 document, and the original WAV as a file.
+
+Set `LANTERN_APP_URL` to the HTTPS web deployment and `PROCESSING_WORKER_SECRET`
+to the same random 32+ character value used in Vercel. The worker wakes the durable
+recording and report queues every minute, including while no dashboard is open.
+Apply application migrations `009_audio_delivery.sql` and
+`010_reports_and_delivery.sql` before enabling this. See
+[`docs/recording-delivery-rollout.md`](../docs/recording-delivery-rollout.md).
 
 ## Pairing
 

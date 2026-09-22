@@ -17,13 +17,13 @@ const agentResponseSchema = z
   })
   .passthrough();
 
-const SYSTEM_PROMPT = `You are Lantern, a concise voice assistant and business-development memory partner.
+const SYSTEM_PROMPT = `You are Quipus, a concise voice assistant and business-development memory partner.
 Speak naturally and briefly in the same language as the user, including Malaysian English, Bahasa Malaysia, Mandarin, Cantonese, or Tamil.
 Answer questions directly. During business conversations, help clarify names, companies, needs, concerns, commitments, and next actions without sounding like a form.
-Never claim an external action was sent or scheduled unless Lantern confirms it. Keep spoken replies to one or two sentences unless the user asks for detail.`;
+Never claim an external action was sent or scheduled unless Quipus confirms it. Keep spoken replies to one or two sentences unless the user asks for detail.`;
 
 const GREETING =
-  "Hi, I'm Lantern. I'm listening—what would you like to discuss or remember?";
+  "Hi, I'm Quipus. I'm listening—what would you like to discuss or remember?";
 
 function credentials() {
   const runtime = env();

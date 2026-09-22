@@ -5,6 +5,8 @@ import { Check, X } from "lucide-react";
 import type { MeetingApproval, WorkspaceMode } from "@/lib/workspace/model";
 import { scheduleDetailsSchema } from "@/lib/workspace/model";
 import styles from "./workspace.module.css";
+import { useWorkspaceTime } from "./WorkspaceTime";
+import { localDateTime, localDateTimeToIso } from "@/lib/workspace-time";
 
 export function ApprovalDialog({
   approval,
@@ -21,6 +23,7 @@ export function ApprovalDialog({
   onApprove: (approval: MeetingApproval) => Promise<unknown>;
   executionError: string | null;
 }) {
+  const { timezone } = useWorkspaceTime();
   const dialog = useRef<HTMLDialogElement>(null);
   const [title, setTitle] = useState("");
   const [dateTime, setDateTime] = useState("");
@@ -36,9 +39,7 @@ export function ApprovalDialog({
     setTitle(approval.title);
     setDateTime(
       approval.details.startAt
-        ? new Date(Date.parse(approval.details.startAt) + 8 * 3600_000)
-            .toISOString()
-            .slice(0, 16)
+        ? localDateTime(approval.details.startAt, timezone)
         : "",
     );
     setDuration(approval.details.durationMinutes?.toString() || "");
@@ -46,7 +47,7 @@ export function ApprovalDialog({
     setLocation(approval.details.location || "");
     setError(null);
     dialog.current?.showModal();
-  }, [approval]);
+  }, [approval, timezone]);
   if (!approval) return null;
   return (
     <dialog
@@ -65,7 +66,7 @@ export function ApprovalDialog({
           try {
             const details = scheduleDetailsSchema.parse({
               ...approval.details,
-              startAt: new Date(`${dateTime}:00+08:00`).toISOString(),
+              startAt: localDateTimeToIso(dateTime, timezone),
               durationMinutes: Number(duration),
               attendees: email
                 .split(",")
@@ -118,7 +119,7 @@ export function ApprovalDialog({
         </label>
         <div className={styles.formRow}>
           <label>
-            Date & time · MYT
+            Date & time · {timezone.replaceAll("_", " ")}
             <input
               type="datetime-local"
               required

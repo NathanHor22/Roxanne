@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { loadDeviceBriefing } from "@/lib/device-briefing-service";
+import { answerVoicePrompt, createVoicePrompt } from "@/lib/device-dialogue";
+import { deviceSpeechPage } from "@/lib/device-speech-response";
 import { createAcknowledgementTone, deviceAudioRate } from "@/lib/device-audio";
 import {
   commandReply,
@@ -12,6 +14,8 @@ import { authenticateLantern } from "@/lib/lantern-device-auth";
 import { createOpenAISpeech } from "@/lib/providers/openai-speech";
 import { transcribeWithOpenAI } from "@/lib/providers/openai-transcription";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { prepareReportQuery } from "@/lib/device-report-session";
+import { parseReportRequest } from "@/lib/report-request";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -23,6 +27,8 @@ const contextSchema = z.enum([
   "wake_command",
   "consent",
   "consent_retry",
+  "action",
+  "report",
 ]);
 const MAX_COMMAND_BYTES = 320 * 1024;
 
@@ -40,7 +46,7 @@ function batteryLevel(request: Request) {
 
 export async function POST(request: Request) {
   const client = getServerSupabase();
-  if (!client) return errorResponse("Lantern service is unavailable.", 503);
+  if (!client) return errorResponse("Quipus service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return errorResponse("Device credential is invalid or revoked.", 403);
 
@@ -50,15 +56,15 @@ export async function POST(request: Request) {
     ) as DeviceCommandContext;
     const contentType = request.headers.get("content-type")?.toLowerCase() || "";
     if (!contentType.startsWith("audio/wav")) {
-      return errorResponse("Lantern voice commands require WAV audio.", 415);
+      return errorResponse("Quipus voice commands require WAV audio.", 415);
     }
     const declaredLength = Number(request.headers.get("content-length") || 0);
     if (declaredLength > MAX_COMMAND_BYTES) {
-      return errorResponse("Lantern voice command is too long.", 413);
+      return errorResponse("Quipus voice command is too long.", 413);
     }
     const bytes = await request.arrayBuffer();
     if (bytes.byteLength <= 44 || bytes.byteLength > MAX_COMMAND_BYTES) {
-      return errorResponse("Lantern voice command is empty or too long.", 400);
+      return errorResponse("Quipus voice command is empty or too long.", 400);
     }
 
     const transcription = await transcribeWithOpenAI(
@@ -71,14 +77,38 @@ export async function POST(request: Request) {
         modelId: "whisper-1",
         prompt:
           context === "wake_word"
-            ? "Lantern. Green Lantern. Ring."
-            : context === "consent" || context === "consent_retry"
+            ? "Computer. Quipus."
+            : context === "consent" || context === "consent_retry" || context === "action"
               ? "Yes. No. Yeah. Ya. Tidak. Boleh. Tak."
-              : "Start recording. Stop recording. Status report.",
+              : "Start recording. Status report. Full breakdown. Third meeting. Yesterday. At two pm. Continue my report. Stop.",
         timeoutMs: 45_000,
       },
     );
+    if (context === "action") {
+      const token = z.string().uuid().parse(request.headers.get("x-lantern-review-token"));
+      const reply = await answerVoicePrompt(client, device, token, transcription.text);
+      return await deviceSpeechPage(client, device, { ...reply, intent: reply.token === token ? "action_unclear" : "action_reply" });
+    }
     const intent = interpretDeviceCommand(transcription.text, context);
+    const protocol3 = request.headers.get("x-lantern-protocol") === "3";
+    if (protocol3 && (context === "report" || (context === "wake_command" && intent !== "start_recording" && parseReportRequest(transcription.text, "Asia/Kuala_Lumpur").action !== "unknown"))) {
+      const contextId = z.string().uuid().optional().parse(request.headers.get("x-quipus-context-id") || undefined);
+      const playbackId = z.string().uuid().optional().parse(request.headers.get("x-quipus-playback-id") || undefined);
+      const page = request.headers.get("x-quipus-playback-page");
+      const playbackPage = page === null ? undefined : z.coerce.number().int().min(0).max(10000).parse(page);
+      return await deviceSpeechPage(client, device, await prepareReportQuery(client, device, { text: transcription.text, contextId, playbackId, playbackPage }));
+    }
+    if (intent === "status_report") {
+      // New firmware fetches the paged report after this short acknowledgement.
+      if (request.headers.get("x-lantern-protocol") === "2") {
+        return await deviceSpeechPage(client, device, { speech: "Preparing your status report.", intent });
+      }
+      const briefing = await loadDeviceBriefing(client, device.userId, "status", batteryLevel(request));
+      const reply = briefing.followUpIds.length
+        ? await createVoicePrompt(client, device, "review", {}, briefing.followUpIds, briefing.speech)
+        : { speech: briefing.speech };
+      return await deviceSpeechPage(client, device, { ...reply, intent });
+    }
     if (
       (context === "wake" || context === "wake_word" || context === "wake_command") &&
       intent === "unknown"
@@ -91,15 +121,7 @@ export async function POST(request: Request) {
         },
       });
     }
-    const speech =
-      intent === "status_report"
-        ? (await loadDeviceBriefing(
-            client,
-            device.userId,
-            "status",
-            batteryLevel(request),
-          )).speech
-        : commandReply(intent, context);
+    const speech = commandReply(intent, context);
     let audioBody: BodyInit | null;
     let voiceOutput = "speech";
     if (context === "wake_command" && intent === "start_recording") {
@@ -127,9 +149,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : "Lantern voice command failed.";
+    const message = cause instanceof Error ? cause.message : "Quipus voice command failed.";
     if (
-      ["wake", "wake_word", "wake_command"].includes(
+      ["wake", "wake_word", "wake_command", "report"].includes(
         request.headers.get("x-lantern-command-context") || "",
       ) &&
       message === "OpenAI did not detect speech in this recording."
@@ -144,7 +166,7 @@ export async function POST(request: Request) {
     }
     console.error("[lantern-device-command]", cause);
     if (cause instanceof z.ZodError || cause instanceof SyntaxError) {
-      return errorResponse("Lantern voice command request is invalid.", 400);
+      return errorResponse("Quipus voice command request is invalid.", 400);
     }
     if (
       message.startsWith("OpenAI transcription is not configured") ||
@@ -152,6 +174,6 @@ export async function POST(request: Request) {
     ) {
       return errorResponse(message, 503);
     }
-    return errorResponse("Lantern could not understand that voice command.", 502);
+    return errorResponse("Quipus could not understand that voice command.", 502);
   }
 }

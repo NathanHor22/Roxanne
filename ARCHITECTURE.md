@@ -1,28 +1,28 @@
-# Lantern architecture
+# Quipus architecture
 
 ## First-phase behavior
 
-Lantern separates a conversation that already happened from a meeting agreed
+Quipus separates a conversation that already happened from a meeting agreed
 for the future. A captured conversation holds the transcript, recap, and
 follow-ups. A schedule follow-up becomes a dashboard approval. Explicit
-approval creates a Google Calendar event; opening that event in Lantern shows
+approval creates a Google Calendar event; opening that event in Quipus shows
 the original conversation's bullet recap and preparation tasks. Conversations
 with an archived recording can also replay the original audio.
 
 The intended wearable path is Agora transcription followed by OpenAI
 understanding. This phase implements the completed-transcript boundary, the
-downstream software, and a provider-independent Lantern device core. It does
+downstream software, and a provider-independent Quipus device core. It does
 not yet implement passive wearable audio transport or production provider
 adapters.
 
 ```mermaid
 flowchart TD
-    A[Lantern quick meeting state machine] --> B[Device-authenticated gateway]
+    A[Quipus quick meeting state machine] --> B[Device-authenticated gateway]
     B -. future audio and final segments .-> C[POST /api/conversations]
     D[Completed transcript import] --> C
     C --> E[OpenAI structured extraction]
     E --> F[Supabase conversation, recap, follow-ups]
-    F --> M[Lantern Relay]
+    F --> M[Quipus Relay]
     M --> N[OpenAI structured matching]
     O[Exa public company research] --> N
     N --> P[Owner reviews introduction]
@@ -38,7 +38,7 @@ flowchart TD
 
 The calendar provides month and agenda views. Conversations and People provide
 other ways to reach the same context. Settings exposes the Google connection
-and a route into the authenticated workspace. Lantern provides an interactive
+and a route into the authenticated workspace. Quipus provides an interactive
 simulator on the public sample and pairing, revocation, and telemetry in live
 mode.
 
@@ -46,7 +46,7 @@ mode.
 
 | Boundary | Implementation | Current behavior |
 | --- | --- | --- |
-| Lantern state machine | `lib/lantern-state.ts` | Enforces consent, recording, pause/reconnect, status-report, and pending-approval transitions without provider calls. |
+| Quipus state machine | `lib/lantern-state.ts` | Enforces consent, recording, pause/reconnect, status-report, and pending-approval transitions without provider calls. |
 | Device identity | `lib/lantern-device-auth.ts`, migration 004 | Claims an expiring one-time code and validates a revocable per-device secret whose digest is stored server-side. |
 | Device controls and consent | Centre-button firmware state machine, `/api/device/v1/command`, `/api/device/v1/speak`, firmware 0.3.1 | Keeps idle silent; short press opens server-bound spoken yes/no consent, a recording stops from the centre button, long press while ready plays the actual daily status report, and external invitations remain approval-only in the dashboard. |
 | Device sessions | `/api/device/v1/sessions` and `/api/device/v1/sessions/[id]/events` | Stores versioned, idempotent state transitions and rejects stale events. |
@@ -79,7 +79,7 @@ AI agent, receive its transcript, and extract after completion. Those routes
 are legacy behavior; the passive wearable should later feed normalized final
 segments into the new boundary through authenticated device transport.
 
-## Lantern Relay
+## Quipus Relay
 
 Relay is the net-new hackathon agent layer. It treats the event as an essential
 place: conversations captured there become a temporary relationship graph, and
@@ -96,7 +96,7 @@ addresses, audio URLs, recordings, follow-ups, and unrelated meeting fields are
 excluded from the OpenAI request. The request uses the Responses API with
 `store: false` and a strict JSON schema.
 
-OpenAI can return at most four proposals. Lantern then verifies that both
+OpenAI can return at most four proposals. Quipus then verifies that both
 conversation and contact IDs exist, the parties differ, both evidence strings
 exactly match supplied evidence after whitespace normalization, the pair is
 unique, and the score is at least 70. Provider output cannot create an invite.
@@ -115,7 +115,7 @@ proposal cannot execute. Successful or idempotently recovered Calendar
 execution marks the proposal scheduled; the browser cannot mark it scheduled
 through the generic Relay status route.
 
-## Lantern device core
+## Quipus device core
 
 The standalone device never receives a browser cookie. An owner creates a
 pairing code through `POST /api/devices/pairing`; the device claims it through
@@ -149,7 +149,7 @@ read-back proposal produces `pending_dashboard_approval`. The state machine has
 no transition that sends an invitation from voice confirmation. Google
 execution continues to require the existing authenticated dashboard approval.
 
-The Lantern dashboard uses the same state machine locally as an executable
+The Quipus dashboard uses the same state machine locally as an executable
 prototype. This validates interaction rules but does not represent connected
 hardware, captured audio, OpenAI extraction accuracy, or provider delivery.
 
@@ -390,7 +390,7 @@ have been connected.
 
 ## Setup and remaining work
 
-Apply migrations 001 through 006 before enabling the complete Lantern and Relay
+Apply migrations 001 through 006 before enabling the complete Quipus and Relay
 flow. Set
 the Supabase values and owner identity, then the Agora Speech-to-Text and OpenAI
 credentials. Google execution additionally needs OAuth client configuration,
@@ -404,7 +404,7 @@ The following are deliberately deferred:
 
 - Hour-plus wearable replay with an encoded on-device format, provider token
   renewal, cross-reboot upload resumption, incremental durable transcript
-  storage, and explicit gap records. Lantern V2 now writes a complete PCM WAV
+  storage, and explicit gap records. Quipus V2 now writes a complete PCM WAV
   to FAT32 microSD and uploads it in idempotent 512 KB chunks; the current 25 MB
   WAV contract covers about 13 minutes 39 seconds.
 - A field-quality custom wake-word model. The prototype deliberately uses the
@@ -419,6 +419,6 @@ The following are deliberately deferred:
   access bypasses login and does not provide multiuser isolation.
 - Two-way Google Calendar synchronization, watch/webhook handling, importing
   unrelated events, and reconciling edits/deletions made in Google. The
-  dashboard currently uses Lantern's own stored meeting/event records.
+  dashboard currently uses Quipus's own stored meeting/event records.
 - Automatic conflict checks and richer handling of rescheduled or cancelled
   meetings. Explicit approval remains a requirement before sending invitations.

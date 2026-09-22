@@ -29,10 +29,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className={styles.page}>
       <div className={styles.gridGlow} aria-hidden="true" />
       <div className={styles.authShell}>
-        <section className={styles.intro} aria-label="About Lantern">
+        <section className={styles.intro} aria-label="About Quipus">
           <div className={styles.brandLockup}>
             <span className={styles.logo}><LanternMark /></span>
-            <strong>Lantern</strong>
+            <strong>Quipus</strong>
           </div>
           <p className={styles.eyebrow}>CONVERSATION INTELLIGENCE</p>
           <h1>Carry every conversation forward.</h1>
@@ -43,17 +43,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <ul className={styles.signalList}>
             <li><Headphones /><span>Replay the original conversation</span></li>
             <li><Check /><span>Review every extracted commitment</span></li>
-            <li><ShieldCheck /><span>Approve before Lantern acts</span></li>
+            <li><ShieldCheck /><span>Approve before Quipus acts</span></li>
           </ul>
         </section>
 
         <section className={styles.card} aria-labelledby="login-title">
           <span className={styles.accessPill}><i /> SECURE ACCESS</span>
           <p className={styles.cardKicker}>WELCOME BACK</p>
-          <h2 id="login-title">Sign in to your Lantern.</h2>
+          <h2 id="login-title">Sign in to your Quipus.</h2>
           <p className={styles.description}>
             Continue with any Google account. Each account receives its own
-            private Lantern workspace.
+            private Quipus workspace.
           </p>
 
           {message ? <p className={styles.notice} role="alert">{message}</p> : null}
@@ -64,7 +64,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className={styles.localNotice}>
               <strong>Local development mode</strong>
               <span>Supabase Auth is not configured, so local access remains open.</span>
-              <Link href={nextPath}>Return to Lantern</Link>
+              <Link href={nextPath}>Return to Quipus</Link>
             </div>
           )}
 

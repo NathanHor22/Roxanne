@@ -1,0 +1,3921 @@
+{
+  "status": "UNROUTED placement study - NOT fabrication or print assembly",
+  "units": "mm",
+  "board": {
+    "width": 110,
+    "length": 158,
+    "thickness": 1.6,
+    "mount_holes": [
+      [
+        -49,
+        73
+      ],
+      [
+        49,
+        73
+      ],
+      [
+        -49,
+        -47
+      ],
+      [
+        49,
+        -73
+      ]
+    ],
+    "hole_diameter": 2.8
+  },
+  "array": {
+    "diameter": 100,
+    "mic_spacing": 66,
+    "pcb_thickness": 1.2
+  },
+  "parts": [
+    {
+      "name": "main_pcb_110x158",
+      "file": "model-parts/main_pcb_110x158.stl",
+      "colour": [
+        0.045,
+        0.3,
+        0.18
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -55.0,
+          -79.0,
+          0.0
+        ],
+        [
+          55.0,
+          79.0,
+          1.600000023841858
+        ]
+      ],
+      "volume_mm3": 27746.61663368527,
+      "note": "Proposed 4-layer outline; no copper routing or footprint pads released"
+    },
+    {
+      "name": "mount_ring_1",
+      "file": "model-parts/mount_ring_1.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -51.89639663696289,
+          70.10089874267578,
+          1.600000023841858
+        ],
+        [
+          -46.099998474121094,
+          75.89910125732422,
+          1.649999976158142
+        ]
+      ],
+      "volume_mm3": 1.013163630782708,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "mount_ring_2",
+      "file": "model-parts/mount_ring_2.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          46.10360336303711,
+          70.10089874267578,
+          1.600000023841858
+        ],
+        [
+          51.900001525878906,
+          75.89910125732422,
+          1.649999976158142
+        ]
+      ],
+      "volume_mm3": 1.013163630782708,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "mount_ring_3",
+      "file": "model-parts/mount_ring_3.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -51.89639663696289,
+          -49.89909744262695,
+          1.600000023841858
+        ],
+        [
+          -46.099998474121094,
+          -44.10090255737305,
+          1.649999976158142
+        ]
+      ],
+      "volume_mm3": 1.013163630782708,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "mount_ring_4",
+      "file": "model-parts/mount_ring_4.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          46.10360336303711,
+          -75.89910125732422,
+          1.600000023841858
+        ],
+        [
+          51.900001525878906,
+          -70.10089874267578,
+          1.649999976158142
+        ]
+      ],
+      "volume_mm3": 1.013163630782708,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "audio_array_100mm",
+      "file": "model-parts/audio_array_100mm.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -49.93784713745117,
+          -24.984458923339844,
+          10.0
+        ],
+        [
+          50.0,
+          74.98445892333984,
+          11.199999809265137
+        ]
+      ],
+      "volume_mm3": 9424.77796076938,
+      "note": "Seeed drawing diameter 100, PCB 1.2, 66 mm mic spacing. Holes/components simplified; no XIAO fitted."
+    },
+    {
+      "name": "MIC_1",
+      "file": "model-parts/MIC_1.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -35.400001525878906,
+          -10.399999618530273,
+          11.199999809265137
+        ],
+        [
+          -30.600000381469727,
+          -5.599999904632568,
+          12.399999618530273
+        ]
+      ],
+      "volume_mm3": 26.627070781254588,
+      "note": "Microphone position from 66 x 66 array geometry; body illustrative"
+    },
+    {
+      "name": "mic_port_1",
+      "file": "model-parts/mic_port_1.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -33.39950180053711,
+          -8.39987564086914,
+          11.199999809265137
+        ],
+        [
+          -32.599998474121094,
+          -7.600124359130859,
+          11.25
+        ]
+      ],
+      "volume_mm3": 0.025132741228718423,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "MIC_2",
+      "file": "model-parts/MIC_2.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          30.600000381469727,
+          -10.399999618530273,
+          11.199999809265137
+        ],
+        [
+          35.400001525878906,
+          -5.599999904632568,
+          12.399999618530273
+        ]
+      ],
+      "volume_mm3": 26.627070781254588,
+      "note": "Microphone position from 66 x 66 array geometry; body illustrative"
+    },
+    {
+      "name": "mic_port_2",
+      "file": "model-parts/mic_port_2.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          32.60049819946289,
+          -8.39987564086914,
+          11.199999809265137
+        ],
+        [
+          33.400001525878906,
+          -7.600124359130859,
+          11.25
+        ]
+      ],
+      "volume_mm3": 0.025132741228718423,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "MIC_3",
+      "file": "model-parts/MIC_3.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          30.600000381469727,
+          55.599998474121094,
+          11.199999809265137
+        ],
+        [
+          35.400001525878906,
+          60.400001525878906,
+          12.399999618530273
+        ]
+      ],
+      "volume_mm3": 26.62707078125459,
+      "note": "Microphone position from 66 x 66 array geometry; body illustrative"
+    },
+    {
+      "name": "mic_port_3",
+      "file": "model-parts/mic_port_3.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          32.60049819946289,
+          57.60012435913086,
+          11.199999809265137
+        ],
+        [
+          33.400001525878906,
+          58.39987564086914,
+          11.25
+        ]
+      ],
+      "volume_mm3": 0.0251327412287184,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "MIC_4",
+      "file": "model-parts/MIC_4.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -35.400001525878906,
+          55.599998474121094,
+          11.199999809265137
+        ],
+        [
+          -30.600000381469727,
+          60.400001525878906,
+          12.399999618530273
+        ]
+      ],
+      "volume_mm3": 26.62707078125459,
+      "note": "Microphone position from 66 x 66 array geometry; body illustrative"
+    },
+    {
+      "name": "mic_port_4",
+      "file": "model-parts/mic_port_4.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -33.39950180053711,
+          57.60012435913086,
+          11.199999809265137
+        ],
+        [
+          -32.599998474121094,
+          58.39987564086914,
+          11.25
+        ]
+      ],
+      "volume_mm3": 0.0251327412287184,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "XVF3800_processor",
+      "file": "model-parts/XVF3800_processor.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -3.5,
+          21.5,
+          11.199999809265137
+        ],
+        [
+          3.5,
+          28.5,
+          12.199999809265137
+        ]
+      ],
+      "volume_mm3": 49.0,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "audio_codec",
+      "file": "model-parts/audio_codec.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          13.5,
+          13.5,
+          11.199999809265137
+        ],
+        [
+          18.5,
+          18.5,
+          12.100000381469727
+        ]
+      ],
+      "volume_mm3": 22.500000000000007,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "audio_amp",
+      "file": "model-parts/audio_amp.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          22.0,
+          3.0,
+          11.199999809265137
+        ],
+        [
+          26.0,
+          7.0,
+          12.199999809265137
+        ]
+      ],
+      "volume_mm3": 15.999999999999998,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "array_service_usb",
+      "file": "model-parts/array_service_usb.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -4.5,
+          -26.0,
+          11.199999809265137
+        ],
+        [
+          4.5,
+          -19.0,
+          14.399999618530273
+        ]
+      ],
+      "volume_mm3": 200.2540172808288,
+      "note": "Service USB; not connected simultaneously with powered carrier until backfeed checked"
+    },
+    {
+      "name": "array_speaker_socket",
+      "file": "model-parts/array_speaker_socket.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          9.0,
+          -23.0,
+          11.199999809265137
+        ],
+        [
+          17.0,
+          -17.0,
+          16.200000762939453
+        ]
+      ],
+      "volume_mm3": 240.0,
+      "note": "Mating connector revision to verify"
+    },
+    {
+      "name": "array_logic_socket",
+      "file": "model-parts/array_logic_socket.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -10.0,
+          64.5,
+          11.199999809265137
+        ],
+        [
+          10.0,
+          69.5,
+          14.199999809265137
+        ]
+      ],
+      "volume_mm3": 299.99999999999994,
+      "note": "Illustrative position; module-side connector drawing is unresolved"
+    },
+    {
+      "name": "array_led_1",
+      "file": "model-parts/array_led_1.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          39.0,
+          24.0,
+          11.199999809265137
+        ],
+        [
+          41.0,
+          26.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.399999999999998,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_2",
+      "file": "model-parts/array_led_2.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          33.64101791381836,
+          44.0,
+          11.199999809265137
+        ],
+        [
+          35.64101791381836,
+          46.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.3999999999999986,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_3",
+      "file": "model-parts/array_led_3.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          19.0,
+          58.64101791381836,
+          11.199999809265137
+        ],
+        [
+          21.0,
+          60.64101791381836,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.3999999999999986,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_4",
+      "file": "model-parts/array_led_4.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -1.0,
+          64.0,
+          11.199999809265137
+        ],
+        [
+          1.0,
+          66.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.399999999999998,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_5",
+      "file": "model-parts/array_led_5.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -21.0,
+          58.64101791381836,
+          11.199999809265137
+        ],
+        [
+          -19.0,
+          60.64101791381836,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.3999999999999986,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_6",
+      "file": "model-parts/array_led_6.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -35.64101791381836,
+          44.0,
+          11.199999809265137
+        ],
+        [
+          -33.64101791381836,
+          46.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.3999999999999986,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_7",
+      "file": "model-parts/array_led_7.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -41.0,
+          24.0,
+          11.199999809265137
+        ],
+        [
+          -39.0,
+          26.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.399999999999998,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_8",
+      "file": "model-parts/array_led_8.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -35.64101791381836,
+          4.0,
+          11.199999809265137
+        ],
+        [
+          -33.64101791381836,
+          6.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.3999999999999986,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_9",
+      "file": "model-parts/array_led_9.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -21.0,
+          -10.641016006469727,
+          11.199999809265137
+        ],
+        [
+          -19.0,
+          -8.641016006469727,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.399999999999998,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_10",
+      "file": "model-parts/array_led_10.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          -1.0,
+          -16.0,
+          11.199999809265137
+        ],
+        [
+          1.0,
+          -14.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.399999999999998,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_11",
+      "file": "model-parts/array_led_11.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          19.0,
+          -10.641016006469727,
+          11.199999809265137
+        ],
+        [
+          21.0,
+          -8.641016006469727,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.399999999999998,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_led_12",
+      "file": "model-parts/array_led_12.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "audio",
+      "explode": [
+        0,
+        0,
+        35
+      ],
+      "bounds": [
+        [
+          33.64101791381836,
+          4.0,
+          11.199999809265137
+        ],
+        [
+          35.64101791381836,
+          6.0,
+          11.800000190734863
+        ]
+      ],
+      "volume_mm3": 2.3999999999999986,
+      "note": "RGB LEDs disabled in the power budget"
+    },
+    {
+      "name": "array_support_1",
+      "file": "model-parts/array_support_1.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        17
+      ],
+      "bounds": [
+        [
+          -23.851892471313477,
+          47.00077819824219,
+          1.600000023841858
+        ],
+        [
+          -18.854999542236328,
+          51.99922180175781,
+          10.0
+        ]
+      ],
+      "volume_mm3": 164.93361431346415,
+      "note": "Support envelope only; diameter and screw positions require module verification"
+    },
+    {
+      "name": "array_support_2",
+      "file": "model-parts/array_support_2.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        17
+      ],
+      "bounds": [
+        [
+          18.858108520507812,
+          47.00077819824219,
+          1.600000023841858
+        ],
+        [
+          23.854999542236328,
+          51.99922180175781,
+          10.0
+        ]
+      ],
+      "volume_mm3": 164.93361431346412,
+      "note": "Support envelope only; diameter and screw positions require module verification"
+    },
+    {
+      "name": "array_support_3",
+      "file": "model-parts/array_support_3.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        17
+      ],
+      "bounds": [
+        [
+          -23.851892471313477,
+          -1.999222993850708,
+          1.600000023841858
+        ],
+        [
+          -18.854999542236328,
+          2.999222993850708,
+          10.0
+        ]
+      ],
+      "volume_mm3": 164.93361431346415,
+      "note": "Support envelope only; diameter and screw positions require module verification"
+    },
+    {
+      "name": "array_support_4",
+      "file": "model-parts/array_support_4.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        17
+      ],
+      "bounds": [
+        [
+          18.858108520507812,
+          -1.999222993850708,
+          1.600000023841858
+        ],
+        [
+          23.854999542236328,
+          2.999222993850708,
+          10.0
+        ]
+      ],
+      "volume_mm3": 164.93361431346415,
+      "note": "Support envelope only; diameter and screw positions require module verification"
+    },
+    {
+      "name": "display_carrier",
+      "file": "model-parts/display_carrier.stl",
+      "colour": [
+        0.035,
+        0.12,
+        0.18
+      ],
+      "kind": "display",
+      "explode": [
+        0,
+        0,
+        30
+      ],
+      "bounds": [
+        [
+          -16.0,
+          -70.0,
+          8.0
+        ],
+        [
+          26.0,
+          -28.0,
+          9.199999809265137
+        ]
+      ],
+      "volume_mm3": 2115.316672105402,
+      "note": "Provisional envelope for 1.3-inch SPI module; exact SKU/drawing pending"
+    },
+    {
+      "name": "display_bezel",
+      "file": "model-parts/display_bezel.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "display",
+      "explode": [
+        0,
+        0,
+        30
+      ],
+      "bounds": [
+        [
+          -11.0,
+          -65.0,
+          9.199999809265137
+        ],
+        [
+          21.0,
+          -31.0,
+          11.899999618530273
+        ]
+      ],
+      "volume_mm3": 2936.4643270806982,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "display_glass",
+      "file": "model-parts/display_glass.stl",
+      "colour": [
+        0.02,
+        0.15,
+        0.1
+      ],
+      "kind": "display",
+      "explode": [
+        0,
+        0,
+        30
+      ],
+      "bounds": [
+        [
+          -8.0,
+          -60.0,
+          11.899999618530273
+        ],
+        [
+          18.0,
+          -34.0,
+          12.300000190734863
+        ]
+      ],
+      "volume_mm3": 270.36909733552943,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "display_support_1",
+      "file": "model-parts/display_support_1.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        15
+      ],
+      "bounds": [
+        [
+          -13.997513771057129,
+          -67.99938201904297,
+          1.600000023841858
+        ],
+        [
+          -10.0,
+          -64.00061798095703,
+          8.0
+        ]
+      ],
+      "volume_mm3": 80.42477193189865,
+      "note": "Provisional screen support; final mount pattern pending"
+    },
+    {
+      "name": "display_support_2",
+      "file": "model-parts/display_support_2.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        15
+      ],
+      "bounds": [
+        [
+          20.002485275268555,
+          -67.99938201904297,
+          1.600000023841858
+        ],
+        [
+          24.0,
+          -64.00061798095703,
+          8.0
+        ]
+      ],
+      "volume_mm3": 80.42477193189865,
+      "note": "Provisional screen support; final mount pattern pending"
+    },
+    {
+      "name": "display_support_3",
+      "file": "model-parts/display_support_3.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        15
+      ],
+      "bounds": [
+        [
+          -13.997513771057129,
+          -33.9993782043457,
+          1.600000023841858
+        ],
+        [
+          -10.0,
+          -30.000621795654297,
+          8.0
+        ]
+      ],
+      "volume_mm3": 80.42477193189869,
+      "note": "Provisional screen support; final mount pattern pending"
+    },
+    {
+      "name": "display_support_4",
+      "file": "model-parts/display_support_4.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "support",
+      "explode": [
+        0,
+        0,
+        15
+      ],
+      "bounds": [
+        [
+          20.002485275268555,
+          -33.9993782043457,
+          1.600000023841858
+        ],
+        [
+          24.0,
+          -30.000621795654297,
+          8.0
+        ]
+      ],
+      "volume_mm3": 80.42477193189869,
+      "note": "Provisional screen support; final mount pattern pending"
+    },
+    {
+      "name": "ESP32_module",
+      "file": "model-parts/ESP32_module.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -51.0,
+          -81.75,
+          1.600000023841858
+        ],
+        [
+          -33.0,
+          -56.25,
+          2.4000000953674316
+        ]
+      ],
+      "volume_mm3": 367.2000000000001,
+      "note": "Nominal Espressif module body; antenna faces bottom edge"
+    },
+    {
+      "name": "ESP32_shield",
+      "file": "model-parts/ESP32_shield.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -50.5,
+          -73.5,
+          2.4000000953674316
+        ],
+        [
+          -33.5,
+          -56.5,
+          4.699999809265137
+        ]
+      ],
+      "volume_mm3": 664.5223096792927,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "antenna_mark_0",
+      "file": "model-parts/antenna_mark_0.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -47.0,
+          -76.25,
+          2.4000000953674316
+        ],
+        [
+          -37.0,
+          -75.75,
+          2.450000047683716
+        ]
+      ],
+      "volume_mm3": 0.2499999999999991,
+      "note": "Visual antenna indication, not an RF trace design"
+    },
+    {
+      "name": "antenna_mark_1",
+      "file": "model-parts/antenna_mark_1.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -47.0,
+          -77.25,
+          2.4000000953674316
+        ],
+        [
+          -37.0,
+          -76.75,
+          2.450000047683716
+        ]
+      ],
+      "volume_mm3": 0.2499999999999991,
+      "note": "Visual antenna indication, not an RF trace design"
+    },
+    {
+      "name": "antenna_mark_2",
+      "file": "model-parts/antenna_mark_2.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -47.0,
+          -78.25,
+          2.4000000953674316
+        ],
+        [
+          -37.0,
+          -77.75,
+          2.450000047683716
+        ]
+      ],
+      "volume_mm3": 0.2499999999999991,
+      "note": "Visual antenna indication, not an RF trace design"
+    },
+    {
+      "name": "antenna_mark_3",
+      "file": "model-parts/antenna_mark_3.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -47.0,
+          -79.25,
+          2.4000000953674316
+        ],
+        [
+          -37.0,
+          -78.75,
+          2.450000047683716
+        ]
+      ],
+      "volume_mm3": 0.2499999999999991,
+      "note": "Visual antenna indication, not an RF trace design"
+    },
+    {
+      "name": "antenna_mark_4",
+      "file": "model-parts/antenna_mark_4.stl",
+      "colour": [
+        0.82,
+        0.61,
+        0.2
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -47.0,
+          -80.25,
+          2.4000000953674316
+        ],
+        [
+          -37.0,
+          -79.75,
+          2.450000047683716
+        ]
+      ],
+      "volume_mm3": 0.2499999999999991,
+      "note": "Visual antenna indication, not an RF trace design"
+    },
+    {
+      "name": "U1_charger",
+      "file": "model-parts/U1_charger.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -31.5,
+          9.5,
+          1.600000023841858
+        ],
+        [
+          -28.5,
+          12.5,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 9.0,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U2_USB_CC",
+      "file": "model-parts/U2_USB_CC.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -43.79999923706055,
+          12.199999809265137,
+          1.600000023841858
+        ],
+        [
+          -42.20000076293945,
+          13.800000190734863,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 2.559999999999995,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U3_inverter",
+      "file": "model-parts/U3_inverter.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -41.45000076293945,
+          20.549999237060547,
+          1.600000023841858
+        ],
+        [
+          -38.54999923706055,
+          23.450000762939453,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 8.410000000000009,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U4_OR_gate",
+      "file": "model-parts/U4_OR_gate.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -35.45000076293945,
+          20.549999237060547,
+          1.600000023841858
+        ],
+        [
+          -32.54999923706055,
+          23.450000762939453,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 8.410000000000009,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U12_suspend_inverter",
+      "file": "model-parts/U12_suspend_inverter.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -28.450000762939453,
+          20.549999237060547,
+          1.600000023841858
+        ],
+        [
+          -25.549999237060547,
+          23.450000762939453,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 8.409999999999997,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "Q1_suspend_level_shift",
+      "file": "model-parts/Q1_suspend_level_shift.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -28.450000762939453,
+          15.350000381469727,
+          1.600000023841858
+        ],
+        [
+          -25.549999237060547,
+          16.649999618530273,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 3.769999999999998,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U5_power_controller",
+      "file": "model-parts/U5_power_controller.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          36.54999923706055,
+          58.5,
+          1.600000023841858
+        ],
+        [
+          39.45000076293945,
+          61.5,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 8.700000000000012,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U6_load_switch",
+      "file": "model-parts/U6_load_switch.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          33.0,
+          47.0,
+          1.600000023841858
+        ],
+        [
+          35.0,
+          49.0,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 3.9999999999999996,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U7_3V3",
+      "file": "model-parts/U7_3V3.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -20.25,
+          9.5,
+          1.600000023841858
+        ],
+        [
+          -17.75,
+          12.5,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 7.5,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U8_5V",
+      "file": "model-parts/U8_5V.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -8.25,
+          9.5,
+          1.600000023841858
+        ],
+        [
+          -5.75,
+          12.5,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 7.5,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U10_USB_isolator",
+      "file": "model-parts/U10_USB_isolator.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -39.0,
+          -25.0,
+          1.600000023841858
+        ],
+        [
+          -37.0,
+          -23.0,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 3.9999999999999996,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "U11_gauge",
+      "file": "model-parts/U11_gauge.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          34.0,
+          7.0,
+          1.600000023841858
+        ],
+        [
+          36.0,
+          9.0,
+          2.5999999046325684
+        ]
+      ],
+      "volume_mm3": 3.9999999999999996,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "L1_3V3",
+      "file": "model-parts/L1_3V3.stl",
+      "colour": [
+        0.16,
+        0.18,
+        0.18
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -21.0,
+          15.0,
+          1.600000023841858
+        ],
+        [
+          -17.0,
+          19.0,
+          3.700000047683716
+        ]
+      ],
+      "volume_mm3": 33.43776101152847,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "L2_5V",
+      "file": "model-parts/L2_5V.stl",
+      "colour": [
+        0.16,
+        0.18,
+        0.18
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -9.0,
+          15.0,
+          1.600000023841858
+        ],
+        [
+          -5.0,
+          19.0,
+          3.700000047683716
+        ]
+      ],
+      "volume_mm3": 33.43776101152847,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "charge_passive_1",
+      "file": "model-parts/charge_passive_1.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -42.79999923706055,
+          3.5999999046325684,
+          1.600000023841858
+        ],
+        [
+          -41.20000076293945,
+          4.400000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999998,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_2",
+      "file": "model-parts/charge_passive_2.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -39.400001525878906,
+          3.5999999046325684,
+          1.600000023841858
+        ],
+        [
+          -37.79999923706055,
+          4.400000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999998,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_3",
+      "file": "model-parts/charge_passive_3.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -36.0,
+          3.5999999046325684,
+          1.600000023841858
+        ],
+        [
+          -34.400001525878906,
+          4.400000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8319999999999981,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_4",
+      "file": "model-parts/charge_passive_4.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -32.599998474121094,
+          3.5999999046325684,
+          1.600000023841858
+        ],
+        [
+          -31.0,
+          4.400000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_5",
+      "file": "model-parts/charge_passive_5.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -29.200000762939453,
+          3.5999999046325684,
+          1.600000023841858
+        ],
+        [
+          -27.600000381469727,
+          4.400000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_6",
+      "file": "model-parts/charge_passive_6.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -42.79999923706055,
+          0.5,
+          1.600000023841858
+        ],
+        [
+          -41.20000076293945,
+          1.2999999523162842,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8319999999999979,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_7",
+      "file": "model-parts/charge_passive_7.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -39.400001525878906,
+          0.5,
+          1.600000023841858
+        ],
+        [
+          -37.79999923706055,
+          1.2999999523162842,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8319999999999979,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_8",
+      "file": "model-parts/charge_passive_8.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -36.0,
+          0.5,
+          1.600000023841858
+        ],
+        [
+          -34.400001525878906,
+          1.2999999523162842,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8319999999999979,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_9",
+      "file": "model-parts/charge_passive_9.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -32.599998474121094,
+          0.5,
+          1.600000023841858
+        ],
+        [
+          -31.0,
+          1.2999999523162842,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000003,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "charge_passive_10",
+      "file": "model-parts/charge_passive_10.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -29.200000762939453,
+          0.5,
+          1.600000023841858
+        ],
+        [
+          -27.600000381469727,
+          1.2999999523162842,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000003,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_1",
+      "file": "model-parts/regulators_passive_1.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -23.799999237060547,
+          1.600000023841858,
+          1.600000023841858
+        ],
+        [
+          -22.200000762939453,
+          2.4000000953674316,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000003,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_2",
+      "file": "model-parts/regulators_passive_2.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -20.399999618530273,
+          1.600000023841858,
+          1.600000023841858
+        ],
+        [
+          -18.799999237060547,
+          2.4000000953674316,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000003,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_3",
+      "file": "model-parts/regulators_passive_3.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -17.0,
+          1.600000023841858,
+          1.600000023841858
+        ],
+        [
+          -15.399999618530273,
+          2.4000000953674316,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000003,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_4",
+      "file": "model-parts/regulators_passive_4.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -13.600000381469727,
+          1.600000023841858,
+          1.600000023841858
+        ],
+        [
+          -12.0,
+          2.4000000953674316,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000003,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_5",
+      "file": "model-parts/regulators_passive_5.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -10.199999809265137,
+          1.600000023841858,
+          1.600000023841858
+        ],
+        [
+          -8.600000381469727,
+          2.4000000953674316,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000003,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_6",
+      "file": "model-parts/regulators_passive_6.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -23.799999237060547,
+          -1.5,
+          1.600000023841858
+        ],
+        [
+          -22.200000762939453,
+          -0.699999988079071,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_7",
+      "file": "model-parts/regulators_passive_7.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -20.399999618530273,
+          -1.5,
+          1.600000023841858
+        ],
+        [
+          -18.799999237060547,
+          -0.699999988079071,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_8",
+      "file": "model-parts/regulators_passive_8.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -17.0,
+          -1.5,
+          1.600000023841858
+        ],
+        [
+          -15.399999618530273,
+          -0.699999988079071,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_9",
+      "file": "model-parts/regulators_passive_9.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -13.600000381469727,
+          -1.5,
+          1.600000023841858
+        ],
+        [
+          -12.0,
+          -0.699999988079071,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_10",
+      "file": "model-parts/regulators_passive_10.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -10.199999809265137,
+          -1.5,
+          1.600000023841858
+        ],
+        [
+          -8.600000381469727,
+          -0.699999988079071,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_11",
+      "file": "model-parts/regulators_passive_11.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -23.799999237060547,
+          -4.599999904632568,
+          1.600000023841858
+        ],
+        [
+          -22.200000762939453,
+          -3.799999952316284,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_12",
+      "file": "model-parts/regulators_passive_12.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -20.399999618530273,
+          -4.599999904632568,
+          1.600000023841858
+        ],
+        [
+          -18.799999237060547,
+          -3.799999952316284,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_13",
+      "file": "model-parts/regulators_passive_13.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -17.0,
+          -4.599999904632568,
+          1.600000023841858
+        ],
+        [
+          -15.399999618530273,
+          -3.799999952316284,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_14",
+      "file": "model-parts/regulators_passive_14.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -13.600000381469727,
+          -4.599999904632568,
+          1.600000023841858
+        ],
+        [
+          -12.0,
+          -3.799999952316284,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_15",
+      "file": "model-parts/regulators_passive_15.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -10.199999809265137,
+          -4.599999904632568,
+          1.600000023841858
+        ],
+        [
+          -8.600000381469727,
+          -3.799999952316284,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000004,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_16",
+      "file": "model-parts/regulators_passive_16.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -23.799999237060547,
+          -7.699999809265137,
+          1.600000023841858
+        ],
+        [
+          -22.200000762939453,
+          -6.900000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000006,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_17",
+      "file": "model-parts/regulators_passive_17.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -20.399999618530273,
+          -7.699999809265137,
+          1.600000023841858
+        ],
+        [
+          -18.799999237060547,
+          -6.900000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000006,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "regulators_passive_18",
+      "file": "model-parts/regulators_passive_18.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -17.0,
+          -7.699999809265137,
+          1.600000023841858
+        ],
+        [
+          -15.399999618530273,
+          -6.900000095367432,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8320000000000006,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_1",
+      "file": "model-parts/controller_passive_1.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          28.200000762939453,
+          39.599998474121094,
+          1.600000023841858
+        ],
+        [
+          29.799999237060547,
+          40.400001525878906,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8319999999999993,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_2",
+      "file": "model-parts/controller_passive_2.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          31.600000381469727,
+          39.599998474121094,
+          1.600000023841858
+        ],
+        [
+          33.20000076293945,
+          40.400001525878906,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999998,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_3",
+      "file": "model-parts/controller_passive_3.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          35.0,
+          39.599998474121094,
+          1.600000023841858
+        ],
+        [
+          36.599998474121094,
+          40.400001525878906,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999997,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_4",
+      "file": "model-parts/controller_passive_4.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          38.400001525878906,
+          39.599998474121094,
+          1.600000023841858
+        ],
+        [
+          40.0,
+          40.400001525878906,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999997,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_5",
+      "file": "model-parts/controller_passive_5.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          41.79999923706055,
+          39.599998474121094,
+          1.600000023841858
+        ],
+        [
+          43.400001525878906,
+          40.400001525878906,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999997,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_6",
+      "file": "model-parts/controller_passive_6.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          28.200000762939453,
+          36.5,
+          1.600000023841858
+        ],
+        [
+          29.799999237060547,
+          37.29999923706055,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8319999999999994,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_7",
+      "file": "model-parts/controller_passive_7.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          31.600000381469727,
+          36.5,
+          1.600000023841858
+        ],
+        [
+          33.20000076293945,
+          37.29999923706055,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.8319999999999981,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_8",
+      "file": "model-parts/controller_passive_8.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          35.0,
+          36.5,
+          1.600000023841858
+        ],
+        [
+          36.599998474121094,
+          37.29999923706055,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999997,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "controller_passive_9",
+      "file": "model-parts/controller_passive_9.stl",
+      "colour": [
+        0.53,
+        0.43,
+        0.28
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          38.400001525878906,
+          36.5,
+          1.600000023841858
+        ],
+        [
+          40.0,
+          37.29999923706055,
+          2.25
+        ]
+      ],
+      "volume_mm3": 0.831999999999997,
+      "note": "Passive placement reservation; not a final part-to-pad layout"
+    },
+    {
+      "name": "USB_C_charge_program",
+      "file": "model-parts/USB_C_charge_program.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -56.75,
+          25.5,
+          1.600000023841858
+        ],
+        [
+          -49.25,
+          34.5,
+          4.800000190734863
+        ]
+      ],
+      "volume_mm3": 170.1726257107835,
+      "note": "Receptacle envelope; cable enters from left"
+    },
+    {
+      "name": "microSD_socket",
+      "file": "model-parts/microSD_socket.stl",
+      "colour": [
+        0.55,
+        0.59,
+        0.61
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          41.5,
+          -20.5,
+          1.600000023841858
+        ],
+        [
+          56.5,
+          -5.5,
+          3.5
+        ]
+      ],
+      "volume_mm3": 361.23904416669126,
+      "note": "Provisional socket; card slides right"
+    },
+    {
+      "name": "microSD_card",
+      "file": "model-parts/microSD_card.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "sd",
+      "explode": [
+        22,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          46.5,
+          -18.5,
+          1.850000023841858
+        ],
+        [
+          61.5,
+          -7.5,
+          2.8499999046325684
+        ]
+      ],
+      "volume_mm3": 164.86265482457432,
+      "note": "Card withdrawal envelope; confirm push-push travel"
+    },
+    {
+      "name": "POWER_body",
+      "file": "model-parts/POWER_body.stl",
+      "colour": [
+        0.37,
+        0.39,
+        0.37
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          45.0,
+          58.0,
+          1.600000023841858
+        ],
+        [
+          51.0,
+          64.0,
+          3.799999952316284
+        ]
+      ],
+      "volume_mm3": 79.2,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "POWER_cap",
+      "file": "model-parts/POWER_cap.stl",
+      "colour": [
+        0.1,
+        0.7,
+        0.38
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          45.40323257446289,
+          58.40080642700195,
+          3.799999952316284
+        ],
+        [
+          50.599998474121094,
+          63.59919357299805,
+          5.5
+        ]
+      ],
+      "volume_mm3": 36.10318277505391,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "RECORD_STOP_body",
+      "file": "model-parts/RECORD_STOP_body.stl",
+      "colour": [
+        0.37,
+        0.39,
+        0.37
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          42.0,
+          -51.0,
+          1.600000023841858
+        ],
+        [
+          48.0,
+          -45.0,
+          3.799999952316284
+        ]
+      ],
+      "volume_mm3": 79.2,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "RECORD_STOP_cap",
+      "file": "model-parts/RECORD_STOP_cap.stl",
+      "colour": [
+        0.85,
+        0.3,
+        0.2
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          42.40323257446289,
+          -50.59919357299805,
+          3.799999952316284
+        ],
+        [
+          47.599998474121094,
+          -45.40080642700195,
+          5.5
+        ]
+      ],
+      "volume_mm3": 36.10318277505391,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "VOLUME_UP_body",
+      "file": "model-parts/VOLUME_UP_body.stl",
+      "colour": [
+        0.37,
+        0.39,
+        0.37
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          42.0,
+          -35.0,
+          1.600000023841858
+        ],
+        [
+          48.0,
+          -29.0,
+          3.799999952316284
+        ]
+      ],
+      "volume_mm3": 79.2,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "VOLUME_UP_cap",
+      "file": "model-parts/VOLUME_UP_cap.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          42.40323257446289,
+          -34.59919357299805,
+          3.799999952316284
+        ],
+        [
+          47.599998474121094,
+          -29.400808334350586,
+          5.5
+        ]
+      ],
+      "volume_mm3": 36.10318277505391,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "VOLUME_DOWN_body",
+      "file": "model-parts/VOLUME_DOWN_body.stl",
+      "colour": [
+        0.37,
+        0.39,
+        0.37
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          42.0,
+          -67.0,
+          1.600000023841858
+        ],
+        [
+          48.0,
+          -61.0,
+          3.799999952316284
+        ]
+      ],
+      "volume_mm3": 79.2,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "VOLUME_DOWN_cap",
+      "file": "model-parts/VOLUME_DOWN_cap.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          42.40323257446289,
+          -66.59918975830078,
+          3.799999952316284
+        ],
+        [
+          47.599998474121094,
+          -61.40080642700195,
+          5.5
+        ]
+      ],
+      "volume_mm3": 36.103182775053924,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "BOOT_body",
+      "file": "model-parts/BOOT_body.stl",
+      "colour": [
+        0.37,
+        0.39,
+        0.37
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -42.0,
+          -40.0,
+          1.600000023841858
+        ],
+        [
+          -38.0,
+          -36.0,
+          3.799999952316284
+        ]
+      ],
+      "volume_mm3": 35.2,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "BOOT_cap",
+      "file": "model-parts/BOOT_cap.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -41.398258209228516,
+          -39.399566650390625,
+          3.799999952316284
+        ],
+        [
+          -38.599998474121094,
+          -36.600433349609375,
+          5.5
+        ]
+      ],
+      "volume_mm3": 10.467786721761184,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "RESET_body",
+      "file": "model-parts/RESET_body.stl",
+      "colour": [
+        0.37,
+        0.39,
+        0.37
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -32.0,
+          -40.0,
+          1.600000023841858
+        ],
+        [
+          -28.0,
+          -36.0,
+          3.799999952316284
+        ]
+      ],
+      "volume_mm3": 35.2,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "RESET_cap",
+      "file": "model-parts/RESET_cap.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "button",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -31.39826011657715,
+          -39.399566650390625,
+          3.799999952316284
+        ],
+        [
+          -28.600000381469727,
+          -36.600433349609375,
+          5.5
+        ]
+      ],
+      "volume_mm3": 10.467786721761184,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "battery_socket",
+      "file": "model-parts/battery_socket.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          34.0,
+          16.0,
+          1.600000023841858
+        ],
+        [
+          46.0,
+          24.0,
+          8.600000381469727
+        ]
+      ],
+      "volume_mm3": 671.0385837720205,
+      "note": "Connector housing envelope; verify exact selected connector and mating space"
+    },
+    {
+      "name": "audio_harness_socket",
+      "file": "model-parts/audio_harness_socket.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          11.5,
+          56.0,
+          1.600000023841858
+        ],
+        [
+          28.5,
+          62.0,
+          6.599999904632568
+        ]
+      ],
+      "volume_mm3": 509.3132741228717,
+      "note": "Connector housing envelope; verify exact selected connector and mating space"
+    },
+    {
+      "name": "speaker_in_socket",
+      "file": "model-parts/speaker_in_socket.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -50.5,
+          -6.0,
+          1.600000023841858
+        ],
+        [
+          -43.5,
+          0.0,
+          5.599999904632568
+        ]
+      ],
+      "volume_mm3": 167.45061929829743,
+      "note": "Connector housing envelope; verify exact selected connector and mating space"
+    },
+    {
+      "name": "speaker_out_socket",
+      "file": "model-parts/speaker_out_socket.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -51.5,
+          -18.0,
+          1.600000023841858
+        ],
+        [
+          -44.5,
+          -12.0,
+          5.599999904632568
+        ]
+      ],
+      "volume_mm3": 167.45061929829743,
+      "note": "Connector housing envelope; verify exact selected connector and mating space"
+    },
+    {
+      "name": "display_socket",
+      "file": "model-parts/display_socket.stl",
+      "colour": [
+        0.83,
+        0.89,
+        0.84
+      ],
+      "kind": "main",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -2.0,
+          -26.5,
+          1.600000023841858
+        ],
+        [
+          20.0,
+          -21.5,
+          5.599999904632568
+        ]
+      ],
+      "volume_mm3": 439.45061929829734,
+      "note": "Connector housing envelope; verify exact selected connector and mating space"
+    },
+    {
+      "name": "battery_insulation",
+      "file": "model-parts/battery_insulation.stl",
+      "colour": [
+        0.13,
+        0.2,
+        0.17
+      ],
+      "kind": "battery",
+      "explode": [
+        0,
+        0,
+        -20
+      ],
+      "bounds": [
+        [
+          -17.0,
+          -48.0,
+          -4.800000190734863
+        ],
+        [
+          45.0,
+          46.0,
+          -4.0
+        ]
+      ],
+      "volume_mm3": 4659.6530964914855,
+      "note": "Insulating support envelope, retention/case not designed here"
+    },
+    {
+      "name": "battery_91x59x5",
+      "file": "model-parts/battery_91x59x5.stl",
+      "colour": [
+        0.72,
+        0.56,
+        0.16
+      ],
+      "kind": "battery",
+      "explode": [
+        0,
+        0,
+        -40
+      ],
+      "bounds": [
+        [
+          -15.5,
+          -46.5,
+          -10.800000190734863
+        ],
+        [
+          43.5,
+          44.5,
+          -5.800000190734863
+        ]
+      ],
+      "volume_mm3": 26827.83185307179,
+      "note": "User measured; 4Ah is an assumption for runtime, ratings unverified"
+    },
+    {
+      "name": "battery_label",
+      "file": "model-parts/battery_label.stl",
+      "colour": [
+        0.73,
+        0.76,
+        0.73
+      ],
+      "kind": "battery",
+      "explode": [
+        0,
+        0,
+        -40
+      ],
+      "bounds": [
+        [
+          -13.0,
+          -40.5,
+          -10.850000381469727
+        ],
+        [
+          41.0,
+          38.5,
+          -10.800000190734863
+        ]
+      ],
+      "volume_mm3": 213.29613716694416,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "side_speaker_41x29x10",
+      "file": "model-parts/side_speaker_41x29x10.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "speaker",
+      "explode": [
+        -22,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -69.0,
+          -27.5,
+          -7.5
+        ],
+        [
+          -59.0,
+          13.5,
+          21.5
+        ]
+      ],
+      "volume_mm3": 10653.893421169303,
+      "note": "Measured bounding envelope; 4 ohm/2W requirement is not verified for existing speaker"
+    },
+    {
+      "name": "speaker_cone",
+      "file": "model-parts/speaker_cone.stl",
+      "colour": [
+        0.06,
+        0.065,
+        0.067
+      ],
+      "kind": "speaker",
+      "explode": [
+        -22,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -69.5999984741211,
+          -24.5,
+          -4.5
+        ],
+        [
+          -69.0,
+          10.5,
+          18.5
+        ]
+      ],
+      "volume_mm3": 431.4955592153854,
+      "note": "Nominal clearance envelope"
+    },
+    {
+      "name": "battery_red_0",
+      "file": "model-parts/battery_red_0.stl",
+      "colour": [
+        0.65,
+        0.06,
+        0.04
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          36.90899658203125,
+          38.3533935546875,
+          -6.646289348602295
+        ],
+        [
+          47.09096908569336,
+          40.6466064453125,
+          -4.3532257080078125
+        ]
+      ],
+      "volume_mm3": 13.40530414438403,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    },
+    {
+      "name": "battery_red_1",
+      "file": "model-parts/battery_red_1.stl",
+      "colour": [
+        0.65,
+        0.06,
+        0.04
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          46.35955047607422,
+          33.4404296875,
+          -5.3473286628723145
+        ],
+        [
+          49.64044952392578,
+          40.56023025512695,
+          5.347334384918213
+        ]
+      ],
+      "volume_mm3": 15.705096303018147,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    },
+    {
+      "name": "battery_red_2",
+      "file": "model-parts/battery_red_2.stl",
+      "colour": [
+        0.65,
+        0.06,
+        0.04
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          39.496551513671875,
+          22.587146759033203,
+          4.351804733276367
+        ],
+        [
+          49.50388717651367,
+          34.4130744934082,
+          6.648195266723633
+        ]
+      ],
+      "volume_mm3": 18.911440250183418,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    },
+    {
+      "name": "battery_black_0",
+      "file": "model-parts/battery_black_0.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          35.90899658203125,
+          38.3533935546875,
+          -6.646289348602295
+        ],
+        [
+          46.09096908569336,
+          40.6466064453125,
+          -4.3532257080078125
+        ]
+      ],
+      "volume_mm3": 13.40530414438403,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    },
+    {
+      "name": "battery_black_1",
+      "file": "model-parts/battery_black_1.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          45.35955047607422,
+          33.4404296875,
+          -5.3473286628723145
+        ],
+        [
+          48.64044952392578,
+          40.56023025512695,
+          5.347334384918213
+        ]
+      ],
+      "volume_mm3": 15.705096303018147,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    },
+    {
+      "name": "battery_black_2",
+      "file": "model-parts/battery_black_2.stl",
+      "colour": [
+        0.035,
+        0.045,
+        0.045
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          37.51850891113281,
+          22.561697006225586,
+          4.351667404174805
+        ],
+        [
+          48.48182678222656,
+          34.43827819824219,
+          6.648332595825195
+        ]
+      ],
+      "volume_mm3": 19.776665737127548,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    },
+    {
+      "name": "speaker_lead_0",
+      "file": "model-parts/speaker_lead_0.stl",
+      "colour": [
+        0.66,
+        0.1,
+        0.07
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -56.0,
+          -15.749767303466797,
+          4.25
+        ],
+        [
+          -49.0,
+          -14.250232696533203,
+          5.749067783355713
+        ]
+      ],
+      "volume_mm3": 12.37002107350981,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    },
+    {
+      "name": "speaker_lead_1",
+      "file": "model-parts/speaker_lead_1.stl",
+      "colour": [
+        0.66,
+        0.1,
+        0.07
+      ],
+      "kind": "wire",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -60.54570388793945,
+          -18.642919540405273,
+          4.357182502746582
+        ],
+        [
+          -55.454898834228516,
+          -14.357080459594727,
+          8.643001556396484
+        ]
+      ],
+      "volume_mm3": 10.304142545408334,
+      "note": "Illustrative wire route; verify cable lengths and strain relief"
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "revision": "Lantern service case v0.3 \u2014 Fovea front branding",
+  "units": "mm",
+  "parts": {
+    "front_shell": {
+      "bounds_mm": [
+        92.0,
+        112.0,
+        36.6
+      ],
+      "volume_cm3": 59.748,
+      "triangles": 62992,
+      "watertight": true,
+      "solid_count": 1
+    },
+    "rear_lid": {
+      "bounds_mm": [
+        92.0,
+        112.0,
+        4.2
+      ],
+      "volume_cm3": 25.113,
+      "triangles": 2796,
+      "watertight": true,
+      "solid_count": 1
+    },
+    "battery_tray": {
+      "bounds_mm": [
+        80.5,
+        97.8,
+        8.6
+      ],
+      "volume_cm3": 12.267,
+      "triangles": 4562,
+      "watertight": true,
+      "solid_count": 1
+    },
+    "speaker_retainer": {
+      "bounds_mm": [
+        1.6,
+        58.8,
+        33.6
+      ],
+      "volume_cm3": 1.64,
+      "triangles": 3008,
+      "watertight": true,
+      "solid_count": 1
+    }
+  },
+  "clearances_mm": {
+    "glass_to_bezel": 0.30000000000000027,
+    "board_components_to_battery_tray": 1.8999999999999986,
+    "tray_to_speaker_retainer": 1.2999999999999972,
+    "sd_slot_recess": 11.5,
+    "lid_skirt_per_side": 0.35
+  },
+  "overlaps_mm3": {
+    "front_shell / rear_lid": 0.0,
+    "front_shell / battery_tray": 0.0,
+    "front_shell / speaker_retainer": 0.0,
+    "rear_lid / battery_tray": 0.0,
+    "rear_lid / speaker_retainer": 0.0,
+    "battery_tray / speaker_retainer": 0.0,
+    "front_shell / board_reference": 0.0,
+    "front_shell / glass_reference": 0.0,
+    "front_shell / display_reference": 0.0,
+    "front_shell / battery_reference": 0.0,
+    "front_shell / speaker_reference": 0.0,
+    "front_shell / usb_reference": 0.0,
+    "front_shell / branding_finish_reference": 0.0,
+    "rear_lid / board_reference": 0.0,
+    "rear_lid / glass_reference": 0.0,
+    "rear_lid / display_reference": 0.0,
+    "rear_lid / battery_reference": 0.0,
+    "rear_lid / speaker_reference": 0.0,
+    "rear_lid / usb_reference": 0.0,
+    "rear_lid / branding_finish_reference": 0.0,
+    "battery_tray / board_reference": 0.0,
+    "battery_tray / glass_reference": 0.0,
+    "battery_tray / display_reference": 0.0,
+    "battery_tray / battery_reference": 0.0,
+    "battery_tray / speaker_reference": 0.0,
+    "battery_tray / usb_reference": 0.0,
+    "battery_tray / branding_finish_reference": 0.0,
+    "speaker_retainer / board_reference": 0.0,
+    "speaker_retainer / glass_reference": 0.0,
+    "speaker_retainer / display_reference": 0.0,
+    "speaker_retainer / battery_reference": 0.0,
+    "speaker_retainer / speaker_reference": 0.0,
+    "speaker_retainer / usb_reference": 0.0,
+    "speaker_retainer / branding_finish_reference": 0.0,
+    "front_shell / future_mic_reserved_volume": 0.0,
+    "rear_lid / future_mic_reserved_volume": 0.0,
+    "battery_tray / future_mic_reserved_volume": 0.0,
+    "speaker_retainer / future_mic_reserved_volume": 0.0,
+    "front_shell / sd_card_withdrawal": 0.0,
+    "rear_lid / sd_card_withdrawal": 0.0,
+    "battery_tray / sd_card_withdrawal": 0.0,
+    "speaker_retainer / sd_card_withdrawal": 0.0,
+    "front_shell / speaker": 0.0,
+    "rear_lid / speaker": 0.0,
+    "battery_tray / speaker": 0.0,
+    "speaker_retainer / speaker": 0.0,
+    "front_shell / battery": 0.0,
+    "rear_lid / battery": 0.0,
+    "battery_tray / battery": 0.0,
+    "speaker_retainer / battery": 0.0
+  },
+  "notes": {
+    "battery_and_speaker": "User ruler measurements, 2026-09-20; verify terminals, rim and wire exit before printing",
+    "board": "LCDWiki ES3C28P manufacturer dimension drawing",
+    "mic_position": "Nominal from manufacturer drawing; verify against physical board",
+    "usb": "Generous recessed opening; actual plug hood clearance must be checked",
+    "fit": "Not physically printed or acoustically tested",
+    "sd_access": "Side and nominal centre from manufacturer drawing; verify card travel and fingertip reach with the fit gauge"
+  },
+  "branding": {
+    "process": "engraved into front shell",
+    "depth_mm": 0.6,
+    "remaining_front_wall_mm": 1.7999999999999998,
+    "tagline": "Your business development partner",
+    "paint": "Optional white paint, shown as a reference only"
+  }
+}

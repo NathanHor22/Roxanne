@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireAuthenticatedSession } from "@/lib/api-security";
+import { requireWhatsAppOwner } from "@/lib/whatsapp-owner-auth";
 import {
   parseWhatsAppDisconnect,
   requestWhatsAppRelay,
@@ -14,7 +14,7 @@ export const revalidate = 0;
 const requestSchema = z.object({ approved: z.literal(true) }).strict();
 
 export async function POST(request: Request) {
-  const authError = await requireAuthenticatedSession();
+  const authError = await requireWhatsAppOwner();
   if (authError) return authError;
   try {
     requestSchema.parse(await request.json());

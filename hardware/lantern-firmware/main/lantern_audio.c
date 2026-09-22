@@ -43,6 +43,7 @@ static TaskHandle_t s_pcm_task;
 static volatile bool s_pcm_playing;
 static volatile bool s_pcm_input_finished;
 static volatile bool s_pcm_failed;
+static volatile bool s_pcm_cancelled;
 static volatile bool s_speaker_active;
 
 #if LANTERN_AUDIO_SHARED_BUS
@@ -101,6 +102,7 @@ static void pcm_playback_task(void *argument) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     bool speaker_started = false;
     while (s_pcm_playing) {
+      if (s_pcm_cancelled) break;
       size_t available = xStreamBufferBytesAvailable(s_pcm_stream);
       if (!speaker_started) {
         // Hold a small amount of PCM before enabling I2S. This absorbs normal
@@ -381,6 +383,7 @@ esp_err_t lantern_audio_pcm_begin(void) {
   s_pcm_playing = true;
   s_pcm_input_finished = false;
   s_pcm_failed = false;
+  s_pcm_cancelled = false;
   s_speaker_active = true;
   xTaskNotifyGive(s_pcm_task);
   ESP_LOGI(TAG, "%d kHz buffered PCM playback opened", LANTERN_TTS_SAMPLE_RATE / 1000);
@@ -391,16 +394,25 @@ esp_err_t lantern_audio_pcm_write(const void *data, size_t length) {
   if (!s_pcm_playing || !data || !length) return length ? ESP_ERR_INVALID_STATE : ESP_OK;
   const uint8_t *bytes = data;
   size_t sent = 0;
-  while (sent < length && s_pcm_playing) {
+  TickType_t progress_at = xTaskGetTickCount();
+  while (sent < length && s_pcm_playing && !s_pcm_cancelled) {
     size_t chunk = xStreamBufferSend(
-      s_pcm_stream, bytes + sent, length - sent, pdMS_TO_TICKS(2000));
+      s_pcm_stream, bytes + sent, length - sent, pdMS_TO_TICKS(100));
     if (!chunk) {
+      if (s_pcm_cancelled) return ESP_FAIL;
+      if ((xTaskGetTickCount() - progress_at) * portTICK_PERIOD_MS < 2000) continue;
       s_pcm_failed = true;
       return ESP_ERR_TIMEOUT;
     }
     sent += chunk;
+    progress_at = xTaskGetTickCount();
   }
   return sent == length ? ESP_OK : ESP_FAIL;
+}
+
+void lantern_audio_pcm_cancel(void) {
+  s_pcm_cancelled = true;
+  // Only the playback task owns the I2S channel; it stops and drains safely.
 }
 
 void lantern_audio_pcm_end(void) {

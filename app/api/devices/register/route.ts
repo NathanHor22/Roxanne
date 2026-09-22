@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const input = registerDeviceSchema.parse(await request.json());
     if (!client) throw new Error("Supabase is unavailable.");
     const userId = await resolveWorkspaceUserId(client);
-    if (!userId) throw new Error("The Lantern workspace is unavailable.");
+    if (!userId) throw new Error("The Quipus workspace is unavailable.");
 
     const now = new Date().toISOString();
     const record = {

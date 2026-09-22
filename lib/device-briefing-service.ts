@@ -13,13 +13,14 @@ export interface LoadedDeviceBriefing {
   speech: string;
   meetingCount: number;
   approvalCount: number;
+  followUpIds: string[];
 }
 
 export async function loadDeviceBriefing(
   client: SupabaseClient,
   userId: string,
   kind: "boot" | "status",
-  batteryLevel: number,
+  batteryLevel: number | null,
 ): Promise<LoadedDeviceBriefing> {
   const { data: profile, error: profileError } = await client
     .from("profiles")
@@ -34,6 +35,7 @@ export async function loadDeviceBriefing(
       speech: buildBootBriefing({ ownerName, batteryLevel }),
       meetingCount: 0,
       approvalCount: 0,
+      followUpIds: [],
     };
   }
 
@@ -60,15 +62,14 @@ export async function loadDeviceBriefing(
     ? await Promise.all([
         client
           .from("meeting_insights")
-          .select("meeting_id,intent,next_action,key_points")
+          .select("meeting_id,intent,next_action,key_points,wants,concern,promised")
           .eq("user_id", userId)
           .in("meeting_id", meetingIds),
         client
           .from("follow_ups")
           .select("id")
           .eq("user_id", userId)
-          .eq("type", "schedule")
-          .eq("status", "pending")
+          .in("status", ["pending", "approved"])
           .in("meeting_id", meetingIds),
       ])
     : [{ data: [], error: null }, { data: [], error: null }];
@@ -78,6 +79,10 @@ export async function loadDeviceBriefing(
   const insightByMeeting = new Map(
     (insightsResult.data || []).map((insight) => [insight.meeting_id, insight]),
   );
+  const { data: commitments, error: commitmentsError } = meetingIds.length
+    ? await client.from("commitments").select("meeting_id,owner_type,description,due_at,status").eq("user_id", userId).in("meeting_id", meetingIds)
+    : { data: [], error: null };
+  if (commitmentsError) throw new Error(commitmentsError.message);
   const meetings: DeviceMeetingBrief[] = todaysRows.map((meeting) => {
     const insight = insightByMeeting.get(meeting.id);
     return {
@@ -87,6 +92,11 @@ export async function loadDeviceBriefing(
         : [],
       intent: insight?.intent,
       nextAction: insight?.next_action,
+      wants: insight?.wants,
+      concern: insight?.concern,
+      promised: insight?.promised,
+      commitments: (commitments || []).filter(c => c.meeting_id === meeting.id).map(c =>
+        `${c.owner_type === "user" ? "You" : "The contact"}: ${c.description}${c.due_at ? `, due ${new Intl.DateTimeFormat("en-MY", { timeZone, dateStyle: "medium" }).format(new Date(c.due_at))}` : ""}. ${c.status === "completed" ? "Completed." : "Still open."}`),
     };
   });
   const approvalCount = approvalsResult.data?.length || 0;
@@ -98,5 +108,6 @@ export async function loadDeviceBriefing(
     }),
     meetingCount: meetings.length,
     approvalCount,
+    followUpIds: (approvalsResult.data || []).map(row => row.id),
   };
 }

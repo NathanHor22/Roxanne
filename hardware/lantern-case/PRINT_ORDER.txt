@@ -1,0 +1,27 @@
+LANTERN — PROTOTYPE CASE v0.3
+
+FIRST: print only exports/print_first_front_fit_check.stl, quantity 1.
+Material: PLA is acceptable for this dimensional test.
+Units: millimetres. Scale: 100%, no automatic resizing.
+
+After the owner confirms the board, mic, USB cable and SD-card removal fit, print:
+  exports/front_shell.stl         — quantity 1, green PETG
+  exports/rear_lid.stl            — quantity 1, black PETG, flat back
+  exports/battery_tray.stl        — quantity 1, PETG
+  exports/speaker_retainer.stl    — quantity 1, PETG
+
+Finished assembly: 92 mm wide × 112 mm tall × 39 mm deep.
+Starting settings: 0.4 mm nozzle, 0.2 mm layers, 4 perimeters,
+5 top/bottom layers, 20–30% infill. Inspect bridge/support needs at the
+USB/SD openings, side speaker supports and small acoustic passage. Preserve all sound openings.
+Front logo and tagline are engraved 0.6 mm. Check fine details on the
+fit-test piece. A smooth build plate is preferred. White in the preview
+is optional paint after printing, not a second STL or automatic colour.
+STLs are already oriented for printing. Confirm placement in your slicer.
+
+DO NOT print files with _assembly or _reference in the name.
+The STEP and Blender files are for editing/review, not additional parts.
+Read README.md for fasteners, tolerances and assembly.
+
+This prototype has passed digital geometry checks, not a physical fit test.
+Please quote the fit-check piece before quoting the full case.

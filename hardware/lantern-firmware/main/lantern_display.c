@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,6 +16,7 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
@@ -27,8 +29,27 @@ static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_panel_io_handle_t s_panel_io;
 static uint16_t *s_pixels;
 static uint16_t *s_transfer_pixels;
-static SemaphoreHandle_t s_lock;
 static SemaphoreHandle_t s_transfer_done;
+static QueueHandle_t s_updates;
+
+typedef struct {
+  lantern_screen_t screen;
+  char detail[96];
+} display_update_t;
+
+// Only this task owns the framebuffer and DMA staging buffer. A one-item
+// mailbox keeps the latest state instead of replaying stale progress screens.
+static void render_screen(lantern_screen_t screen, const char *detail);
+
+static void display_task(void *argument) {
+  (void)argument;
+  display_update_t update;
+  while (true) {
+    if (xQueueReceive(s_updates, &update, portMAX_DELAY) == pdTRUE) {
+      render_screen(update.screen, update.detail);
+    }
+  }
+}
 
 #define TRANSFER_ROWS 16
 
@@ -149,6 +170,24 @@ static void ring(int center_x, int center_y, int outer_radius, int thickness, ui
       if (distance <= outer && distance >= inner) pixel(center_x + x, center_y + y, color);
     }
   }
+}
+
+static void quipus_mark(int center_x, int top, uint16_t color) {
+  // Static connected threads. Draw only when the screen state changes.
+  const int ends_x[] = {82, 76, 64, 46, 24};
+  const int ends_y[] = {0, 22, 44, 62, 78};
+  for (int side = -1; side <= 1; side += 2) {
+    for (int thread = 0; thread < 5; ++thread) {
+      for (int step = 0; step <= 160; ++step) {
+        float t = step / 160.0f, u = 1.0f - t;
+        int x = center_x + side * (int)(3*u*u*t*18 + 3*u*t*t*(ends_x[thread]-20) + t*t*t*ends_x[thread]);
+        int y = top + (int)(u*u*u*80 + 3*u*u*t*52 + 3*u*t*t*ends_y[thread] + t*t*t*ends_y[thread]);
+        rect(x, y, 2, 2, color);
+      }
+    }
+  }
+  ring(center_x, top + 83, 5, 2, color);
+  rect(center_x, top + 87, 2, 10, color);
 }
 
 static const uint8_t *glyph(char raw) {
@@ -281,9 +320,14 @@ esp_err_t lantern_display_init(void) {
     LANTERN_DISPLAY_WIDTH * TRANSFER_ROWS * sizeof(uint16_t),
     MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
   if (!s_transfer_pixels) return ESP_ERR_NO_MEM;
-  s_lock = xSemaphoreCreateMutex();
   s_transfer_done = xSemaphoreCreateBinary();
-  if (!s_lock || !s_transfer_done) return ESP_ERR_NO_MEM;
+  s_updates = xQueueCreate(1, sizeof(display_update_t));
+  if (!s_transfer_done || !s_updates) return ESP_ERR_NO_MEM;
+  if (xTaskCreate(display_task, "lantern_display", 4096, NULL, 2, NULL) != pdPASS) {
+    vQueueDelete(s_updates);
+    s_updates = NULL;
+    return ESP_ERR_NO_MEM;
+  }
   gpio_set_level(LANTERN_DISPLAY_BACKLIGHT_GPIO, 1);
   lantern_display_show(LANTERN_SCREEN_BOOTING, "HARDWARE CHECK");
   ESP_LOGI(TAG, "%s ready at %dx%d",
@@ -293,26 +337,24 @@ esp_err_t lantern_display_init(void) {
 }
 
 void lantern_display_show(lantern_screen_t screen, const char *detail) {
-  if (!s_pixels || !s_panel_io || !s_lock) return;
-  if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(1000)) != pdTRUE) return;
+  if (!s_updates) return;
+  display_update_t update = {.screen = screen};
+  snprintf(update.detail, sizeof(update.detail), "%s", detail ? detail : "");
+  xQueueOverwrite(s_updates, &update);
+}
 
-#if LANTERN_DISPLAY_DRIVER_ILI9341
-  // Lantern V2 uses a clearly green face so the larger display reads as a
-  // product interface instead of the panel's white factory/blank state.
-  const uint16_t background = rgb565(0, 112, 54);
-  const uint16_t green = rgb565(96, 255, 148);
-  const uint16_t dim_green = rgb565(0, 62, 31);
-  const uint16_t foreground = rgb565(174, 255, 202);
-#else
-  const uint16_t background = rgb565(2, 8, 7);
-  const uint16_t green = rgb565(48, 255, 136);
-  const uint16_t dim_green = rgb565(18, 92, 58);
-  const uint16_t foreground = rgb565(226, 244, 235);
-#endif
+static void render_screen(lantern_screen_t screen, const char *detail) {
+  static int previous_screen = -1;
+  static char previous_detail[96];
+  if ((int)screen == previous_screen && strcmp(detail, previous_detail) == 0) return;
+
+  const uint16_t background = rgb565(17, 25, 22);
+  const uint16_t green = rgb565(181, 213, 177);
+  const uint16_t foreground = rgb565(233, 238, 231);
   const uint16_t amber = rgb565(255, 184, 72);
   const uint16_t red = rgb565(255, 78, 86);
   uint16_t accent = green;
-  const char *title = "LANTERN";
+  const char *title = "QUIPUS";
   const char *status = "BOOTING";
 
   switch (screen) {
@@ -330,21 +372,37 @@ void lantern_display_show(lantern_screen_t screen, const char *detail) {
     case LANTERN_SCREEN_BOOTING: default: break;
   }
 
-  fill(background);
   const int ring_y = LANTERN_DISPLAY_HEIGHT > 240 ? 118 : 92;
   const int status_y = LANTERN_DISPLAY_HEIGHT > 240 ? 220 : 162;
   const int detail_y = LANTERN_DISPLAY_HEIGHT > 240 ? 274 : 202;
-  ring(120, ring_y, 51, 9, dim_green);
-  ring(120, ring_y, 38, 5, accent);
-  rect(86, ring_y - 44, 68, 8, accent);
-  rect(86, ring_y + 36, 68, 8, accent);
-  centered_text(12, title, 3, foreground);
-  centered_text(status_y, status, 2, accent);
+  int first_row = 0;
+  int end_row = LANTERN_DISPLAY_HEIGHT;
+  if ((int)screen == previous_screen) {
+    // Progress only changes the detail line. Transfer complete DMA strips
+    // surrounding it, preserving the rest of the already-rendered screen.
+    rect(0, detail_y, LANTERN_DISPLAY_WIDTH, 7, background);
+    first_row = (detail_y / TRANSFER_ROWS) * TRANSFER_ROWS;
+    end_row = ((detail_y + 7 + TRANSFER_ROWS - 1) / TRANSFER_ROWS) * TRANSFER_ROWS;
+    if (end_row > LANTERN_DISPLAY_HEIGHT) end_row = LANTERN_DISPLAY_HEIGHT;
+  } else {
+    fill(background);
+    if (screen == LANTERN_SCREEN_READY || screen == LANTERN_SCREEN_BOOTING) {
+      quipus_mark(LANTERN_DISPLAY_WIDTH / 2, ring_y - 44, accent);
+    } else if (screen == LANTERN_SCREEN_RECORDING) {
+      ring(LANTERN_DISPLAY_WIDTH / 2, ring_y, 17, 17, red);
+    } else {
+      // No decorative animation while listening, uploading, or reporting.
+      rect(LANTERN_DISPLAY_WIDTH / 2 - 22, ring_y, 44, 2, accent);
+    }
+    centered_text(12, title, 3, foreground);
+    centered_text(status_y, status, 2, accent);
+  }
   if (detail && detail[0]) centered_text(detail_y, detail, 1, foreground);
 
+  bool complete = true;
   while (xSemaphoreTake(s_transfer_done, 0) == pdTRUE) {}
-  for (int y = 0; y < LANTERN_DISPLAY_HEIGHT; y += TRANSFER_ROWS) {
-    int rows = LANTERN_DISPLAY_HEIGHT - y;
+  for (int y = first_row; y < end_row; y += TRANSFER_ROWS) {
+    int rows = end_row - y;
     if (rows > TRANSFER_ROWS) rows = TRANSFER_ROWS;
     const size_t pixel_count = (size_t)rows * LANTERN_DISPLAY_WIDTH;
 #if LANTERN_DISPLAY_DRIVER_ILI9341
@@ -362,12 +420,15 @@ void lantern_display_show(lantern_screen_t screen, const char *detail) {
 #endif
     if (result != ESP_OK) {
       ESP_LOGE(TAG, "draw failed: %s", esp_err_to_name(result));
+      complete = false;
       break;
     }
     if (xSemaphoreTake(s_transfer_done, pdMS_TO_TICKS(1000)) != pdTRUE) {
       ESP_LOGE(TAG, "draw timed out");
+      complete = false;
       break;
     }
   }
-  xSemaphoreGive(s_lock);
+  previous_screen = complete ? (int)screen : -1;
+  if (complete) snprintf(previous_detail, sizeof(previous_detail), "%s", detail);
 }

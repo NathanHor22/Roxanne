@@ -41,7 +41,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const client = getServerSupabase();
-  if (!client) return noStore("Lantern service is unavailable.", 503);
+  if (!client) return noStore("Quipus service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return noStore("Device credential is invalid or revoked.", 403);
 
@@ -89,13 +89,13 @@ export async function POST(
       .is("ended_at", null)
       .maybeSingle();
     if (sessionError) throw new Error(sessionError.message);
-    if (!stored) return noStore("Lantern session was not found.", 404);
+    if (!stored) return noStore("Quipus session was not found.", 404);
     const current = lanternMachineSchema.parse(stored.machine);
     if (
       input.expectedVersion !== current.version ||
       Number(stored.state_version) !== current.version
     ) {
-      return noStore("Lantern session state is stale.", 409);
+      return noStore("Quipus session state is stale.", 409);
     }
 
     const serverTime = new Date().toISOString();
@@ -104,7 +104,7 @@ export async function POST(
       input.event.type === "BEGIN_QUICK" ||
       input.event.type === "BEGIN_STATUS"
     ) {
-      return noStore("Start a new Lantern mode through the session endpoint.", 400);
+      return noStore("Start a new Quipus mode through the session endpoint.", 400);
     }
     const event = lanternEventSchema.parse(
       input.event.type === "ACTION_PROPOSED"
@@ -161,7 +161,7 @@ export async function POST(
       if (startedAgentId) {
         await stopAgoraLanternTranscription(startedAgentId).catch(() => undefined);
       }
-      return noStore("Lantern session state changed.", 409);
+      return noStore("Quipus session state changed.", 409);
     }
     const storedMachine = lanternMachineSchema.parse(
       transition.stored_machine || next,
@@ -232,10 +232,10 @@ export async function POST(
     const message = error instanceof Error ? error.message : "";
     return noStore(
       error instanceof z.ZodError
-        ? "Lantern event is invalid."
+        ? "Quipus event is invalid."
         : message.startsWith("Agora recording is not configured")
           ? message
-          : "Lantern event could not be saved.",
+          : "Quipus event could not be saved.",
       error instanceof z.ZodError
         ? 400
         : message.startsWith("Agora recording is not configured")

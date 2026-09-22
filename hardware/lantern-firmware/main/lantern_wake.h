@@ -7,7 +7,7 @@
 #include "esp_err.h"
 
 // The prototype uses Espressif's bundled "Computer" WakeNet9 model. A future
-// trained Lantern model can replace these two values without changing the
+// trained Quipus model can replace these two values without changing the
 // command or consent state machine.
 #define LANTERN_WAKE_MODEL_MATCH "computer"
 #define LANTERN_WAKE_PHRASE "COMPUTER"

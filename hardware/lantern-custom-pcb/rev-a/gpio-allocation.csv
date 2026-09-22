@@ -1,0 +1,13 @@
+﻿Function,GPIO numbers - not physical pads,Constraint
+Audio MCLK reserve,4,Only if required by the selected DSP firmware
+Audio BCLK / frame sync,5 / 7,Choose one clock master; finalize firmware image
+Audio capture / playback,6 / 8,ESP RX / ESP TX; playback also feeds echo reference
+Audio reset; I2C SDA / SCL,9; 16 / 15,"Check control addresses, voltage and off-state paths"
+LCD MOSI / SCLK / CS,11 / 12 / 10,SPI display; final panel/FPC still to select
+LCD DC / RESET / backlight,13 / 14 / 47,Backlight uses a driver stage
+SD CLK / CMD / D0,38 / 40 / 39,Dedicated SDMMC wiring
+SD D1 / D2 / D3,41 / 42 / 48,Four-bit target; route beside ground reference
+Volume + / - / Record,1 / 2 / 21,Switches with defined pull-ups and debounce
+Power request / acknowledge,17 / 18,Power-controller handshake; verify boot defaults
+USB D- / D+,19 / 20,USB programming; ESD and off-state isolation
+UART TX / RX; BOOT / RESET,43 / 44; 0 / EN,Recessed service controls and test pads

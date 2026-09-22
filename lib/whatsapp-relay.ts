@@ -61,7 +61,7 @@ interface RelayDependencies {
   timeoutMs?: number;
 }
 
-type RelayPath = "/status" | "/qr" | "/pair" | "/disconnect";
+type RelayPath = "/status" | "/qr" | "/pair" | "/disconnect" | "/send-report";
 
 function relayConfiguration(override?: RelayConfiguration): RelayConfiguration {
   if (override) return override;

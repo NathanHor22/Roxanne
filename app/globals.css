@@ -309,3 +309,26 @@ svg { width: 18px; height: 18px; stroke-width: 1.8; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Quipus shared tokens: readable surfaces, with glass reserved for controls. */
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --q-bg: #111916; --q-surface: #19231e; --q-surface-raised: #233128;
+  --q-text: #e9eee7; --q-muted: #9aa99e; --q-line: #ffffff12;
+  --q-accent: #b5d5b1; --q-pale: #93be9920; --q-glass: #ffffff04;
+  --ink: var(--q-text); --ink-soft: var(--q-text); --muted: var(--q-muted);
+  --paper: var(--q-bg); --surface: var(--q-surface); --white: var(--q-surface);
+  --line: var(--q-line); --line-strong: #ffffff25; --accent: var(--q-accent);
+  --accent-soft: var(--q-pale); --danger: #efab9b; --danger-soft: #c9695120;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --q-bg: #f4f5ef; --q-surface: #fcfdf9; --q-surface-raised: #e8ede4;
+  --q-text: #1f3328; --q-muted: #657366; --q-line: #253e2815;
+  --q-accent: #3f6d4b; --q-pale: #50794b12; --q-glass: #ffffff78;
+  --line-strong: #253e2830; --danger: #a64036; --danger-soft: #c9695110;
+}
+html { background: var(--q-bg); }
+body { background: var(--q-bg); color: var(--q-text); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--q-accent); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

@@ -18,4 +18,5 @@ typedef enum {
 } lantern_screen_t;
 
 esp_err_t lantern_display_init(void);
+// Non-blocking, task-context only; copies detail and coalesces pending updates.
 void lantern_display_show(lantern_screen_t screen, const char *detail);

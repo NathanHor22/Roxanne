@@ -97,10 +97,10 @@ async function claimWithQualifiedQueries(
       .maybeSingle();
     if (existingError) throw new Error(existingError.message);
     if (existing && existing.user_id !== pairing.user_id) {
-      throw new Error("Lantern hardware is already paired to another owner.");
+      throw new Error("Quipus hardware is already paired to another owner.");
     }
     if (existing && existing.revoked_at === null && existing.credential_hash) {
-      throw new Error("Lantern hardware is already paired; revoke it before pairing again.");
+      throw new Error("Quipus hardware is already paired; revoke it before pairing again.");
     }
 
     let claimedDevice: { id: string; name: string } | null = null;
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
   const client = getServerSupabase();
   if (!client) {
     return NextResponse.json(
-      { error: "Lantern pairing is unavailable." },
+      { error: "Quipus pairing is unavailable." },
       { status: 503, headers: { "cache-control": "no-store" } },
     );
   }
@@ -255,8 +255,8 @@ export async function POST(request: Request) {
       {
         error:
           error instanceof z.ZodError
-            ? "Lantern claim details are invalid."
-            : "Lantern could not be paired.",
+            ? "Quipus claim details are invalid."
+            : "Quipus could not be paired.",
       },
       {
         status: error instanceof z.ZodError ? 400 : 500,

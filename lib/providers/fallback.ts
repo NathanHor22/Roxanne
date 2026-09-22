@@ -14,7 +14,7 @@ export const FALLBACK_TRANSCRIPTION_WARNING =
   "ElevenLabs is not configured. This is a clearly labelled sample transcript, not a transcription of the uploaded audio.";
 
 export const FALLBACK_EXTRACTION_WARNING =
-  "Qwen is not configured. Insights were produced by Lantern's deterministic local rules and should be reviewed.";
+  "Qwen is not configured. Insights were produced by Quipus's deterministic local rules and should be reviewed.";
 
 const FALLBACK_SEGMENTS: TranscriptSegment[] = [
   {

@@ -5,8 +5,8 @@ import { LanternMark } from "@/components/brand/LanternMark";
 import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
-  title: "Terms of Use · Lantern",
-  description: "Terms for using the Lantern conversation and follow-up prototype.",
+  title: "Terms of Use · Quipus",
+  description: "Terms for using the Quipus conversation and follow-up prototype.",
 };
 
 export default function TermsPage() {
@@ -15,7 +15,7 @@ export default function TermsPage() {
       <div className={styles.shell}>
         <Link className={styles.brand} href="/">
           <span className={styles.mark}><LanternMark /></span>
-          Lantern
+          Quipus
         </Link>
         <article className={styles.article}>
           <p className={styles.eyebrow}>TERMS</p>
@@ -23,16 +23,16 @@ export default function TermsPage() {
           <p className={styles.updated}>Effective 13 September 2026</p>
 
           <p>
-            Lantern is an early prototype that captures consented conversations,
+            Quipus is an early prototype that captures consented conversations,
             prepares summaries and follow-ups, and creates Google Calendar events
-            after approval. By using Lantern, you agree to these terms.
+            after approval. By using Quipus, you agree to these terms.
           </p>
 
           <h2>Recording consent</h2>
           <p>
-            You are responsible for telling participants that Lantern is recording
+            You are responsible for telling participants that Quipus is recording
             and for obtaining every consent required by the laws and rules that apply
-            to you. Do not use Lantern for covert or unlawful recording.
+            to you. Do not use Quipus for covert or unlawful recording.
           </p>
 
           <h2>Review before acting</h2>
@@ -45,7 +45,7 @@ export default function TermsPage() {
 
           <h2>Account and device security</h2>
           <p>
-            Keep control of your Google account, paired Lantern devices, hotspot
+            Keep control of your Google account, paired Quipus devices, hotspot
             credentials, and pairing codes. Revoke a device promptly if it is lost or
             transferred. You may not access another person&apos;s workspace or interfere
             with the service.
@@ -53,14 +53,14 @@ export default function TermsPage() {
 
           <h2>Prototype availability</h2>
           <p>
-            Lantern may change, lose features, or be unavailable while it is under
+            Quipus may change, lose features, or be unavailable while it is under
             development. Do not rely on it as the only copy of important recordings,
             commitments, or appointments.
           </p>
 
           <h2>Acceptable use</h2>
           <p>
-            Do not use Lantern to violate privacy, intellectual property, employment,
+            Do not use Quipus to violate privacy, intellectual property, employment,
             surveillance, anti-spam, or other applicable laws; upload malicious
             material; impersonate others; or send invitations without authority.
           </p>

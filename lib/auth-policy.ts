@@ -59,7 +59,7 @@ export function isLanternDevicePath(pathname: string): boolean {
     pathname === "/api/device/v1/restart" ||
     pathname === "/api/device/v1/speak" ||
     pathname === "/api/device/v1/sessions" ||
-    /^\/api\/device\/v1\/sessions\/[0-9a-f-]{36}\/(?:events|transcript|audio|complete)$/iu.test(
+    /^\/api\/device\/v1\/sessions\/[0-9a-f-]{36}\/(?:events|transcript|audio|upload|complete)$/iu.test(
       pathname,
     )
   );

@@ -1,4 +1,7 @@
 "use client";
+import { ShareMeetingWhatsApp } from "./WhatsAppDelivery";
+import { EmailFollowUp } from "./EmailFollowUp";
+import { RetryRecording } from "./RetryRecording";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -27,7 +30,8 @@ import {
   type WorkspaceMode,
 } from "@/lib/workspace/model";
 import { ConversationReplay, type PlaybackProgress } from "./ConversationReplay";
-import { dateLabel, initials, timeLabel } from "./ConversationPanel";
+import { initials } from "./ConversationPanel";
+import { useWorkspaceTime } from "./WorkspaceTime";
 import styles from "./conversation-detail.module.css";
 
 type EditableContact = Pick<Contact, "name" | "company" | "role" | "email">;
@@ -53,6 +57,7 @@ export function ConversationDetail({
   onApprove: (approval: MeetingApproval) => void;
   onUpdateContact: (id: string, changes: EditableContact) => Promise<boolean>;
 }) {
+  const { dateLabel, timeLabel } = useWorkspaceTime();
   const playback = useRef<PlaybackProgress | undefined>(undefined);
   const contact = conversation.contacts[0] || null;
   const insight = conversation.insight;
@@ -124,15 +129,16 @@ export function ConversationDetail({
         </div>
         <dl className={styles.heroFacts}>
           <div><dt><Clock3 /> Duration</dt><dd>{durationMinutes} min</dd></div>
-          <div><dt><Headphones /> Source</dt><dd>{conversation.source === "hardware" ? "Lantern" : conversation.source}</dd></div>
+          <div><dt><Headphones /> Source</dt><dd>{conversation.source === "hardware" ? "Quipus" : conversation.source}</dd></div>
           <div><dt><FileText /> Transcript</dt><dd>{conversation.transcript?.length || 0} segments</dd></div>
         </dl>
       </header>
 
       {error && <p className={styles.pageError} role="alert">{error}</p>}
+      {conversation.status === "ready" && <ShareMeetingWhatsApp key={conversation.id} meetingId={conversation.id} title={conversation.title} sample={mode === "sample"} />}
 
       <div className={styles.detailGrid}>
-        <main className={styles.replayColumn}>
+        <section className={styles.replayColumn} aria-label="Recording and transcript">
           <ConversationReplay
             key={conversation.id}
             conversation={conversation}
@@ -141,7 +147,7 @@ export function ConversationDetail({
               playback.current = progress;
             }}
           />
-        </main>
+        </section>
 
         <aside className={styles.contextColumn}>
           <section className={styles.contextCard}>
@@ -238,8 +244,14 @@ export function ConversationDetail({
                   </div>
                 ))}
               </div>
+              {tasks.filter(task => task.type === "email" && task.status !== "completed").map(task => (
+                <EmailFollowUp key={task.id} task={task} sample={mode === "sample"}
+                  recipient={conversation.contacts.find(person => person.id === task.contactId)?.email || ""}
+                  onSent={() => onTask(task.id, true)} />
+              ))}
             </section>
           )}
+          {conversation.status === "failed" && conversation.source === "hardware" && conversation.recordingId && <section className={styles.contextCard}><RetryRecording recordingId={conversation.recordingId} sample={mode === "sample"} /></section>}
         </aside>
       </div>
     </div>

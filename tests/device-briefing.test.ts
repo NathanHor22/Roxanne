@@ -6,6 +6,7 @@ import {
   buildStatusBriefing,
   localDateKey,
   ownerSpokenName,
+  splitSpeechPages,
 } from "../lib/device-briefing";
 import { createOpenAISpeech } from "../lib/providers/openai-speech";
 
@@ -14,11 +15,11 @@ test("builds an owner-specific boot briefing with bounded battery", () => {
   assert.equal(ownerSpokenName(null, "nigel.tan@example.com"), "nigel tan");
   assert.equal(
     buildBootBriefing({ ownerName: "Nathan Hor", batteryLevel: 140 }),
-    "Lantern. Sector twenty four eighteen online. Battery at 100 percent. Welcome, Nathan Hor. Ready. Say computer or press the centre button.",
+    "Quipus ready, Nathan. Say Computer for a command, or tap or press to record.",
   );
 });
 
-test("builds a concise daily status report and flags approvals", () => {
+test("builds a daily status report and asks to review specific approvals", () => {
   const speech = buildStatusBriefing({
     ownerName: "Nathan Hor",
     meetings: [
@@ -32,8 +33,33 @@ test("builds a concise daily status report and flags approvals", () => {
   });
   assert.match(speech, /Today you recorded 1 conversation\./);
   assert.match(speech, /Mr Chung, Acme/);
-  assert.match(speech, /1 meeting approval is waiting in the dashboard/);
-  assert.match(speech, /before an invitation is sent/);
+  assert.match(speech, /1 pending action item/);
+  assert.match(speech, /Each invitation needs your approval before it is sent/);
+});
+
+test("full reports preserve all meetings, details, and final points across speech pages", () => {
+  const meetings = Array.from({ length: 6 }, (_, meeting) => ({ title: `Client ${meeting}`,
+    keyPoints: Array.from({ length: 8 }, (_, point) => `Point ${meeting}-${point}: ${"Discuss the complete proposal and its delivery timeline. ".repeat(4)}`),
+    concern: `Concern ${meeting}`, promised: `Promise ${meeting}`, commitments: [`Commitment ${meeting}`] }));
+  const speech = buildStatusBriefing({ ownerName: "Nathan", meetings, pendingApprovals: 2 });
+  const pages = splitSpeechPages(speech);
+  assert.ok(pages.length > 10);
+  assert.ok(pages.every(page => page.length <= 650));
+  assert.equal(pages.join(" "), speech);
+  for (const [index, meeting] of meetings.entries()) {
+    assert.ok(speech.includes(`Point ${index}-7:`));
+    assert.ok(speech.includes(meeting.concern));
+    assert.ok(speech.includes(meeting.promised));
+  }
+  assert.match(pages.at(-1)!, /Would you like to review them/);
+});
+
+test("speech rejects oversized input instead of silently cutting off a report", async () => {
+  let fetched = false;
+  await assert.rejects(createOpenAISpeech("a".repeat(4097), { apiKey: "test", fetchImpl: async () => {
+    fetched = true; return new Response();
+  } }));
+  assert.equal(fetched, false);
 });
 
 test("uses the owner timezone for the status-report day", () => {

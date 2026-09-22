@@ -6,11 +6,30 @@ import {
   createLanternMachine,
   lanternMachineSchema,
   LanternTransitionError,
+  RECORDING_CONSENT_WINDOW_MS,
 } from "../lib/lantern-state";
 
 const at = "2026-09-11T10:00:00+08:00";
 const later = "2026-09-11T10:00:10+08:00";
 const expires = "2026-09-11T10:00:30+08:00";
+
+test("spoken recording consent survives prompt playback and cloud recognition latency", () => {
+  const start = Date.parse(at);
+  const awaiting = advanceLantern(createLanternMachine("ready"), {
+    type: "BEGIN_QUICK", at, sessionId: "slow-speech-session", promptId: "spoken-consent",
+    promptExpiresAt: new Date(start + RECORDING_CONSENT_WINDOW_MS).toISOString(),
+  });
+  const answer = { type: "RECORDING_CONSENT" as const, promptId: "spoken-consent", accepted: true };
+  assert.equal(advanceLantern(awaiting, {
+    ...answer, at: new Date(start + 65_000).toISOString(),
+  }).state, "recording");
+  assert.notEqual(advanceLantern(awaiting, {
+    ...answer, accepted: false, at: new Date(start + 65_000).toISOString(),
+  }).state, "recording");
+  assert.throws(() => advanceLantern(awaiting, {
+    ...answer, at: new Date(start + RECORDING_CONSENT_WINDOW_MS + 1).toISOString(),
+  }), /expired/);
+});
 
 test("quick mode cannot record before its exact consent prompt is confirmed", () => {
   const ready = createLanternMachine("ready");

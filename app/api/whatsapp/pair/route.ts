@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireAuthenticatedSession } from "@/lib/api-security";
+import { requireWhatsAppOwner } from "@/lib/whatsapp-owner-auth";
 import {
   normalizeOwnerPairPhone,
   parseWhatsAppPairingCode,
@@ -18,7 +18,7 @@ const requestSchema = z.object({
 }).strict();
 
 export async function POST(request: Request) {
-  const authError = await requireAuthenticatedSession();
+  const authError = await requireWhatsAppOwner();
   if (authError) return authError;
   try {
     const input = requestSchema.parse(await request.json());

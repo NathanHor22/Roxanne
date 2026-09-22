@@ -29,7 +29,7 @@ async function workspaceContext() {
   if (!userId)
     return {
       readinessError: NextResponse.json(
-        { error: "The Lantern workspace is not available in Supabase." },
+        { error: "The Quipus workspace is not available in Supabase." },
         { status: 503 },
       ),
     };
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     const runtime = env();
     if (!runtime.OPENAI_API_KEY)
       return NextResponse.json(
-        { error: "Add OPENAI_API_KEY to the Lantern server before running Relay." },
+        { error: "Add OPENAI_API_KEY to the Quipus server before running Relay." },
         { status: 503 },
       );
     const { meetings } = await loadMeetings();
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Lantern Relay could not compare the conversations.",
+            : "Quipus Relay could not compare the conversations.",
       },
       { status: 502 },
     );

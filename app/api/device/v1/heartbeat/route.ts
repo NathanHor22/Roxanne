@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   );
   if (!authorization) return response("Device authentication required.", 401);
   const client = getServerSupabase();
-  if (!client) return response("Lantern service is unavailable.", 503);
+  if (!client) return response("Quipus service is unavailable.", 503);
 
   try {
     const input = heartbeatSchema.parse(await request.json());
@@ -93,8 +93,8 @@ export async function POST(request: Request) {
     console.error("[device-heartbeat]", error);
     return response(
       error instanceof z.ZodError
-        ? "Lantern heartbeat is invalid."
-        : "Lantern heartbeat could not be saved.",
+        ? "Quipus heartbeat is invalid."
+        : "Quipus heartbeat could not be saved.",
       error instanceof z.ZodError ? 400 : 500,
     );
   }

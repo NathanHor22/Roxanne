@@ -12,12 +12,13 @@ import {
   RequestError,
 } from "./protocol.js";
 import { WhatsAppWorker } from "./whatsapp.js";
+import { parseDocument, reportRecipient } from "./media.js";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
   redact: ["req.headers.authorization", "authorization", "token"],
 });
-const MAX_BODY_BYTES = 64 * 1024;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 function json(
   response: ServerResponse,
@@ -127,6 +128,16 @@ async function main(): Promise<void> {
         json(response, 200, { ok: true, ...result });
         return;
       }
+      if (method === "POST" && pathname === "/send-report") {
+        const body = await readJson(request) as Record<string, unknown>;
+        if (!body || body.approved !== true || typeof body.idempotencyKey !== "string" || !/^[A-Za-z0-9._:-]{8,200}$/u.test(body.idempotencyKey)) throw new RequestError(400, "Report approval and delivery key are required.");
+        const to = reportRecipient(body.to);
+        const document = body.document ? parseDocument(body.document) : undefined;
+        const text = typeof body.text === "string" ? body.text : "";
+        if (!document && (!text.trim() || text.length > 4000)) throw new RequestError(400, "Report text is invalid.");
+        json(response, 200, { ok: true, ...await worker.send(to, text, body.idempotencyKey, { approved: true, document }) });
+        return;
+      }
 
       if (method === "POST" && pathname === "/disconnect") {
         await worker.disconnect();
@@ -155,9 +166,29 @@ async function main(): Promise<void> {
   });
 
   let shuttingDown = false;
+  let processingTimer: NodeJS.Timeout | undefined;
+  let kicking = false;
+  if (process.env.LANTERN_APP_URL && process.env.PROCESSING_WORKER_SECRET) {
+    const endpoint = new URL("/api/internal/process-recordings", process.env.LANTERN_APP_URL);
+    if (endpoint.protocol !== "https:") throw new Error("LANTERN_APP_URL must use HTTPS.");
+    const kick = async () => {
+      if (kicking || shuttingDown) return;
+      kicking = true;
+      try {
+        const response = await fetch(endpoint, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15000), headers: { authorization: `Bearer ${process.env.PROCESSING_WORKER_SECRET}` } });
+        if (!response.ok) logger.warn({ status: response.status }, "Recording queue wakeup failed");
+        await response.body?.cancel();
+      } catch { logger.warn("Recording queue wakeup could not reach Lantern"); }
+      finally { kicking = false; }
+    };
+    processingTimer = setInterval(() => void kick(), 60000);
+    processingTimer.unref();
+    void kick();
+  }
   const shutdown = (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    if (processingTimer) clearInterval(processingTimer);
     logger.info({ signal }, "Shutting down WhatsApp worker");
     worker.shutdown();
     server.close(() => {

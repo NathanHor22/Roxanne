@@ -4,7 +4,7 @@
   place-content: center;
   justify-items: center;
   gap: 10px;
-  color: #62756a;
+  color: var(--q-muted);
 }
 
 .deviceLoading svg {
@@ -16,7 +16,7 @@
 }
 
 .kicker {
-  color: #13804a;
+  color: var(--q-accent);
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.14em;
@@ -26,9 +26,9 @@
   display: grid;
   grid-template-columns: minmax(310px, 0.78fr) minmax(430px, 1.22fr);
   overflow: hidden;
-  border: 1px solid #dce7df;
+  border: 1px solid var(--q-line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--q-surface);
   box-shadow: 0 14px 42px #173d2b0a;
 }
 
@@ -41,11 +41,11 @@
   background:
     radial-gradient(circle at 20% 5%, #2b815333 0, transparent 32%),
     linear-gradient(155deg, #0a281a, #07160f);
-  color: #eefbf3;
+  color: var(--q-text);
 }
 
 .pairingIntro .kicker {
-  color: #77e4a3;
+  color: var(--q-accent);
 }
 
 .pairingIcon {
@@ -54,10 +54,10 @@
   height: 54px;
   margin-bottom: 25px;
   place-items: center;
-  border: 1px solid #67e99b3b;
+  border: 1px solid var(--q-line);
   border-radius: 50%;
-  background: #41d47b12;
-  color: #70eca2;
+  background: var(--q-pale);
+  color: var(--q-accent);
   box-shadow: 0 0 36px #41e3811a;
 }
 
@@ -76,7 +76,7 @@
 .pairingIntro > p {
   max-width: 440px;
   margin: 0 0 28px;
-  color: #acc5b6;
+  color: var(--q-accent);
   font-size: 14px;
   line-height: 1.75;
 }
@@ -89,18 +89,18 @@
   gap: 8px;
   min-height: 42px;
   padding: 10px 15px;
-  border: 1px solid #4fe18a;
+  border: 1px solid var(--q-line);
   border-radius: 7px;
-  background: #4fe18a;
-  color: #082116;
+  background: var(--q-pale);
+  color: var(--q-accent);
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
 }
 
 .pairingPrimary:hover {
-  border-color: #78efa7;
-  background: #78efa7;
+  border-color: var(--q-line);
+  background: var(--q-pale);
 }
 
 .pairingPrimary svg,
@@ -114,26 +114,26 @@
   width: min(100%, 330px);
   gap: 6px;
   padding: 18px 20px;
-  border: 1px solid #61df953e;
+  border: 1px solid var(--q-line);
   border-radius: 9px;
-  background: #43db7e0d;
+  background: var(--q-pale);
 }
 
 .activePairingCode span {
-  color: #7fbe98;
+  color: var(--q-accent);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.13em;
 }
 
 .activePairingCode strong {
-  color: #dfffea;
+  color: var(--q-accent);
   font-size: 29px;
   letter-spacing: 0.13em;
 }
 
 .activePairingCode small {
-  color: #9fb7a8;
+  color: var(--q-accent);
   font-size: 11px;
 }
 
@@ -141,10 +141,10 @@
   width: 100%;
   margin: 16px 0 0;
   padding: 11px 13px;
-  border: 1px solid #ecc4bd;
+  border: 1px solid var(--q-line);
   border-radius: 7px;
-  background: #fff2ef;
-  color: #963f34;
+  background: var(--q-surface);
+  color: var(--danger);
   font-size: 12px;
 }
 
@@ -152,10 +152,10 @@
   width: 100%;
   margin: 16px 0 0;
   padding: 11px 13px;
-  border: 1px solid #9bd7b3;
+  border: 1px solid var(--q-line);
   border-radius: 7px;
-  background: #effbf3;
-  color: #22623d;
+  background: var(--q-pale);
+  color: var(--q-accent);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -170,14 +170,14 @@
   justify-content: space-between;
   gap: 15px;
   padding-bottom: 22px;
-  border-bottom: 1px solid #e6ece7;
+  border-bottom: 1px solid var(--q-line);
 }
 
 .setupSteps > header > span:last-child {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #67796f;
+  color: var(--q-muted);
   font-size: 12px;
 }
 
@@ -198,7 +198,7 @@
   grid-template-columns: 35px minmax(0, 1fr);
   gap: 15px;
   padding: 19px 0;
-  border-bottom: 1px solid #edf1ee;
+  border-bottom: 1px solid var(--q-line);
 }
 
 .setupSteps li > span {
@@ -207,20 +207,20 @@
   height: 30px;
   place-items: center;
   border-radius: 50%;
-  background: #e8f4ec;
-  color: #22704a;
+  background: var(--q-pale);
+  color: var(--q-accent);
   font-size: 12px;
   font-weight: 700;
 }
 
 .setupSteps li strong {
-  color: #294237;
+  color: var(--q-accent);
   font-size: 13px;
 }
 
 .setupSteps li p {
   margin: 4px 0 0;
-  color: #687970;
+  color: var(--q-muted);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -230,7 +230,7 @@
   align-items: center;
   gap: 6px;
   margin-top: 9px;
-  color: #147344;
+  color: var(--q-accent);
   font-size: 12px;
   font-weight: 650;
   text-decoration: none;
@@ -245,13 +245,13 @@
   align-items: center;
   gap: 8px;
   padding-top: 21px;
-  color: #687970;
+  color: var(--q-muted);
   font-size: 12px;
 }
 
 .setupSteps > footer svg {
   width: 15px;
-  color: #2a7c51;
+  color: var(--q-accent);
 }
 
 .healthLayout {
@@ -265,11 +265,11 @@
   justify-content: space-between;
   gap: 20px;
   padding: 25px 27px;
-  border: 1px solid #dce7df;
+  border: 1px solid var(--q-line);
   border-radius: 12px;
   background:
-    radial-gradient(circle at 3% 5%, #dff3e6 0, transparent 25%),
-    #fff;
+    radial-gradient(circle at 3% 5%, var(--q-pale) 0, transparent 25%),
+    var(--q-surface);
 }
 
 .deviceIdentity {
@@ -287,7 +287,7 @@
   place-items: center;
   border-radius: 50%;
   background: #153f2b;
-  color: #70eca2;
+  color: var(--q-accent);
   box-shadow: 0 0 0 6px #e4f3e9;
 }
 
@@ -303,7 +303,7 @@
 
 .deviceIdentity p {
   margin: 0;
-  color: #687970;
+  color: var(--q-muted);
   font-size: 12px;
 }
 
@@ -320,13 +320,13 @@
 }
 
 .onlineBadge {
-  background: #e7f5eb;
-  color: #187044;
+  background: var(--q-pale);
+  color: var(--q-accent);
 }
 
 .attentionBadge {
-  background: #fff1e8;
-  color: #9a572d;
+  background: var(--q-surface);
+  color: #deac83;
 }
 
 .onlineBadge svg,
@@ -346,15 +346,15 @@
   gap: 12px;
   min-width: 0;
   padding: 18px;
-  border: 1px solid #dfe8e1;
+  border: 1px solid var(--q-line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--q-surface);
 }
 
 .healthStats article > svg {
   width: 20px;
   height: 20px;
-  color: #278051;
+  color: var(--q-accent);
 }
 
 .healthStats article > span {
@@ -365,7 +365,7 @@
 
 .healthStats strong {
   overflow: hidden;
-  color: #253e33;
+  color: var(--q-accent);
   font-size: 16px;
   font-weight: 650;
   text-overflow: ellipsis;
@@ -374,7 +374,7 @@
 }
 
 .healthStats small {
-  color: #718078;
+  color: var(--q-muted);
   font-size: 11px;
 }
 
@@ -387,9 +387,9 @@
 
 .deviceDetails,
 .connectionCard {
-  border: 1px solid #dce7df;
+  border: 1px solid var(--q-line);
   border-radius: 11px;
-  background: #fff;
+  background: var(--q-surface);
 }
 
 .deviceDetails {
@@ -402,13 +402,13 @@
   justify-content: space-between;
   gap: 15px;
   padding-bottom: 17px;
-  border-bottom: 1px solid #e8ede9;
+  border-bottom: 1px solid var(--q-line);
 }
 
 .deviceDetails h3,
 .connectionCard h3 {
   margin: 4px 0 0;
-  color: #2a4237;
+  color: var(--q-accent);
   font: 400 20px Georgia, serif;
 }
 
@@ -417,10 +417,10 @@
   align-items: center;
   gap: 7px;
   padding: 7px 10px;
-  border: 1px solid #dbe5de;
+  border: 1px solid var(--q-line);
   border-radius: 6px;
-  background: #fff;
-  color: #52675b;
+  background: var(--q-surface);
+  color: var(--q-muted);
   font-size: 12px;
 }
 
@@ -437,7 +437,7 @@
   justify-content: space-between;
   gap: 30px;
   padding: 16px 0;
-  border-bottom: 1px solid #edf1ee;
+  border-bottom: 1px solid var(--q-line);
   font-size: 12px;
 }
 
@@ -445,7 +445,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #687970;
+  color: var(--q-muted);
 }
 
 .deviceDetails dt svg {
@@ -454,7 +454,7 @@
 
 .deviceDetails dd {
   margin: 0;
-  color: #344d41;
+  color: var(--q-accent);
   font-weight: 600;
   text-align: right;
 }
@@ -465,8 +465,8 @@
   margin-top: 18px;
   padding: 13px;
   border-radius: 7px;
-  background: #fff2ed;
-  color: #8e4938;
+  background: var(--q-surface);
+  color: #deac83;
 }
 
 .lastError > svg {
@@ -496,7 +496,7 @@
 .connectionCard ul {
   margin: 20px 0;
   padding: 0;
-  border-top: 1px solid #e8ede9;
+  border-top: 1px solid var(--q-line);
   list-style: none;
 }
 
@@ -506,8 +506,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 13px 0;
-  border-bottom: 1px solid #edf1ee;
-  color: #687970;
+  border-bottom: 1px solid var(--q-line);
+  color: var(--q-muted);
   font-size: 12px;
 }
 
@@ -518,7 +518,7 @@
 }
 
 .connectionCard li strong {
-  color: #385044;
+  color: var(--q-accent);
   font-size: 11px;
 }
 
@@ -535,14 +535,14 @@
 }
 
 .neutralServiceDot {
-  background: #b0b9b3;
+  background: var(--q-pale);
 }
 
 .wifiAction {
   width: 100%;
-  border-color: #1c7249;
+  border-color: var(--q-line);
   background: #1c7249;
-  color: #fff;
+  color: var(--q-text);
 }
 
 .wifiAction svg:last-child {
@@ -551,7 +551,7 @@
 
 .connectionCard > p {
   margin: 11px 0 0;
-  color: #76857d;
+  color: var(--q-muted);
   font-size: 11px;
   line-height: 1.55;
 }
@@ -562,19 +562,19 @@
   justify-content: space-between;
   gap: 20px;
   padding: 20px 23px;
-  border: 1px solid #eadedb;
+  border: 1px solid var(--q-line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--q-surface);
 }
 
 .deviceDangerZone strong {
-  color: #553d38;
+  color: var(--q-text);
   font-size: 13px;
 }
 
 .deviceDangerZone p {
   margin: 4px 0 0;
-  color: #7c706d;
+  color: var(--q-muted);
   font-size: 12px;
 }
 
@@ -584,10 +584,10 @@
   gap: 7px;
   min-height: 37px;
   padding: 8px 12px;
-  border: 1px solid #d9b9b1;
+  border: 1px solid var(--q-line);
   border-radius: 6px;
-  background: #fff;
-  color: #8a4539;
+  background: var(--q-surface);
+  color: var(--danger);
   font-size: 12px;
   font-weight: 650;
 }

@@ -1,0 +1,6 @@
+references/*.zip
+references/*.step
+references/*.png
+references/*.pdf
+__pycache__/
+exports/*.blend1

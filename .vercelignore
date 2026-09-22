@@ -17,7 +17,14 @@ hardware/lantern-firmware/build
 hardware/lantern-firmware/.ccache
 hardware/lantern-firmware/sdkconfig
 hardware/backups
+hardware/lantern-firmware/build-v2
+hardware/lantern-firmware/managed_components
+hardware/lantern-firmware/sdkconfig.v2
+hardware/lantern-case
+hardware/lantern-custom-pcb
 .env
 .env.local
 .env.*.local
 *.tsbuildinfo
+tmp
+output

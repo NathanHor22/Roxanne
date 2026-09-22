@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+// The device must download/play the prompt, capture the answer, and finish
+// cloud speech recognition before submitting consent. Keep that round trip
+// bounded without timing out an immediate spoken answer on a slow connection.
+export const RECORDING_CONSENT_WINDOW_MS = 120_000;
+
 export const lanternStateSchema = z.enum([
   "connecting",
   "ready",
@@ -110,7 +115,7 @@ export const lanternMachineSchema = z
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Prompt does not match Lantern state.",
+        message: "Prompt does not match Quipus state.",
       });
     }
     if (machine.state !== "offline_buffering" && machine.resumeState !== null) {
@@ -147,6 +152,7 @@ export const lanternEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("RESUME"), at: timestamp }),
   z.object({ type: z.literal("STOP"), at: timestamp }),
   z.object({ type: z.literal("ARCHIVE_ACCEPTED"), at: timestamp }),
+  z.object({ type: z.literal("PROCESSING_QUEUED"), at: timestamp }),
   z.object({ type: z.literal("PROCESSING_COMPLETE"), at: timestamp }),
   z.object({ type: z.literal("DISMISS_REPORT"), at: timestamp }),
   z.object({
@@ -232,7 +238,7 @@ function requireState(
 ) {
   if (!states.includes(machine.state)) {
     throw new LanternTransitionError(
-      `${event.type} is not allowed while Lantern is ${machine.state}.`,
+      `${event.type} is not allowed while Quipus is ${machine.state}.`,
     );
   }
 }
@@ -251,18 +257,18 @@ function validatePrompt(
     machine.prompt.id !== event.promptId
   ) {
     throw new LanternTransitionError(
-      "This response does not belong to the active Lantern prompt.",
+      "This response does not belong to the active Quipus prompt.",
     );
   }
   if (Date.parse(event.at) > Date.parse(machine.prompt.expiresAt)) {
     throw new LanternTransitionError(
-      "The Lantern confirmation prompt has expired.",
+      "The Quipus confirmation prompt has expired.",
     );
   }
 }
 
 /**
- * Authoritative provider-independent Lantern session state.
+ * Authoritative provider-independent Quipus session state.
  * Speech recognition may create events, but it cannot skip these transitions.
  */
 export function advanceLantern(
@@ -332,6 +338,9 @@ export function advanceLantern(
     case "ARCHIVE_ACCEPTED":
       requireState(machine, event, "finalising");
       return { ...next, state: "processing", bufferedSeconds: 0 };
+    case "PROCESSING_QUEUED":
+      requireState(machine, event, "finalising", "processing");
+      return resetToReady(machine);
     case "PROCESSING_COMPLETE":
       requireState(machine, event, "processing");
       return {

@@ -22,26 +22,26 @@ const prompts: Record<DevicePromptKind, string> = {
   consent_request:
     "Recording requires consent. Do you consent to being recorded? Say yes or no.",
   consent_success:
-    "Understood. Device authenticated. Consent confirmed. Recording now.",
+    "Consent confirmed. Starting your recording.",
   consent_failure:
-    "Authentication failed. Recording was not started. Please start another session.",
-  wake_retry: "Verification failed. Please try again.",
-  wake_failure: "Verification failed. Please verify yourself.",
+    "Consent was not given. Recording has not started. Please start another session.",
+  wake_retry: "I did not catch that. Please try again.",
+  wake_failure: "No command heard. Returning to ready.",
   command_error:
-    "I couldn't understand the command. Press the centre button to retry, or hold it to cancel.",
+    "I couldn't understand the command. Tap or press to retry. Hold to cancel.",
   recording_uploading:
-    "Recording stopped. Uploading now. Keep Lantern powered on.",
+    "Recording stopped. Uploading now. Keep Quipus powered on.",
   upload_complete: "Recording uploaded. Session complete.",
   session_error:
-    "I couldn't start the session. Press the centre button to retry, or hold it to cancel.",
+    "I couldn't start the session. Tap or press to retry. Hold to cancel.",
   consent_error:
-    "I couldn't verify consent. Press the centre button to retry, or hold it to cancel.",
+    "I couldn't verify consent. Tap or press to retry. Hold to cancel.",
   stop_error:
-    "I couldn't close the recording session. Keep Lantern powered on. Press the centre button to retry, or hold it to cancel.",
+    "I couldn't close the recording session. Keep Quipus powered on. Tap or press to retry. Hold to cancel.",
   upload_error:
-    "Upload paused. Keep Lantern powered on. Press the centre button to retry, or hold it to cancel.",
+    "Upload paused. Keep Quipus powered on. Tap or press to retry. Hold to cancel.",
   status_error:
-    "I couldn't load your status report. Press the centre button to retry.",
+    "I couldn't load your status report. Tap or press to retry.",
   local_recording:
     "Live transcription is unavailable. Recording locally.",
   processing_pending:

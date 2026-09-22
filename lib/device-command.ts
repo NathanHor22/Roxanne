@@ -4,7 +4,9 @@ export type DeviceCommandContext =
   | "wake_word"
   | "wake_command"
   | "consent"
-  | "consent_retry";
+  | "consent_retry"
+  | "action"
+  | "report";
 export type DeviceCommandIntent =
   | "wake_detected"
   | "status_report"
@@ -24,17 +26,6 @@ function normalizedCommand(value: string) {
     .trim();
 }
 
-function containsOath(command: string) {
-  const markers = [
-    "brightest day",
-    "blackest night",
-    "escape my sight",
-    "beware my power",
-    "green lantern",
-  ];
-  return markers.filter((marker) => command.includes(marker)).length >= 3;
-}
-
 export function interpretDeviceCommand(
   transcript: string,
   context: DeviceCommandContext,
@@ -42,7 +33,9 @@ export function interpretDeviceCommand(
   const command = normalizedCommand(transcript);
   if (!command) return "unknown";
 
-  const hasWakeAddress = /\b(?:lantern|latern|green lantern|ring)\b/iu.test(command);
+  // Legacy addresses remain compatible with older firmware. The installed
+  // offline model still wakes on Computer, not the new product name.
+  const hasWakeAddress = /\b(?:computer|quipus|lantern|latern|ring)\b/iu.test(command);
 
   if (context === "wake_word") {
     return hasWakeAddress ? "wake_detected" : "unknown";
@@ -72,7 +65,6 @@ export function interpretDeviceCommand(
   }
 
   if (
-    containsOath(command) ||
     /\b(?:status report|daily report|daily briefing|today's meetings|todays meetings|what happened today|ring status|laporan status|laporan hari ini|ring report)\b/iu.test(
       command,
     )
@@ -103,7 +95,7 @@ export function commandReply(
 ) {
   switch (intent) {
     case "wake_detected":
-      return "Lantern verified. Say your command.";
+      return "I'm listening. Say your command.";
     case "start_recording":
       return context === "wake_command"
         ? "Start recording selected."
@@ -111,18 +103,18 @@ export function commandReply(
     case "stop_recording":
       return "There is no active recording to stop.";
     case "consent_yes":
-      return "Understood. Device authenticated. Consent confirmed. Recording now.";
+      return "Consent confirmed. Starting your recording.";
     case "consent_no":
       return context === "consent_retry"
-        ? "Authentication failed. Recording was not started. Please start another session."
-        : "Not authenticated. Please confirm again. Do you consent to being recorded?";
+        ? "Consent was not given. Recording has not started. Please start another session."
+        : "Recording has not started. Please confirm again. Do you consent to being recorded?";
     case "unknown":
       if (context === "consent" || context === "consent_retry") {
         return "I did not hear a clear yes or no. Please confirm. Do you consent to being recorded?";
       }
       return context === "wake_command"
         ? "I did not catch that. Say start recording or status report."
-        : "I did not catch that. Say Lantern, start recording, or Lantern, status report.";
+        : "I did not catch that. Say Computer, then start recording or status report.";
     case "status_report":
       return "Preparing your status report.";
   }

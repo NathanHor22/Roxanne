@@ -1,14 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <radialGradient id="g" cx="50%" cy="42%" r="70%">
-      <stop offset="0" stop-color="#124f34"/>
-      <stop offset="1" stop-color="#061810"/>
-    </radialGradient>
-  </defs>
-  <rect width="64" height="64" rx="15" fill="url(#g)"/>
-  <g fill="none" stroke="#4dff91" stroke-linecap="round">
-    <circle cx="32" cy="32" r="19" stroke-width="4"/>
-    <circle cx="32" cy="32" r="8" fill="#4dff91" fill-opacity=".18" stroke-width="3"/>
-    <path d="M32 5v8M32 51v8M5 32h8M51 32h8" stroke-width="4"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" rx="20" fill="#111916"/><g transform="translate(0 4)" fill="none" stroke="#b5d5b1" stroke-width="2.8" stroke-linecap="round"><path d="M60 61C54 32 35 13 8 10M60 61C48 37 33 27 12 24M60 61C47 45 34 39 20 38M60 61C48 53 40 50 31 50M60 61L45 60M60 61C66 32 85 13 112 10M60 61C72 37 87 27 108 24M60 61C73 45 86 39 100 38M60 61C72 53 80 50 89 50M60 61L75 60M57 62C57 57 63 57 63 62C63 67 57 67 57 62ZM60 66V72"/></g></svg>

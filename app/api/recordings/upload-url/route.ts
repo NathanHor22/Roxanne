@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
     const userId = await resolveWorkspaceUserId(client);
-    if (!userId) throw new Error("No authenticated Lantern user is available.");
+    if (!userId) throw new Error("No authenticated Quipus user is available.");
 
     const contentType = normalizeAudioContentType(input.fileName, input.contentType);
     if (!contentType) {

@@ -1,0 +1,164 @@
+{
+  "parameters": {
+    "revision": "Lantern service case v0.3 \u2014 Fovea front branding",
+    "units": "mm",
+    "case": {
+      "width": 92,
+      "length": 112,
+      "depth": 39,
+      "wall": 2.4,
+      "corner_radius": 8,
+      "lid_clearance": 0.35
+    },
+    "board": {
+      "center_x": 9.5,
+      "width": 50,
+      "length": 86,
+      "pcb_thickness": 1.6,
+      "mount_pitch_x": 42,
+      "mount_pitch_y": 78,
+      "pcb_front_z": 7.0,
+      "rear_component_height": 4.7,
+      "glass_width": 50,
+      "glass_length": 69.2,
+      "glass_front_z": 2.7,
+      "glass_center_y": 0.18,
+      "mic_x": -15,
+      "mic_y": 39
+    },
+    "battery": {
+      "center_x": 2,
+      "width": 59,
+      "length": 91,
+      "thickness": 5,
+      "foam_thickness": 0.5,
+      "tray_z": 15.2,
+      "tray_thickness": 1.8,
+      "side_clearance": 1.0,
+      "end_clearance": 2.0
+    },
+    "speaker": {
+      "width": 41,
+      "length": 29,
+      "thickness": 10,
+      "center_y": 0,
+      "center_z": 19.5,
+      "gasket_thickness": 0.6,
+      "side_clearance": 0.6
+    },
+    "sd_access": {
+      "center_y": 7.97,
+      "opening_length": 24,
+      "opening_z": 4,
+      "opening_height": 14,
+      "card_plane_z": 10.8
+    },
+    "logo": {
+      "width": 50,
+      "length": 60,
+      "finish": "Rear kept flat; supplied Fovea logo engraved on the front"
+    },
+    "future_mic": {
+      "center_x": 12,
+      "center_y": 48.9,
+      "center_z": 26.4,
+      "bay_width": 23,
+      "bay_height": 20,
+      "bay_depth": 6
+    },
+    "status": {
+      "battery_and_speaker": "User ruler measurements, 2026-09-20; verify terminals, rim and wire exit before printing",
+      "board": "LCDWiki ES3C28P manufacturer dimension drawing",
+      "mic_position": "Nominal from manufacturer drawing; verify against physical board",
+      "usb": "Generous recessed opening; actual plug hood clearance must be checked",
+      "fit": "Not physically printed or acoustically tested",
+      "sd_access": "Side and nominal centre from manufacturer drawing; verify card travel and fingertip reach with the fit gauge"
+    },
+    "branding": {
+      "logo_width": 28,
+      "center_x": 0,
+      "logo_center_y": -41,
+      "tagline": "Your business development partner",
+      "font_size": 4.3,
+      "tagline_center_y": -50.5,
+      "depth": 0.6
+    }
+  },
+  "parts": [
+    {
+      "name": "front_shell",
+      "file": "front_shell_assembly.stl",
+      "color": [
+        0.035,
+        0.26,
+        0.13
+      ],
+      "kind": "case"
+    },
+    {
+      "name": "rear_lid",
+      "file": "rear_lid_assembly.stl",
+      "color": [
+        0.06,
+        0.09,
+        0.08
+      ],
+      "kind": "case"
+    },
+    {
+      "name": "battery_tray",
+      "file": "battery_tray_assembly.stl",
+      "color": [
+        0.16,
+        0.33,
+        0.27
+      ],
+      "kind": "case"
+    },
+    {
+      "name": "speaker_retainer",
+      "file": "speaker_retainer_assembly.stl",
+      "color": [
+        0.13,
+        0.2,
+        0.18
+      ],
+      "kind": "case"
+    },
+    {
+      "name": "board_reference",
+      "file": "board_reference.stl",
+      "kind": "reference"
+    },
+    {
+      "name": "glass_reference",
+      "file": "glass_reference.stl",
+      "kind": "reference"
+    },
+    {
+      "name": "display_reference",
+      "file": "display_reference.stl",
+      "kind": "reference"
+    },
+    {
+      "name": "battery_reference",
+      "file": "battery_reference.stl",
+      "kind": "reference"
+    },
+    {
+      "name": "speaker_reference",
+      "file": "speaker_reference.stl",
+      "kind": "reference"
+    },
+    {
+      "name": "usb_reference",
+      "file": "usb_reference.stl",
+      "kind": "reference"
+    },
+    {
+      "name": "branding_finish_reference",
+      "file": "branding_finish_reference.stl",
+      "kind": "reference"
+    }
+  ]
+}

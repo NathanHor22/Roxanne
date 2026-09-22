@@ -18,7 +18,7 @@ function response(error: string, status: number) {
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const client = getServerSupabase();
-  if (!client) return response("Lantern service is unavailable.", 503);
+  if (!client) return response("Quipus service is unavailable.", 503);
   const device = await authenticateLantern(request, client);
   if (!device) return response("Device credential is invalid or revoked.", 403);
 
@@ -47,7 +47,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       .eq("user_id", device.userId)
       .maybeSingle();
     if (lookupError) throw new Error(lookupError.message);
-    if (!stored) return response("Lantern session was not found.", 404);
+    if (!stored) return response("Quipus session was not found.", 404);
     if (stored.transcript_event_id === eventId) {
       return NextResponse.json(
         { accepted: true, duplicate: true, segments: stored.transcript_segments?.length || 0 },

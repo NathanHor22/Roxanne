@@ -45,11 +45,12 @@ export async function GET(request: Request) {
         email: user.email || "",
         name: user.displayName,
       },
-      { onConflict: "id" },
+      // Reconnecting a provider must not overwrite the preferred Quipus name.
+      { onConflict: "id", ignoreDuplicates: true },
     );
     if (profileError) {
       return NextResponse.json(
-        { error: "The Lantern profile could not be prepared for Google." },
+        { error: "The Quipus profile could not be prepared for Google." },
         { status: 503 },
       );
     }
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
     const authorizationUrl = createGoogleAuthorizationUrl(state, {
       config,
       loginHint: user.email || undefined,
+      includeGmail: requestUrl.searchParams.get("gmail") === "1",
     });
 
     return NextResponse.redirect(authorizationUrl);

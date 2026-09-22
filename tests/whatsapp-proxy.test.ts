@@ -125,7 +125,7 @@ test("status responses are strictly whitelisted before reaching a browser", () =
   );
 });
 
-test("management mutations require approval and always return no-store responses", async () => {
+test("an unbound account cannot pair or disconnect the shared prototype relay", async () => {
   const missingApproval = await disconnectWhatsApp(
     new Request("http://localhost/api/whatsapp/disconnect", {
       method: "POST",
@@ -133,7 +133,7 @@ test("management mutations require approval and always return no-store responses
       body: JSON.stringify({}),
     }),
   );
-  assert.equal(missingApproval.status, 400);
+  assert.equal(missingApproval.status, 403);
   assert.match(missingApproval.headers.get("cache-control") || "", /no-store/u);
 
   const wrongPhone = await pairWhatsApp(
@@ -145,7 +145,7 @@ test("management mutations require approval and always return no-store responses
   );
   assert.equal(wrongPhone.status, 403);
   assert.deepEqual(await wrongPhone.json(), {
-    error: "This build can pair only with the owner-approved WhatsApp number.",
+    error: "WhatsApp account setup is required.",
   });
   assert.match(wrongPhone.headers.get("cache-control") || "", /no-store/u);
 });

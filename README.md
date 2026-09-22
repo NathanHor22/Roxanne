@@ -1,14 +1,16 @@
-# Lantern
+# Quipus
 
-Lantern turns Malaysian business conversations into a recap, follow-ups, and
+Quipus by Fovea: capture conversations and follow through. The active dashboard uses Home, Conversations, Calendar and Devices. See [the Quipus release notes](docs/quipus-release.md) for branding, hardware controls and tested limitations. Legacy `lantern` protocol identifiers and deployment URLs remain compatible.
+
+Quipus turns Malaysian business conversations into a recap, follow-ups, and
 meeting approvals. The dashboard combines captured conversations and upcoming
 meetings in a calendar. Open an approved meeting to review the conversation
 that led to it: bullet points, concerns, promises, and preparation tasks. When
 the original recording is available, replay that conversation from its brief.
 
 This phase implements the dashboard, a completed-transcript API, OpenAI
-extraction, explicit Google Calendar actions, and the first Lantern capture
-loop. It also adds Lantern Relay, a hackathon slice that uses OpenAI to find
+extraction, explicit Google Calendar actions, and the first Quipus capture
+loop. It also adds Quipus Relay, a hackathon slice that uses OpenAI to find
 evidence-backed introductions across conversations and holds each one for
 human approval. The ESP32-S3 can open a consented session, publish microphone
 audio to Agora, upload the final captions and original WAV, and ask OpenAI to
@@ -48,12 +50,12 @@ Migration 003 adds structured schedule details and dismissed approvals. It also
 adds a unique Calendar-action index per follow-up. Reconcile any existing
 duplicate Calendar actions for the same follow-up before applying that index.
 
-Migration 004 adds one-time Lantern pairing, revocable device credentials,
+Migration 004 adds one-time Quipus pairing, revocable device credentials,
 telemetry, durable session state, and idempotent device-event records. It does
 not add provider credentials or raw-audio storage to the device.
 
 Migration 005 adds the Agora session identifiers, staged final captions,
-private device recording linkage, provider retry fields, and completed Lantern
+private device recording linkage, provider retry fields, and completed Quipus
 meeting link used by the first capture pilot.
 
 Migration 006 stores user-scoped Relay proposals and their pending, dismissed,
@@ -67,7 +69,7 @@ and provider connections.
 
 If an existing deployment reports `column devices.model does not exist` or
 cannot find `public.device_pairings` in the schema cache, that database has the
-base schema but not the Lantern device upgrade. In the Supabase dashboard, open
+base schema but not the Quipus device upgrade. In the Supabase dashboard, open
 **SQL Editor**, run migrations 003 through 007 above in numerical order, and
 wait for each query to finish before starting the next one. Migration 004 is
 the pairing boundary; 005 adds the recording pipeline, 006 adds Relay, and 007
@@ -77,7 +79,7 @@ and multi-user changes commit.
 
 The live workspace requires `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Every
-successful Supabase Google sign-in creates its own Lantern profile and private
+successful Supabase Google sign-in creates its own Quipus profile and private
 workspace.
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` may contain Supabase's modern publishable key.
@@ -87,7 +89,7 @@ only by server routes and must never use a `NEXT_PUBLIC_` prefix.
 
 ### Google login
 
-Lantern accepts any Google account allowed by the Google Cloud OAuth app. Web
+Quipus accepts any Google account allowed by the Google Cloud OAuth app. Web
 routes require a valid Supabase session, and server-side data operations resolve
 the user ID from that same session. The public homepage, privacy policy, terms,
 login page, and Supabase callback remain available without signing in.
@@ -125,13 +127,13 @@ meeting extraction. A configured OpenAI failure is reported instead of
 returning sample content. Older provider adapters remain in the source for
 compatibility tests but need no production environment variables.
 
-### Lantern Relay with OpenAI
+### Quipus Relay with OpenAI
 
 Set `OPENAI_API_KEY` on the server. `OPENAI_RELAY_MODEL` defaults to
 `gpt-5.4-mini`. Relay calls the OpenAI Responses API with strict structured
 output and `store: false`. It compares up to twelve recent ready conversations,
 accepts at most four proposals, and drops any proposal below a score of 70.
-Each displayed quote must exactly match evidence already saved in Lantern.
+Each displayed quote must exactly match evidence already saved in Quipus.
 
 ```dotenv
 OPENAI_API_KEY=your-openai-api-key
@@ -142,14 +144,14 @@ RELAY_EVENT_NAME=AITKL · Agents, Everywhere
 RELAY_EVENT_VENUE=WORQ Bangsar
 ```
 
-Contact email addresses remain on the Lantern server and are added only after
+Contact email addresses remain on the Quipus server and are added only after
 OpenAI returns valid conversation IDs. Exa is optional: set `EXA_API_KEY` to add
 public company context. Its request receives company names, never transcripts,
 contact details, or recordings.
 
 Open **Relay** in the dashboard. Sample mode demonstrates the queue without any
 provider or Calendar call. Live mode requires OpenAI, Supabase, migration 006,
-and at least two ready conversations. Dismissal changes only Lantern state.
+and at least two ready conversations. Dismissal changes only Quipus state.
 **Approve and send invites** checks that the two attendee emails and source
 conversation still match the reviewed proposal, then creates the Google event
 and marks that proposal scheduled in the same server action.
@@ -201,7 +203,7 @@ privacy policy, and terms as:
 - `https://roxanne-two.vercel.app/privacy`
 - `https://roxanne-two.vercel.app/terms`
 
-Declare only Lantern's active Calendar scopes:
+Declare only Quipus's active Calendar scopes:
 
 - `https://www.googleapis.com/auth/calendar.events.owned`
 - `https://www.googleapis.com/auth/calendar.events.freebusy`
@@ -213,9 +215,9 @@ that domain.
 
 Review or complete the date, time, duration, and attendee emails, then approve.
 The live action creates the Google event with a unique Google Meet link and
-sends attendee updates. Lantern
+sends attendee updates. Quipus
 saves the event and its source-conversation relationship through the action
-record. The dashboard currently shows Lantern's stored conversations and
+record. The dashboard currently shows Quipus's stored conversations and
 events, not a two-way mirror of everything in Google Calendar. The existing
 availability endpoint is not automatically called by this approval flow.
 
@@ -242,15 +244,15 @@ remains in the private `recordings` bucket alongside its transcript metadata;
 the player uses a temporary signed URL for access.
 
 Transcript-only imports, sample conversations, and legacy hardware sessions
-without an archived recording show an explicit no-audio state. Lantern does
+without an archived recording show an explicit no-audio state. Quipus does
 not synthesize a replacement voice track from the transcript. No passive
 wearable is connected by this change: future Agora capture must also archive
 the actual conversation audio with timestamps aligned to its transcript.
 See [replay architecture](ARCHITECTURE.md#original-audio-replay).
 
-### Lantern core
+### Quipus core
 
-Open **Lantern** in the dashboard. Sample mode contains an interactive device
+Open **Quipus** in the dashboard. Sample mode contains an interactive device
 simulator that records no audio and makes no provider calls. It demonstrates
 the actual transition rules used by the server: recording starts only after a
 current consent prompt, offline buffering is capped at 30 seconds, and a voice
@@ -279,7 +281,7 @@ audio, reconnect, and token renewal remain the next reliability phase. Run
 the application with `flash.ps1`.
 
 Legacy follow-up and WhatsApp experiments remain in the repository but are not
-part of the Lantern prototype environment or its Calendar approval flow.
+part of the Quipus prototype environment or its Calendar approval flow.
 
 ## Checks
 

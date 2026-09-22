@@ -415,6 +415,7 @@ export function createGoogleAuthorizationUrl(
   options: {
     config?: GoogleOAuthConfig;
     loginHint?: string;
+    includeGmail?: boolean;
     oauthClient?: OAuth2Client;
   } = {},
 ): string {
@@ -424,7 +425,7 @@ export function createGoogleAuthorizationUrl(
     access_type: "offline",
     include_granted_scopes: true,
     prompt: "consent select_account",
-    scope: [...GOOGLE_OAUTH_SCOPES],
+    scope: [...GOOGLE_OAUTH_SCOPES, ...(options.includeGmail ? ["https://www.googleapis.com/auth/gmail.send"] : [])],
     state,
     ...(options.loginHint?.trim()
       ? { login_hint: options.loginHint.trim() }

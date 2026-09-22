@@ -1,0 +1,27 @@
+{
+  "component_count": 112,
+  "net_count": 77,
+  "schematic_sheets": 9,
+  "pdf_pages": 25,
+  "checks": [
+    "Unique component references, pin numbers and schematic object UUIDs",
+    "Every named net has at least two terminals",
+    "GPIO reservation check",
+    "USB limit tolerance bound",
+    "Inductor saturation budget",
+    "Balanced schematic S-expressions"
+  ],
+  "NOT_performed": [
+    "Native KiCad opening / ERC",
+    "PCB routing / DRC",
+    "Spice or regulator-loop simulation",
+    "Physical measurements"
+  ],
+  "open_release_gates": [
+    "Regulator loop stability below 400kHz RHPZ guideline",
+    "Charger thermal behaviour",
+    "Battery rating and low-voltage droop",
+    "Measured module loads",
+    "Footprints and connector mapping"
+  ]
+}

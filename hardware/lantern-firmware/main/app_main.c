@@ -9,6 +9,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -49,12 +50,12 @@ typedef enum {
 
 static const char *TAG = "lantern";
 static lantern_config_t s_config;
-static local_state_t s_state = LOCAL_READY;
+static volatile local_state_t s_state = LOCAL_READY;
 static recovery_action_t s_recovery = RECOVERY_NONE;
 #if LANTERN_BATTERY_INSTALLED
 static adc_oneshot_unit_handle_t s_adc;
 #endif
-static int s_battery_level = 50;
+static int s_battery_level = -1;
 static TickType_t s_state_entered_at;
 static TickType_t s_last_summary_retry_at;
 static lantern_cloud_session_t s_cloud_session;
@@ -72,6 +73,7 @@ static bool s_wake_available;
 static bool s_sd_recording_active;
 static bool s_sd_archive_required;
 static unsigned s_recording_duration_seconds;
+static volatile bool s_controls_ready;
 
 #define VOICE_ACTIVITY_LEVEL 180
 #define VOICE_SILENCE_MS 650
@@ -87,7 +89,7 @@ static void play_status_report(void);
 static void capture_wake_command(void);
 static bool ready_for_cloud_action(void);
 
-static void capture_short_utterance(unsigned maximum_ms) {
+static bool capture_short_utterance(unsigned maximum_ms) {
   lantern_audio_set_recording(true);
   TickType_t started_at = xTaskGetTickCount();
   TickType_t last_voice_at = started_at;
@@ -105,6 +107,7 @@ static void capture_short_utterance(unsigned maximum_ms) {
     vTaskDelay(pdMS_TO_TICKS(20));
   }
   lantern_audio_set_recording(false);
+  return heard_voice;
   ESP_LOGI(TAG, "voice window captured %u ms activity=%s level=%u",
     (unsigned)((xTaskGetTickCount() - started_at) * portTICK_PERIOD_MS),
     heard_voice ? "yes" : "no", (unsigned)lantern_audio_level());
@@ -198,7 +201,7 @@ static void power_and_battery_init(void) {
 #else
   // The first V2 showcase is USB powered. Avoid turning the unconnected
   // battery-divider pin into random dashboard telemetry.
-  s_battery_level = 100;
+  s_battery_level = -1;
 #endif
 }
 
@@ -209,7 +212,7 @@ static void update_battery_level(void) {
     s_battery_level = battery_from_adc(raw);
   }
 #else
-  s_battery_level = 100;
+  s_battery_level = -1;
 #endif
 }
 
@@ -240,7 +243,7 @@ static void network_changed(const lantern_network_status_t *status) {
   ESP_LOGI(TAG, "network wifi=%d portal=%d paired=%d ip=%s", status->wifi_connected,
     status->setup_portal_active, status->paired, status->ip_address);
   // ESP-IDF invokes this callback on the small sys_evt task. Defer display,
-  // speech, and delays to Lantern's health task.
+  // speech, and delays to Quipus's health task.
   s_network_update_pending = true;
 }
 
@@ -388,12 +391,16 @@ static void session_complete(bool processing_pending) {
 }
 
 static void upload_current_session(bool announce_upload) {
+  int64_t measured_at = esp_timer_get_time();
   s_state = LOCAL_SAVING;
   s_state_entered_at = xTaskGetTickCount();
   if (announce_upload && lantern_network_play_prompt("recording_uploading") != ESP_OK) {
     lantern_audio_chime(1);
   }
+  ESP_LOGI(TAG, "Save timing announcement_ms=%lld",
+    (long long)((esp_timer_get_time() - measured_at) / 1000));
 
+  measured_at = esp_timer_get_time();
   unsigned caption_packets = lantern_transcript_packet_count();
   if (!s_transcript_uploaded && s_used_agora && caption_packets) {
     lantern_display_show(LANTERN_SCREEN_SAVING, "UPLOADING TRANSCRIPT");
@@ -403,6 +410,8 @@ static void upload_current_session(bool announce_upload) {
       ESP_LOGW(TAG, "Agora captions unavailable; server will transcribe the WAV archive");
     }
   }
+  ESP_LOGI(TAG, "Save timing captions_ms=%lld",
+    (long long)((esp_timer_get_time() - measured_at) / 1000));
 
   if (!s_audio_uploaded) {
     if (s_sd_archive_required && !lantern_sd_recording_ready()) {
@@ -420,21 +429,25 @@ static void upload_current_session(bool announce_upload) {
 
   lantern_display_show(LANTERN_SCREEN_SAVING, "PROCESSING SUMMARY");
   bool transcript_ready = false;
-  if (lantern_network_complete_session(&s_cloud_session, &transcript_ready) != ESP_OK) {
+  measured_at = esp_timer_get_time();
+  esp_err_t completion_result = lantern_network_complete_session(&s_cloud_session, &transcript_ready);
+  ESP_LOGI(TAG, "Save timing queue_ms=%lld result=%s",
+    (long long)((esp_timer_get_time() - measured_at) / 1000), esp_err_to_name(completion_result));
+  if (completion_result != ESP_OK) {
     s_pending_completion = s_cloud_session;
     s_summary_retry_pending = true;
     s_last_summary_retry_at = xTaskGetTickCount();
     session_complete(true);
     return;
   }
-  if (transcript_ready && lantern_sd_recording_ready()) {
+  if ((transcript_ready || s_cloud_session.archive_accepted) && lantern_sd_recording_ready()) {
     if (lantern_sd_recording_confirm_uploaded() != ESP_OK) {
       ESP_LOGW(TAG, "processed cloud WAV is ready but the local SD copy could not be removed");
     }
   } else if (lantern_sd_recording_ready()) {
     ESP_LOGW(TAG, "transcript unavailable; preserving the complete WAV on microSD");
   }
-  session_complete(false);
+  session_complete(s_cloud_session.processing_queued);
 }
 
 static void continue_after_stop(void) {
@@ -491,18 +504,59 @@ static void finalise_recording(void) {
   continue_after_stop();
 }
 
+static void review_spoken_actions(void) {
+  unsigned unanswered = 0;
+  while (lantern_network_review_pending() && unanswered < 2) {
+    lantern_display_show(LANTERN_SCREEN_LISTENING, "APPROVE? SAY YES OR NO");
+    lantern_audio_chime(1);
+    vTaskDelay(pdMS_TO_TICKS(250));
+    capture_short_utterance(4000);
+    if (lantern_audio_buffered_samples() < LANTERN_MIC_SAMPLE_RATE / 2) { ++unanswered; continue; }
+    lantern_display_show(LANTERN_SCREEN_UNDERSTANDING, "REVIEWING ACTION");
+    char reply[32];
+    if (lantern_network_run_voice_command("action", s_battery_level, reply, sizeof(reply)) != ESP_OK) {
+      lantern_network_cancel_review();
+      show_error(RECOVERY_STATUS, "ACTION NOT CONFIRMED", "status_error");
+      return;
+    }
+    ++unanswered;
+    // Every answer has a bounded capture window; a new prompt is a new review.
+    if (strcmp(reply, "action_reply") == 0) unanswered = 0;
+  }
+  lantern_network_cancel_review();
+}
+
+static void report_dialogue(esp_err_t result) {
+  for (unsigned turn = 0; turn < 8; ++turn) {
+    if (result == ESP_ERR_NOT_FOUND) { show_ready(); return; }
+    s_state = LOCAL_STATUS;
+    s_recovery = RECOVERY_NONE;
+    if (result != ESP_OK && result != LANTERN_REPORT_INTERRUPTED) {
+      show_error(RECOVERY_STATUS, "REPORT UNAVAILABLE", "status_error");
+      return;
+    }
+    if (result == ESP_OK) review_spoken_actions();
+    if (s_state == LOCAL_ERROR) return;
+    lantern_network_cancel_review();
+    lantern_display_show(LANTERN_SCREEN_LISTENING, "ASK A MEETING OR SAY STOP");
+    lantern_audio_chime(1);
+    vTaskDelay(pdMS_TO_TICKS(250));
+    if (!capture_short_utterance(7000)) { show_ready(); return; }
+    lantern_display_show(LANTERN_SCREEN_UNDERSTANDING, "FINDING YOUR MEETING");
+    char reply[32];
+    result = lantern_network_run_voice_command("report", s_battery_level, reply, sizeof(reply));
+    if (result == ESP_OK && strcmp(reply, "report_stop") == 0) { show_ready(); return; }
+  }
+  show_ready();
+}
+
 static void play_status_report(void) {
   lantern_wake_set_enabled(false);
   s_state = LOCAL_STATUS;
   s_recovery = RECOVERY_NONE;
   s_state_entered_at = xTaskGetTickCount();
   lantern_display_show(LANTERN_SCREEN_STATUS, "LOADING TODAY");
-  if (lantern_network_play_briefing("status", s_battery_level) != ESP_OK) {
-    show_error(RECOVERY_STATUS, "REPORT UNAVAILABLE", "status_error");
-    return;
-  }
-  lantern_display_show(LANTERN_SCREEN_STATUS, "REPORT COMPLETE");
-  s_state_entered_at = xTaskGetTickCount();
+  report_dialogue(lantern_network_play_briefing("status", s_battery_level));
 }
 
 static void command_not_recognised(void) {
@@ -536,6 +590,10 @@ static void capture_wake_command(void) {
   char intent[32];
   esp_err_t result = lantern_network_run_voice_command(
     "wake_command", s_battery_level, intent, sizeof(intent));
+  if (result == LANTERN_REPORT_INTERRUPTED || (result == ESP_OK && strcmp(intent, "report_answer") == 0)) {
+    report_dialogue(result); return;
+  }
+  if (result == ESP_OK && strcmp(intent, "report_stop") == 0) { show_ready(); return; }
   if (result == ESP_ERR_NOT_FOUND) {
     command_not_recognised();
     return;
@@ -550,10 +608,7 @@ static void capture_wake_command(void) {
     return;
   }
   if (strcmp(intent, "status_report") == 0) {
-    s_state = LOCAL_STATUS;
-    s_recovery = RECOVERY_NONE;
-    lantern_display_show(LANTERN_SCREEN_STATUS, "REPORT COMPLETE");
-    s_state_entered_at = xTaskGetTickCount();
+    play_status_report();
     return;
   }
   command_not_recognised();
@@ -569,14 +624,16 @@ static void retry_pending_summary(bool user_requested) {
   s_last_summary_retry_at = xTaskGetTickCount();
   if (result == ESP_OK) {
     s_summary_retry_pending = false;
-    memset(&s_pending_completion, 0, sizeof(s_pending_completion));
-    if (transcript_ready && lantern_sd_recording_ready()) {
+    const char *pending_path = lantern_sd_recording_path();
+    bool same_recording = pending_path && strstr(pending_path, s_pending_completion.session_id);
+    if ((transcript_ready || s_pending_completion.archive_accepted) && same_recording && lantern_sd_recording_ready()) {
       if (lantern_sd_recording_confirm_uploaded() != ESP_OK) {
         ESP_LOGW(TAG, "processed cloud WAV is ready but the local SD copy could not be removed");
       }
     } else if (lantern_sd_recording_ready()) {
       ESP_LOGW(TAG, "transcript unavailable; preserving the complete WAV on microSD");
     }
+    memset(&s_pending_completion, 0, sizeof(s_pending_completion));
     ESP_LOGI(TAG, "background summary retry completed");
     if (user_requested) {
       lantern_display_show(LANTERN_SCREEN_COMPLETE, "SUMMARY READY");
@@ -609,13 +666,15 @@ static void retry_error(void) {
       capture_wake_command();
       break;
     case RECOVERY_CONSENT_CAPTURE:
-      s_state = LOCAL_AWAITING_CONSENT;
-      if (lantern_network_play_prompt("consent_request") != ESP_OK) lantern_audio_chime(1);
-      capture_spoken_consent();
-      break;
     case RECOVERY_RECORDING_START:
-      s_state = LOCAL_AWAITING_CONSENT;
-      accept_recording_consent();
+      // The original prompt may have expired during speech/network processing.
+      // Start a fresh consent exchange; never keep replaying an old yes.
+      if (lantern_network_restart_session() != ESP_OK) {
+        show_error(RECOVERY_RECORDING_START, "SESSION RESET FAILED", "session_error");
+        break;
+      }
+      clear_active_session();
+      start_spoken_consent(true);
       break;
     case RECOVERY_STOP:
       s_state = LOCAL_SAVING;
@@ -729,6 +788,7 @@ static void button_task(void *argument) {
 #elif LANTERN_HAS_TOUCHSCREEN
   ESP_ERROR_CHECK(lantern_board_touch_init());
 #endif
+  s_controls_ready = true;
   // Opening the CH340 serial port briefly drives BOOT. Ignore that transition.
   vTaskDelay(pdMS_TO_TICKS(800));
   bool was_pressed = false;
@@ -759,7 +819,7 @@ static void button_task(void *argument) {
     if (pressed && was_pressed) {
       uint32_t held_ms = (uint32_t)((xTaskGetTickCount() - pressed_at) * portTICK_PERIOD_MS);
       if (held_ms >= 8000) {
-        lantern_display_show(LANTERN_SCREEN_SETUP, "RESETTING LANTERN");
+        lantern_display_show(LANTERN_SCREEN_SETUP, "RESETTING QUIPUS");
         lantern_storage_clear();
         vTaskDelay(pdMS_TO_TICKS(500));
         esp_restart();
@@ -801,6 +861,28 @@ static void button_task(void *argument) {
   }
 }
 
+static void report_interrupt_task(void *argument) {
+  (void)argument;
+  unsigned pressed_samples = 0;
+  while (true) {
+    if (s_controls_ready && lantern_network_report_playing() && lantern_audio_is_speaker_active()) {
+      bool pressed = false;
+#if LANTERN_HAS_PHYSICAL_BUTTONS
+      pressed = gpio_get_level(LANTERN_BUTTON_MAIN_GPIO) == 0;
+#elif LANTERN_HAS_TOUCHSCREEN
+      uint16_t x = 0, y = 0;
+      pressed = lantern_board_touch_read(&x, &y);
+#endif
+      pressed_samples = pressed ? pressed_samples + 1 : 0;
+      if (pressed_samples >= 2) {
+        lantern_network_interrupt_report();
+        pressed_samples = 0;
+      }
+    } else pressed_samples = 0;
+    vTaskDelay(pdMS_TO_TICKS(30));
+  }
+}
+
 static void telemetry_task(void *argument) {
   (void)argument;
   unsigned seconds = 0;
@@ -813,7 +895,11 @@ static void telemetry_task(void *argument) {
       if (s_state == LOCAL_READY) {
         if (network.wifi_connected && network.paired && !s_pair_announcement_shown) {
           s_pair_announcement_shown = true;
-          lantern_display_show(LANTERN_SCREEN_CONNECTING, "SECTOR 2418 ONLINE");
+          // Hold the control state while the one-time boot greeting plays.
+          // Otherwise a wake or tap could start overlapping cloud requests.
+          s_state = LOCAL_COMMAND_PROCESSING;
+          lantern_wake_set_enabled(false);
+          lantern_display_show(LANTERN_SCREEN_READY, "QUIPUS READY");
           if (lantern_network_play_briefing("boot", s_battery_level) != ESP_OK) {
             lantern_audio_chime(2);
             vTaskDelay(pdMS_TO_TICKS(700));
@@ -850,7 +936,7 @@ static void telemetry_task(void *argument) {
 
 void app_main(void) {
   const lantern_board_profile_t *board = lantern_board_profile();
-  ESP_LOGI(TAG, "Lantern %s booting on %s (%s, storage=%s)",
+  ESP_LOGI(TAG, "Quipus %s booting on %s (%s, storage=%s)",
     LANTERN_FIRMWARE_VERSION, board->id, board->model, board->storage_kind);
   s_state_entered_at = xTaskGetTickCount();
   power_and_battery_init();
@@ -875,6 +961,7 @@ void app_main(void) {
   // HTTPS and Agora calls have deep library call chains even though their bulk
   // buffers live in PSRAM. Keep enough internal task stack for both paths.
   xTaskCreate(button_task, "lantern_buttons", 8192, NULL, 5, NULL);
+  xTaskCreate(report_interrupt_task, "quipus_interrupt", 3072, NULL, 5, NULL);
   xTaskCreate(telemetry_task, "lantern_health", 8192, NULL, 3, NULL);
   ESP_ERROR_CHECK(lantern_network_start(&s_config, network_changed));
   show_ready();

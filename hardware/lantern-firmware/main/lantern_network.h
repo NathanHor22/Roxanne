@@ -37,6 +37,8 @@ typedef struct {
   char transcript_event_id[37];
   char audio_event_id[37];
   char completion_event_id[37];
+  bool archive_accepted;
+  bool processing_queued;
   unsigned version;
   char local_date[11];
   char local_time[9];
@@ -46,6 +48,11 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
 void lantern_network_get_status(lantern_network_status_t *status);
 esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_version, int battery_level);
 esp_err_t lantern_network_play_briefing(const char *kind, int battery_level);
+bool lantern_network_review_pending(void);
+void lantern_network_cancel_review(void);
+#define LANTERN_REPORT_INTERRUPTED ((esp_err_t)0x7f01)
+bool lantern_network_report_playing(void);
+void lantern_network_interrupt_report(void);
 esp_err_t lantern_network_play_prompt(const char *kind);
 esp_err_t lantern_network_run_voice_command(const char *context, int battery_level,
                                             char *intent, size_t intent_capacity);

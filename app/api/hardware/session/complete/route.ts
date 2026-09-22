@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (raw.length > 250_000) return NextResponse.json({ error: "Hardware transcript is too large." }, { status: 413 });
     if (!client) throw new Error("Supabase is unavailable.");
     const userId = await resolveWorkspaceUserId(client);
-    if (!userId) throw new Error("The Lantern workspace is unavailable.");
+    if (!userId) throw new Error("The Quipus workspace is unavailable.");
     const { data: device } = await client.from("devices").select("id,name").eq("id", input.deviceId).eq("user_id", userId).maybeSingle();
     if (!device) return NextResponse.json({ error: "Unknown hardware device." }, { status: 404 });
 

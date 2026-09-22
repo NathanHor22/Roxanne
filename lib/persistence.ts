@@ -157,7 +157,7 @@ export async function persistProcessedMeeting(
   if (!userId) {
     if (production) {
       throw new PersistenceConfigurationError(
-        "Supabase persistence could not resolve the authenticated Lantern user.",
+        "Supabase persistence could not resolve the authenticated Quipus user.",
       );
     }
     return { persisted: false, warning: "No Supabase user is available." };

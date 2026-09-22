@@ -24,16 +24,16 @@ export async function PATCH(
   const client = getServerSupabase();
   const readinessError = requireProductionPersistence(
     Boolean(client),
-    "Supabase is required to manage Lantern.",
+    "Supabase is required to manage Quipus.",
   );
   if (readinessError) return readinessError;
 
   try {
     const { id } = paramsSchema.parse(await context.params);
     requestSchema.parse(await request.json());
-    if (!client) throw new Error("Lantern storage is unavailable.");
+    if (!client) throw new Error("Quipus storage is unavailable.");
     const userId = await resolveWorkspaceUserId(client);
-    if (!userId) throw new Error("The Lantern workspace is unavailable.");
+    if (!userId) throw new Error("The Quipus workspace is unavailable.");
     const now = new Date().toISOString();
     const { data, error } = await client
       .from("devices")
@@ -51,7 +51,7 @@ export async function PATCH(
     if (error) throw new Error(error.message);
     if (!data) {
       return NextResponse.json(
-        { error: "Lantern device was not found." },
+        { error: "Quipus device was not found." },
         { status: 404, headers: { "cache-control": "no-store" } },
       );
     }
@@ -65,10 +65,10 @@ export async function PATCH(
       {
         error:
           error instanceof z.ZodError
-            ? "Lantern management request is invalid."
+            ? "Quipus management request is invalid."
             : error instanceof Error
               ? error.message
-              : "Lantern could not be revoked.",
+              : "Quipus could not be revoked.",
       },
       {
         status: error instanceof z.ZodError ? 400 : 500,

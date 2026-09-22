@@ -36,7 +36,7 @@ export const demoContacts: Contact[] = [
     name: "James Tan",
     company: "Acme Manufacturing",
     role: "Head of Procurement",
-    // Safe hackathon destination supplied by the Lantern owner.
+    // Safe hackathon destination supplied by the Quipus owner.
     email: "nathanhor2001@gmail.com",
     phone: "+601154444038",
   },

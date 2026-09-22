@@ -4,7 +4,7 @@
 
 #include "sdkconfig.h"
 
-#define LANTERN_FIRMWARE_VERSION "0.6.6-sd-wav"
+#define LANTERN_FIRMWARE_VERSION "0.8.0-quipus"
 #define LANTERN_API_BASE_URL "https://roxanne-two.vercel.app"
 
 #if CONFIG_LANTERN_BOARD_ZHENGCHEN_M1307
@@ -12,7 +12,7 @@
 #elif CONFIG_LANTERN_BOARD_ES3C28P
 #include "boards/lantern_v2_es3c28p.h"
 #else
-#error "Select a supported Lantern board profile in menuconfig."
+#error "Select a supported Quipus board profile in menuconfig."
 #endif
 
 typedef struct {

@@ -10,10 +10,10 @@ function ascii(data: Uint8Array, offset: number, length: number) {
   return new TextDecoder("ascii").decode(data.subarray(offset, offset + length));
 }
 
-/** Validates the canonical PCM WAV emitted by the Lantern firmware. */
+/** Validates the canonical PCM WAV emitted by the Quipus firmware. */
 export function parseLanternWav(data: Uint8Array): CanonicalWav {
   if (data.length < 44 || ascii(data, 0, 4) !== "RIFF" || ascii(data, 8, 8) !== "WAVEfmt ") {
-    throw new Error("Lantern audio is not a WAV file.");
+    throw new Error("Quipus audio is not a WAV file.");
   }
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const riffSize = view.getUint32(4, true);
@@ -31,11 +31,11 @@ export function parseLanternWav(data: Uint8Array): CanonicalWav {
     bitsPerSample !== 16 ||
     ascii(data, 36, 4) !== "data"
   ) {
-    throw new Error("Lantern audio must be canonical 16 kHz mono 16-bit PCM WAV.");
+    throw new Error("Quipus audio must be canonical 16 kHz mono 16-bit PCM WAV.");
   }
   const dataBytes = view.getUint32(40, true);
   if (dataBytes === 0 || dataBytes + 44 !== data.length || dataBytes % 2 !== 0) {
-    throw new Error("Lantern WAV data length is invalid.");
+    throw new Error("Quipus WAV data length is invalid.");
   }
   return {
     sampleRate,

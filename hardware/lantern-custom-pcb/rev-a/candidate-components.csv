@@ -1,0 +1,16 @@
+﻿Variant,Quantity,Candidate,Function,Release status
+Main,1,ESP32-S3-WROOM-1-N16R8,Processor/radio,Candidate; antenna keepout and exact module pads
+A0 only,1,ReSpeaker XVF3800 module,4 mics + processing + output path,Cytron MPN 114993701; module mechanics/interface to confirm
+A1 only,1,XVF3800 reference-design circuit,Custom four-mic processor board,"Exact silicon, support parts, firmware rights and rails pending"
+A1 only,4,Infineon IM69D130,PDM microphone heads,"Bench candidate; fixed geometry, supply and connector drawing"
+Main,1,BQ24074,Charging and source power path,"Cell limits, USB input policy and thermals pending"
+Main,1 each,LTC2954-1 + TPS22965,Power button and system isolation,Shutdown handshake and all back-power paths to review
+Main,1,TPS63070,3.3 V buck-boost rail,"Inductor, passives and load budget pending"
+A0 only,1,Regulated 5 V converter - TBD,Switched audio-module power,Part and load/current budget not yet selected
+Main,1,MAX17048,Battery gauge,Validate pack model and off-state I2C isolation
+Main,1,1.3-inch 240 x 240 SPI display,Small front screen,ST7789 direction; exact panel/FPC not frozen
+Main,1,Hirose DM3AT-SF-PEJM5 candidate,microSD socket,"Check footprint, detect mechanism and eject clearance"
+Main,1,GCT USB4105 family candidate,USB-C connector,"Select suffix, ESD and current-control circuitry"
+Assembly,1 each,Protected cell + one speaker,Battery and playback,Existing electrical ratings unverified
+Assembly,6,Momentary switches,"Power, record, volume +/-, boot, reset",Actuator dimensions and placement pending
+Assembly,Set,Keyed connectors and harnesses,Battery/audio/display/speaker/mics,A1 has four mic sockets; A0 mics are on its module

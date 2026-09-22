@@ -1,0 +1,6 @@
+{
+  "instances_checked": 112,
+  "pin_to_wire_or_NC_checks": 397,
+  "hierarchical_files_exist": true,
+  "scope": "Generated schematic structure and named net topology only; not native KiCad/ERC or electrical validity"
+}

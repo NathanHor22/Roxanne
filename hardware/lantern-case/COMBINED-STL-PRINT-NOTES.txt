@@ -1,0 +1,17 @@
+LANTERN — ONE FILE / FOUR CASE PARTS
+
+File: Lantern-ALL-CASE-PARTS-v0.3.stl
+Contains one each: front case, back cover, internal battery support,
+and speaker retaining mount. No electronics or reference models.
+
+The four parts lie separately on the printing plane, with at least 6 mm
+between their bounding boxes. They are not fused into an assembled case.
+Import in MILLIMETRES at 100% scale. Footprint: 190 x 198.5 mm.
+Allow additional printing-bed space for brims, skirts or supports.
+Do not scale down to fit: split into separate objects and rearrange or
+print in batches instead. The separate-STL package remains available.
+
+These parts will normally print in the same colour in a single job.
+Logo and tagline are engraved; white paint is optional after printing.
+The printer operator must check supports, bridges and bed fit in the slicer.
+This is a digitally checked prototype that still needs a physical fit test.

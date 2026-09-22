@@ -11,7 +11,7 @@
   padding: 4px 0;
   border: 0;
   background: transparent;
-  color: #587064;
+  color: var(--q-accent);
   font-size: 12px;
 }
 
@@ -25,11 +25,11 @@
   justify-content: space-between;
   gap: 30px;
   padding: 26px 28px;
-  border: 1px solid #dce7df;
+  border: 1px solid var(--q-line);
   border-radius: 12px;
   background:
-    radial-gradient(circle at 3% 0, #dff3e6 0, transparent 24%),
-    #fff;
+    radial-gradient(circle at 3% 0, var(--q-pale) 0, transparent 24%),
+    var(--q-surface);
 }
 
 .heroIdentity {
@@ -46,7 +46,7 @@
   place-items: center;
   border-radius: 50%;
   background: #194b33;
-  color: #d9f7e4;
+  color: var(--q-accent);
 }
 
 .heroAvatar {
@@ -64,15 +64,15 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #718078;
+  color: var(--q-muted);
   font-size: 11px;
 }
 
 .status {
   padding: 3px 7px;
   border-radius: 99px;
-  background: #e7f5eb;
-  color: #1d7247;
+  background: var(--q-pale);
+  color: var(--q-accent);
   font-weight: 700;
   text-transform: capitalize;
 }
@@ -80,7 +80,7 @@
 .hero h2 {
   overflow: hidden;
   margin: 7px 0 2px;
-  color: #1f392d;
+  color: var(--q-accent);
   font: 400 clamp(27px, 3vw, 36px)/1.08 Georgia, serif;
   letter-spacing: -0.04em;
   text-overflow: ellipsis;
@@ -90,7 +90,7 @@
 .heroIdentity p {
   overflow: hidden;
   margin: 0;
-  color: #65776d;
+  color: var(--q-muted);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -108,14 +108,14 @@
   gap: 4px;
   min-width: 105px;
   padding: 3px 20px;
-  border-left: 1px solid #e3e9e4;
+  border-left: 1px solid var(--q-line);
 }
 
 .heroFacts dt {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #78877f;
+  color: var(--q-muted);
   font-size: 10px;
 }
 
@@ -125,7 +125,7 @@
 
 .heroFacts dd {
   margin: 0;
-  color: #334c40;
+  color: var(--q-accent);
   font-size: 12px;
   font-weight: 650;
   text-transform: capitalize;
@@ -134,10 +134,10 @@
 .pageError {
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid #ecc8c0;
+  border: 1px solid var(--q-line);
   border-radius: 7px;
-  background: #fff3ef;
-  color: #964438;
+  background: var(--q-surface);
+  color: var(--danger);
   font-size: 12px;
 }
 
@@ -155,9 +155,9 @@
 
 .replayColumn {
   padding: 22px;
-  border: 1px solid #dce7df;
+  border: 1px solid var(--q-line);
   border-radius: 11px;
-  background: #fff;
+  background: var(--q-surface);
 }
 
 .contextColumn {
@@ -167,9 +167,9 @@
 
 .contextCard {
   overflow: hidden;
-  border: 1px solid #dce7df;
+  border: 1px solid var(--q-line);
   border-radius: 11px;
-  background: #fff;
+  background: var(--q-surface);
 }
 
 .cardHeader {
@@ -178,11 +178,11 @@
   justify-content: space-between;
   gap: 12px;
   padding: 18px 19px 14px;
-  border-bottom: 1px solid #e8ede9;
+  border-bottom: 1px solid var(--q-line);
 }
 
 .kicker {
-  color: #148049;
+  color: var(--q-accent);
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.13em;
@@ -190,13 +190,13 @@
 
 .cardHeader h3 {
   margin: 3px 0 0;
-  color: #294237;
+  color: var(--q-accent);
   font: 400 20px Georgia, serif;
 }
 
 .cardHeader > svg {
   width: 18px;
-  color: #5b8d70;
+  color: var(--q-accent);
 }
 
 .cardHeader button {
@@ -204,10 +204,10 @@
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border: 1px solid #dce5df;
+  border: 1px solid var(--q-line);
   border-radius: 6px;
-  background: #fff;
-  color: #4f685b;
+  background: var(--q-surface);
+  color: var(--q-accent);
   font-size: 11px;
 }
 
@@ -236,13 +236,13 @@
 }
 
 .contactDetails > div strong {
-  color: #2b4438;
+  color: var(--q-accent);
   font-size: 13px;
 }
 
 .contactDetails > div p {
   margin: 0;
-  color: #718078;
+  color: var(--q-muted);
   font-size: 11px;
 }
 
@@ -256,7 +256,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 10px 0;
-  border-top: 1px solid #edf1ee;
+  border-top: 1px solid var(--q-line);
   font-size: 11px;
 }
 
@@ -264,7 +264,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #738179;
+  color: var(--q-muted);
 }
 
 .contactDetails dt svg {
@@ -274,7 +274,7 @@
 .contactDetails dd {
   overflow: hidden;
   margin: 0;
-  color: #395246;
+  color: var(--q-accent);
   font-weight: 600;
   text-align: right;
   text-overflow: ellipsis;
@@ -288,8 +288,8 @@
   margin: 2px 0 0;
   padding: 10px;
   border-radius: 6px;
-  background: #f0f6f2;
-  color: #607269;
+  background: var(--q-surface);
+  color: var(--q-muted);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -309,23 +309,23 @@
 .contactForm label {
   display: grid;
   gap: 5px;
-  color: #66786e;
+  color: var(--q-muted);
   font-size: 11px;
 }
 
 .contactForm input {
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid #dce5df;
+  border: 1px solid var(--q-line);
   border-radius: 6px;
   outline: none;
-  background: #fff;
-  color: #30483c;
+  background: var(--q-surface);
+  color: var(--q-accent);
   font-size: 12px;
 }
 
 .contactForm input:focus {
-  border-color: #72a58a;
+  border-color: var(--q-line);
   box-shadow: 0 0 0 2px #e3f0e8;
 }
 
@@ -341,17 +341,17 @@
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  border: 1px solid #d8e2db;
+  border: 1px solid var(--q-line);
   border-radius: 6px;
-  background: #fff;
-  color: #556b5f;
+  background: var(--q-surface);
+  color: var(--q-muted);
   font-size: 11px;
 }
 
 .formActions button[type="submit"] {
-  border-color: #1a7548;
+  border-color: var(--q-line);
   background: #1a7548;
-  color: #fff;
+  color: var(--q-text);
 }
 
 .formActions svg {
@@ -373,22 +373,22 @@
 
 .brief li,
 .brief p {
-  color: #5f7167;
+  color: var(--q-muted);
   font-size: 12px;
   line-height: 1.65;
 }
 
 .brief li::marker {
-  color: #3e865e;
+  color: var(--q-accent);
 }
 
 .brief > div {
   padding-top: 14px;
-  border-top: 1px solid #ebefec;
+  border-top: 1px solid var(--q-line);
 }
 
 .brief > div strong {
-  color: #3c5548;
+  color: var(--q-accent);
   font-size: 11px;
 }
 
@@ -398,9 +398,9 @@
 
 .brief .concern {
   padding: 12px;
-  border: 1px solid #eee5ce;
+  border: 1px solid var(--q-line);
   border-radius: 7px;
-  background: #fbf8ef;
+  background: var(--q-surface);
 }
 
 .emptyCard {
@@ -408,16 +408,16 @@
   justify-items: start;
   gap: 6px;
   padding: 23px 20px;
-  color: #6f7d75;
+  color: var(--q-muted);
 }
 
 .emptyCard > svg {
   width: 19px;
-  color: #64846f;
+  color: var(--q-accent);
 }
 
 .emptyCard strong {
-  color: #41594c;
+  color: var(--q-accent);
   font-size: 12px;
 }
 
@@ -431,16 +431,16 @@
   gap: 7px;
   margin: 16px 17px 4px;
   padding: 14px;
-  border: 1px solid #d8e8dc;
+  border: 1px solid var(--q-line);
   border-radius: 8px;
-  background: #f3f8f4;
+  background: var(--q-surface);
 }
 
 .approval > span {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #33805a;
+  color: var(--q-accent);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -452,13 +452,13 @@
 }
 
 .approval > strong {
-  color: #314c3e;
+  color: var(--q-accent);
   font-size: 13px;
 }
 
 .approval p {
   margin: 0;
-  color: #697a71;
+  color: var(--q-muted);
   font-size: 11px;
 }
 
@@ -469,10 +469,10 @@
   gap: 6px;
   margin-top: 4px;
   padding: 8px;
-  border: 1px solid #1c7549;
+  border: 1px solid var(--q-line);
   border-radius: 6px;
   background: #1c7549;
-  color: #fff;
+  color: var(--q-text);
   font-size: 11px;
   font-weight: 650;
 }
@@ -491,7 +491,7 @@
   gap: 10px;
   align-items: flex-start;
   padding: 11px 0;
-  border-bottom: 1px solid #edf1ee;
+  border-bottom: 1px solid var(--q-line);
 }
 
 .taskList label:last-child,
@@ -503,7 +503,7 @@
   width: 16px;
   height: 16px;
   margin: 2px 0 0;
-  accent-color: #247c50;
+  accent-color: var(--q-accent);
 }
 
 .taskList label > span,
@@ -514,26 +514,26 @@
 
 .taskList strong,
 .commitment strong {
-  color: #425a4e;
+  color: var(--q-accent);
   font-size: 11px;
   font-weight: 550;
 }
 
 .taskList small,
 .commitment small {
-  color: #7a8780;
+  color: var(--q-muted);
   font-size: 10px;
 }
 
 .taskComplete strong {
-  color: #9aa59f !important;
+  color: var(--q-muted) !important;
   text-decoration: line-through;
 }
 
 .commitment > svg {
   width: 15px;
   flex-shrink: 0;
-  color: #4a8663;
+  color: var(--q-accent);
 }
 
 @media (max-width: 1180px) {
@@ -544,7 +544,7 @@
   .heroFacts {
     width: 100%;
     padding-top: 16px;
-    border-top: 1px solid #e3e9e4;
+    border-top: 1px solid var(--q-line);
   }
   .heroFacts > div:first-child {
     padding-left: 0;

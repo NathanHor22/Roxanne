@@ -1,0 +1,29 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ArrowUpRight, CalendarDays } from "lucide-react";
+import styles from "./quipus.module.css";
+
+export function CalendarConnection({ email, connected }: { email: string; connected: boolean | undefined }) {
+  const params = useSearchParams();
+  const result = params.get("google");
+  const [dismissed, setDismissed] = useState(true);
+  const key = `quipus:calendar-later:${email}`;
+  useEffect(() => {
+    try { setDismissed(localStorage.getItem(key) === "1"); }
+    catch { setDismissed(false); }
+  }, [key]);
+  if (connected !== false || (dismissed && result !== "denied" && result !== "error")) return null;
+  return <section className={styles.connectionPrompt} aria-label="Connect your calendar">
+    <CalendarDays aria-hidden="true" />
+    <div><h2>Bring your calendar along.</h2><p>{result === "denied" ? "Calendar access wasn’t granted. You can keep using Quipus and connect when you’re ready." : result === "error" ? "Google couldn’t finish connecting. Your conversations are safe; you can try again." : "You’re signed in. Connect Google Calendar to add the follow-ups you approve."} Each invitation still needs your approval.</p></div>
+    <div className={styles.connectionActions}>
+      <a className={styles.actionButton} href="/api/google/connect?returnTo=%2Fdashboard">Connect Calendar <ArrowUpRight /></a>
+      <button className={styles.textLink} onClick={() => {
+        setDismissed(true);
+        try { localStorage.setItem(key, "1"); } catch {}
+        const url = new URL(window.location.href); url.searchParams.delete("google"); window.history.replaceState({}, "", url);
+      }}>Later, in settings</button>
+    </div>
+  </section>;
+}

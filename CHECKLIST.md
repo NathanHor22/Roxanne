@@ -1,4 +1,4 @@
-# Lantern delivery checklist
+# Quipus delivery checklist
 
 Last verified: 13 September 2026 (Asia/Kuala_Lumpur)
 
@@ -12,14 +12,14 @@ until it has been exercised with real credentials.
 - [x] Google Auth gives every authenticated account an isolated workspace and
       fails closed when production credentials are incomplete.
 - [ ] Change the deployed `DEMO_ACCESS_MODE` from `public` to `owner` after the
-      Lantern build and Supabase redirect allowlist are deployed.
+      Quipus build and Supabase redirect allowlist are deployed.
 - [x] WhatsApp pairing and sends are restricted to `601154444038`.
 - [x] Provider secrets stay server-side.
 - [x] External sends require an explicit approved action.
 
 Reviewer check:
 
-- Open `/dashboard` signed out and confirm Lantern redirects to `/login`.
+- Open `/dashboard` signed out and confirm Quipus redirects to `/login`.
 - Sign in with two Google accounts and confirm each dashboard opens with an
   isolated workspace.
 - Use **Settings > Access & privacy > Sign out** and confirm the session closes.
@@ -74,7 +74,7 @@ Reviewer check:
 - Cancel an action and verify nothing is sent.
 - Repeat the same approved action and verify no duplicate event/message is made.
 
-## Phase 5 — Lantern Relay hackathon slice
+## Phase 5 — Quipus Relay hackathon slice
 
 - [x] Relay is a dedicated dashboard view with a fictional provider-free sample.
 - [x] OpenAI Responses matching uses strict structured output and `store: false`.
@@ -116,8 +116,8 @@ npm.cmd run check
 
 - [x] Vercel account authenticated and `nathans-projects-b0bfd21e/roxanne` linked.
 - [x] GitHub repository connected to the Vercel project.
-- [ ] Commit and push the current Lantern application and firmware rebrand.
-- [x] Lantern Supabase project created and linked as `cjogfunwcwytvooycjzv`.
+- [ ] Commit and push the current Quipus application and firmware rebrand.
+- [x] Quipus Supabase project created and linked as `cjogfunwcwytvooycjzv`.
 - [x] Local Supabase configuration records the production URL and Auth redirects.
 - [x] Remote migrations `001_initial.sql` and `002_worker_hardening.sql` applied;
       14 tables, 12 public RLS policies, and the private recording bucket verified.
@@ -125,7 +125,7 @@ npm.cmd run check
       `004_lantern_devices.sql`, `005_lantern_recording_pipeline.sql`,
       `006_lantern_relay.sql`, and `007_multi_user_workspaces.sql`.
 - [x] Supabase Google Auth is enabled and email/password signup is disabled.
-- [ ] Add the Supabase and Lantern callback URLs to the Google Cloud OAuth client.
+- [ ] Add the Supabase and Quipus callback URLs to the Google Cloud OAuth client.
 - [x] Remove Qwen, Groq, Redis/KV, and WhatsApp variables from Vercel; they are
       outside the active prototype path.
 - [x] Keep only Supabase, OpenAI, Agora, Google Calendar, owner, timezone, and
@@ -134,7 +134,7 @@ npm.cmd run check
       public research will be demonstrated.
 - [x] Initial Vercel production build deployed and assigned to
       `https://roxanne-two.vercel.app`.
-- [x] Deploy the Ilmu-free Lantern build and verify the production login page
+- [x] Deploy the Ilmu-free Quipus build and verify the production login page
       and signed-out dashboard protection.
 - [ ] Verify live Agora/OpenAI readiness from an authenticated dashboard.
 - [ ] Run the complete credential-backed golden path.
@@ -160,7 +160,7 @@ cannot be completed by repository automation alone:
 - [ ] Add `https://cjogfunwcwytvooycjzv.supabase.co/auth/v1/callback` and
       `https://roxanne-two.vercel.app/api/google/callback` to the existing Google
       Cloud OAuth client's authorized redirect URIs, then complete the one-time
-      Google Calendar consent from Lantern Settings.
+      Google Calendar consent from Quipus Settings.
 - [ ] Approve one real Google Calendar invitation during the final golden-path
       test.
 
@@ -178,7 +178,7 @@ cannot be completed by repository automation alone:
 ## Live golden path — final gate
 
 - [ ] Sign in with the owner Google account and open the live dashboard.
-- [ ] Pair the Lantern through `Lantern-XXXX` and `http://192.168.4.1`.
+- [ ] Pair the Quipus through `Quipus-XXXX` and `http://192.168.4.1`.
 - [ ] Record real audio on the ESP32-S3.
 - [ ] Confirm live Agora transcription and live OpenAI extraction.
 - [ ] Reload and confirm the meeting, audio, transcript, and follow-ups persist.

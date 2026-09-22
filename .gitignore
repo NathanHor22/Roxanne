@@ -17,6 +17,7 @@
 # test and build output
 /coverage
 /test-results
+/tmp/
 /playwright-report
 *.tsbuildinfo
 

@@ -33,9 +33,9 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
       .order("start_at"),
     client
       .from("lantern_sessions")
-      .select("id,started_at,capture_ended_at,recording_id,processing_error")
+      .select("id,started_at,capture_ended_at,recording_id,processing_error,processing_stage,upload_bytes,upload_total_bytes")
       .eq("user_id", userId)
-      .not("recording_id", "is", null)
+      .or("recording_id.not.is.null,processing_stage.not.is.null")
       .is("meeting_id", null)
       .order("started_at"),
   ]);
@@ -43,7 +43,7 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
     throw new Error(`Could not load meetings: ${meetingsResult.error.message}`);
   }
   if (archivedSessionsResult.error) {
-    throw new Error(`Could not load archived Lantern recordings: ${archivedSessionsResult.error.message}`);
+    throw new Error(`Could not load archived Quipus recordings: ${archivedSessionsResult.error.message}`);
   }
   const meetingRows = meetingsResult.data || [];
   const archivedSessionRows = (archivedSessionsResult.data || []) as ArchivedLanternSession[];

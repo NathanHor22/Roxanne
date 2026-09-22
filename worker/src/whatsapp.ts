@@ -9,6 +9,7 @@ import pino from "pino";
 import QRCode from "qrcode";
 import type { DeliveryStore, PostgresAuthStore } from "./database.js";
 import { RequestError, assertAllowedRecipient } from "./protocol.js";
+import { readDocument, reportRecipient, type DocumentPayload } from "./media.js";
 
 const baileysLogger = pino({ level: "silent" });
 const RECONNECT_BASE_MS = 2_000;
@@ -227,6 +228,7 @@ export class WhatsAppWorker {
     toInput: unknown,
     text: string,
     idempotencyKey: string,
+    report?: { approved: true; document?: DocumentPayload },
   ): Promise<SendResult> {
     const existing = this.inFlight.get(idempotencyKey);
     if (existing) {
@@ -234,7 +236,7 @@ export class WhatsAppWorker {
       return { ...result, duplicate: true };
     }
 
-    const operation = this.sendOnce(toInput, text, idempotencyKey);
+    const operation = this.sendOnce(toInput, text, idempotencyKey, report);
     this.inFlight.set(idempotencyKey, operation);
     try {
       return await operation;
@@ -247,8 +249,9 @@ export class WhatsAppWorker {
     toInput: unknown,
     text: string,
     idempotencyKey: string,
+    report?: { approved: true; document?: DocumentPayload },
   ): Promise<SendResult> {
-    const to = assertAllowedRecipient(toInput);
+    const to = report?.approved ? reportRecipient(toInput) : assertAllowedRecipient(toInput);
     const claim = await this.deliveryStore.claim(idempotencyKey, DELIVERY_LEASE_MS);
     if (claim.status === "completed") {
       return { id: claim.providerMessageId, duplicate: true, to };
@@ -294,7 +297,7 @@ export class WhatsAppWorker {
     try {
       const sent = await this.socket.sendMessage(
         `${to}@s.whatsapp.net`,
-        { text },
+        report?.document ? { document: await readDocument(report.document), mimetype: report.document.mimeType, fileName: report.document.fileName } : { text },
         { messageId: reservedId },
       );
       const id = sent?.key.id || reservedId;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Contact, Meeting, ScheduleDetails } from "@/lib/types";
+import { getBrowserSupabase } from "@/lib/supabase/client";
 import {
   approveSample,
   liveApprovalRequest,
@@ -145,9 +146,23 @@ export function useWorkspace(initialMode: WorkspaceMode) {
   useEffect(() => {
     if (mode !== "live" || loading) return;
     const refresh = () => void loadLive(false, true);
+    const supabase = getBrowserSupabase();
+    let disposed = false;
+    let channel: ReturnType<NonNullable<typeof supabase>["channel"]> | undefined;
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    void supabase?.auth.getUser().then(({ data }) => {
+      if (disposed || !data.user) return;
+      channel = supabase.channel(`recording-updates-${data.user.id}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "lantern_sessions", filter: `user_id=eq.${data.user.id}` }, () => {
+          clearTimeout(debounce); debounce = setTimeout(refresh, 400);
+        }).subscribe();
+    }).catch(() => { /* The polling fallback remains active if realtime auth fails. */ });
     const interval = window.setInterval(refresh, 10_000);
     window.addEventListener("focus", refresh);
     return () => {
+      disposed = true;
+      clearTimeout(debounce);
+      if (channel) void supabase?.removeChannel(channel);
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };

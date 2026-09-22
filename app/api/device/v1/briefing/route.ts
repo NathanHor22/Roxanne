@@ -1,62 +1,33 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-
 import { loadDeviceBriefing } from "@/lib/device-briefing-service";
+import { createVoicePrompt } from "@/lib/device-dialogue";
+import { deviceSpeechPage } from "@/lib/device-speech-response";
 import { authenticateLantern } from "@/lib/lantern-device-auth";
-import { createOpenAISpeech } from "@/lib/providers/openai-speech";
 import { getServerSupabase } from "@/lib/supabase/server";
-
+import { prepareReportQuery } from "@/lib/device-report-session";
 export const runtime = "nodejs";
-export const maxDuration = 60;
-
-const requestSchema = z
-  .object({
-    kind: z.enum(["boot", "status"]),
-    batteryLevel: z.number().int().min(0).max(100).default(50),
-  })
-  .strict();
-
-function errorResponse(message: string, status: number) {
-  return NextResponse.json(
-    { error: message },
-    { status, headers: { "cache-control": "no-store" } },
-  );
-}
-
+export const maxDuration = 120;
+const schema = z.object({ kind: z.enum(["boot", "status"]), batteryLevel: z.number().int().min(0).max(100).nullable().default(null), reportId: z.string().uuid().optional(), page: z.number().int().nonnegative().max(10000).default(0) }).strict();
 export async function POST(request: Request) {
   const client = getServerSupabase();
-  if (!client) return errorResponse("Lantern service is unavailable.", 503);
+  if (!client) return NextResponse.json({ error: "Service unavailable." }, { status: 503 });
   const device = await authenticateLantern(request, client);
-  if (!device) return errorResponse("Device credential is invalid or revoked.", 403);
-
+  if (!device) return NextResponse.json({ error: "Device credential is invalid or revoked." }, { status: 403 });
   try {
-    const input = requestSchema.parse(await request.json());
-    const briefing = await loadDeviceBriefing(
-      client,
-      device.userId,
-      input.kind,
-      input.batteryLevel,
-    );
-    const audio = await createOpenAISpeech(briefing.speech);
-    return new NextResponse(audio.body, {
-      status: 200,
-      headers: {
-        "cache-control": "no-store",
-        "content-type": "audio/pcm",
-        "x-lantern-audio-rate": "24000",
-        "x-lantern-meeting-count": String(briefing.meetingCount),
-        "x-lantern-approval-count": String(briefing.approvalCount),
-      },
-    });
-  } catch (cause) {
-    console.error("[lantern-device-briefing]", cause);
-    if (cause instanceof z.ZodError || cause instanceof SyntaxError) {
-      return errorResponse("Lantern briefing request is invalid.", 400);
+    const input = schema.parse(await request.json());
+    if (input.reportId) return await deviceSpeechPage(client, device, input);
+    if (input.page !== 0) return NextResponse.json({ error: "A report ID is required." }, { status: 400 });
+    if (input.kind === "status" && request.headers.get("x-lantern-protocol") === "3") {
+      return await deviceSpeechPage(client, device, await prepareReportQuery(client, device, { text: "Today's status report" }));
     }
-    const message = cause instanceof Error ? cause.message : "Lantern briefing failed.";
-    return errorResponse(
-      message.startsWith("OpenAI speech is not configured") ? message : "Lantern briefing failed.",
-      message.startsWith("OpenAI speech is not configured") ? 503 : 502,
-    );
+    const briefing = await loadDeviceBriefing(client, device.userId, input.kind, input.batteryLevel);
+    const prompt = briefing.followUpIds.length
+      ? await createVoicePrompt(client, device, "review", {}, briefing.followUpIds, briefing.speech)
+      : { speech: briefing.speech };
+    return await deviceSpeechPage(client, device, prompt);
+  } catch (error) {
+    console.error("[device-briefing]", error);
+    return NextResponse.json({ error: "Report could not be played. Please retry." }, { status: error instanceof z.ZodError ? 400 : 502 });
   }
 }

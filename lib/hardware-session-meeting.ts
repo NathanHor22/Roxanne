@@ -4,8 +4,11 @@ export interface ArchivedLanternSession {
   id: string;
   started_at: string;
   capture_ended_at: string | null;
-  recording_id: string;
+  recording_id: string | null;
   processing_error: string | null;
+  processing_stage?: string | null;
+  upload_bytes?: number;
+  upload_total_bytes?: number;
 }
 
 /**
@@ -26,10 +29,10 @@ export function archivedLanternSessionMeeting(
 
   return {
     id: `hardware:${session.id}`,
-    title: "Lantern recording",
+    title: session.processing_stage === "uploading" ? `Uploading recording · ${Math.min(100, Math.floor(Number(session.upload_bytes || 0) * 100 / Math.max(1, Number(session.upload_total_bytes || 0))))}%` : "Quipus recording",
     startAt: session.started_at,
     endAt,
-    status: session.processing_error ? "failed" : "processing",
+    status: session.processing_stage ? (session.processing_stage === "failed" ? "failed" : "processing") : session.processing_error ? "failed" : "processing",
     source: "hardware",
     contacts: [],
     recordingId: session.recording_id,

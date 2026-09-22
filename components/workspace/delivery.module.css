@@ -1,0 +1,12 @@
+.panel { margin: 12px 0; padding: 16px; border: 1px solid var(--q-line); border-radius: 14px; background: var(--q-surface); color: var(--q-accent); }
+.panel p { font-size: 13px; line-height: 1.6; margin: 10px 0; }
+.panel button { padding: 9px 13px; background: var(--q-pale); border: 1px solid var(--q-line); border-radius: 8px; color: var(--q-accent); cursor: pointer; text-align: left; font: inherit; font-size: 13px; }
+.panel button:disabled { opacity: .5; cursor: default; }
+.form { display: grid; gap: 14px; margin-top: 16px; }
+.form label { display: grid; gap: 7px; font-size: 13px; line-height: 1.5; }
+.form input:not([type="checkbox"]), .form textarea { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--q-line); border-radius: 8px; background: var(--q-surface); color: var(--q-accent); padding: 10px; font: inherit; }
+.form textarea { resize: vertical; }
+.form .consent { display: flex; gap: 10px; align-items: flex-start; }
+.consent input { accent-color: var(--q-accent); margin-top: 3px; flex-shrink: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.form :focus-visible, .panel button:focus-visible { outline: 2px solid var(--q-line); outline-offset: 3px; }

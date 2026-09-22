@@ -1,7 +1,7 @@
 export const LANTERN_SCHEMA_OUTDATED = "LANTERN_SCHEMA_OUTDATED";
 
 export const lanternSchemaUpgradeMessage =
-  "Lantern's device database is not ready. Apply Supabase migrations 004–007, then try again.";
+  "Quipus's device database is not ready. Apply Supabase migrations 004–007, then try again.";
 
 const schemaErrorCodes = new Set(["42P01", "42703", "42883", "PGRST200", "PGRST202", "PGRST205"]);
 

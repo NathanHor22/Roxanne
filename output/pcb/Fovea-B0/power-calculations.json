@@ -1,0 +1,97 @@
+{
+  "rails": {
+    "3.3": {
+      "record_A": 0.33,
+      "peak_A": 0.85
+    },
+    "5.0": {
+      "record_A": 0.3,
+      "peak_A": 0.8705882352941177
+    }
+  },
+  "cases": {
+    "record": {
+      "output_W": 2.589,
+      "regulator_input_W": 2.8766666666666665,
+      "battery_V": 3.7,
+      "battery_A": 0.8036614675197473,
+      "path_loss_W": 0.09688076315639908,
+      "battery_W": 2.973547429823065,
+      "converter_input_V": 3.579450779872038,
+      "assumed_efficiency": 0.9
+    },
+    "combined_peak": {
+      "output_W": 7.1579411764705885,
+      "regulator_input_W": 8.421107266435987,
+      "battery_V": 3.2,
+      "battery_A": 3.0747589572563014,
+      "path_loss_W": 1.4181213967841786,
+      "battery_W": 9.839228663220165,
+      "converter_input_V": 2.738786156411555,
+      "assumed_efficiency": 0.85
+    }
+  },
+  "assumed_series_ohm": 0.15,
+  "charge_A": 0.5,
+  "charge_min_A": 0.4433196128601624,
+  "charge_max_A": 0.5532856656452162,
+  "usb_input_A": 1.2983870967741935,
+  "usb_input_min_A": 1.1977004152028106,
+  "usb_input_max_A": 1.401107852720756,
+  "battery_capacity_Ah_assumed": 4,
+  "usable_energy_Wh": 11.840000000000002,
+  "runtime_record_h": 3.9817760703095684,
+  "ideal_CC_charge_h": 8.0,
+  "on_hold_s": 0.3342820512820513,
+  "forced_off_s": 6.47525641025641,
+  "speaker_Vrms": 2.8284271247461903,
+  "speaker_Arms": 0.7071067811865476,
+  "speaker_Apeak": 1.0000000000000002,
+  "button_held_A": 0.0003,
+  "button_input_low_V": 0.3,
+  "button_RC_s": 9.09090909090909e-05,
+  "i2c_pull_low_A": 0.000702127659574468,
+  "i2c_rise_100pF_s": 3.9823100000000007e-07,
+  "storage_MiB_per_min": 1.8310546875,
+  "standby_budget_mA": 2.0,
+  "regulator": {
+    "3.3": {
+      "nominal_V": 3.3066666666666666,
+      "min_static_V": 3.268641758241759,
+      "max_static_V": 3.3448018685352015,
+      "divider_A": 5.333333333333334e-06,
+      "inductor_peak_A_est": 1.282006853048947,
+      "required_Isat_20pct_A": 1.5384082236587364,
+      "rhp_zero_Hz": 283162.52571217046
+    },
+    "5.0": {
+      "nominal_V": 4.984615384615385,
+      "min_static_V": 4.926491969568893,
+      "max_static_V": 5.042922922922922,
+      "divider_A": 6.153846153846154e-06,
+      "inductor_peak_A_est": 2.059959859106545,
+      "required_Isat_20pct_A": 2.471951830927854,
+      "rhp_zero_Hz": 183400.56657835262
+    }
+  },
+  "usb_thermal": {
+    "3.0": {
+      "system_A": 0.6537878787878787,
+      "total_input_A": 1.1537878787878788,
+      "charger_loss_W": 1.392272727272727,
+      "estimate_Tj_40C": 101.95613636363635
+    },
+    "3.7": {
+      "system_A": 0.6537878787878787,
+      "total_input_A": 1.1537878787878788,
+      "charger_loss_W": 1.042272727272727,
+      "estimate_Tj_40C": 86.38113636363636
+    },
+    "4.2": {
+      "system_A": 0.6537878787878787,
+      "total_input_A": 1.1537878787878788,
+      "charger_loss_W": 0.7922727272727269,
+      "estimate_Tj_40C": 75.25613636363634
+    }
+  }
+}

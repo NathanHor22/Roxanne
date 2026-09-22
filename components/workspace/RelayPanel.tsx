@@ -214,7 +214,7 @@ export function RelayPanel({
             startAt: startAt.toISOString(),
             durationMinutes: duration,
             attendees,
-            description: `${match.reason}\n\nPrepared by Lantern Relay after owner review.`,
+            description: `${match.reason}\n\nPrepared by Quipus Relay after owner review.`,
             meetingId: match.primary.conversationId,
             relayMatchId: match.id,
             idempotencyKey: `relay:${match.pairKey}:${startAt.toISOString()}:${duration}`,
@@ -244,7 +244,7 @@ export function RelayPanel({
   }
 
   return (
-    <section className={styles.relay} aria-label="Lantern Relay">
+    <section className={styles.relay} aria-label="Quipus Relay">
       <div className={styles.eventBar}>
         <div>
           <span className={styles.liveDot} />

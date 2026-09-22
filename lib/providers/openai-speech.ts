@@ -85,6 +85,7 @@ export async function createOpenAISpeech(
     timeoutMs?: number;
   } = {},
 ) {
+  if (!input.trim() || input.length > 4096) throw new Error("Speech must contain 1 to 4096 characters; split long reports into pages.");
   const runtime = env();
   const apiKey = options.apiKey === undefined ? runtime.OPENAI_API_KEY : options.apiKey;
   if (!apiKey) {

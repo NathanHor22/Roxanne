@@ -217,7 +217,7 @@ export function ConversationReplay({
           </div>
         </header>
         <p className={styles.intro}>
-          Listen to the original audio saved by Lantern and revisit details
+          Listen to the original audio saved by Quipus and revisit details
           beyond the summary.
         </p>
         {source.url && (

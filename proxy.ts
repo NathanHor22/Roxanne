@@ -47,7 +47,7 @@ export async function proxy(request: NextRequest) {
 
   if (mode === "misconfigured") {
     const message =
-      "Lantern authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.";
+      "Quipus authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.";
     if (request.nextUrl.pathname.startsWith("/api/")) {
       return NextResponse.json({ error: message }, { status: 503 });
     }
@@ -58,7 +58,7 @@ export async function proxy(request: NextRequest) {
   }
 
   let response = NextResponse.next({ request });
-  if (isLanternDevicePath(request.nextUrl.pathname)) return response;
+  if (isLanternDevicePath(request.nextUrl.pathname) || request.nextUrl.pathname === "/api/internal/process-recordings") return response;
   const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
     cookies: {
       getAll() {

@@ -27,7 +27,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Relay persistence is not configured." }, { status: 503 });
     const userId = await resolveWorkspaceUserId(client);
     if (!userId)
-      return NextResponse.json({ error: "The Lantern workspace is unavailable." }, { status: 503 });
+      return NextResponse.json({ error: "The Quipus workspace is unavailable." }, { status: 503 });
     const match = await updateRelayMatchStatus(client, userId, id, input.status);
     if (!match)
       return NextResponse.json({ error: "Relay proposal not found." }, { status: 404 });
