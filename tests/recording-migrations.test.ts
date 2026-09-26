@@ -29,6 +29,7 @@ test("real PostgreSQL migrations preserve archives, isolate queues, and atomical
     const user = "11111111-1111-4111-8111-111111111111", other = "22222222-2222-4222-8222-222222222222";
     const device = "33333333-3333-4333-8333-333333333333", session = "44444444-4444-4444-8444-444444444444";
     const audio = "55555555-5555-4555-8555-555555555555", complete = "66666666-6666-4666-8666-666666666666";
+    assert.deepEqual((await db.query("select file_size_limit from storage.buckets where id='recordings'")).rows, [{ file_size_limit: 268435456 }]);
     await db.query("insert into auth.users(id,email) values($1,'owner@example.com'),($2,'other@example.com')", [user, other]);
     await db.query("insert into devices(id,user_id,name,device_state,state_version) values($1,$2,'Test board','finalising',3)", [device,user]);
     await db.query(`insert into lantern_sessions(id,user_id,device_id,mode,state,state_version,machine,started_at)
@@ -67,6 +68,10 @@ test("real PostgreSQL migrations preserve archives, isolate queues, and atomical
     await db.query("insert into meeting_delivery_preferences(user_id,phone,enabled) values($1,'60123456789',true)",[user]);
     const meeting = "77777777-7777-4777-8777-777777777777";
     await db.query("insert into meetings(id,user_id,title,start_at,end_at,status,source,recording_id) values($1,$2,'Test meeting',now(),now(),'processing','hardware',$3)",[meeting,user,audio]);
+    await db.query("insert into meeting_evidence(user_id,meeting_id,category,statement,speaker,start_seconds,end_seconds,quote,confidence,importance) values($1,$2,'need','Needs a pilot','Speaker 1',1,2,'We need a pilot',0.95,5)",[user,meeting]);
+    await db.query("insert into meeting_research_sources(user_id,meeting_id,company,title,url,snippet) values($1,$2,'Acme','Acme official','https://example.com','Public company context')",[user,meeting]);
+    assert.equal((await db.query("select * from meeting_evidence")).rows.length,1);
+    assert.equal((await db.query("select * from meeting_research_sources")).rows.length,1);
     assert.equal((await db.query("select * from meeting_deliveries")).rows.length,0);
     await db.query("update meetings set status='ready' where id=$1",[meeting]);
     await db.query("update meetings set status='ready' where id=$1",[meeting]);

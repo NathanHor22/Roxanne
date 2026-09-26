@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { deviceUploadRequest, directStorageEndpoint, validateTusLocation, verifyDeviceArchive } from "../lib/device-upload";
+import { deviceUploadRequest, directStorageEndpoint, validateTusLocation, verifyDeviceArchive, verifyStoredArchiveMetadata } from "../lib/device-upload";
 import { advanceLantern, createLanternMachine } from "../lib/lantern-state";
 import { isLanternDevicePath } from "../lib/auth-policy";
 
@@ -22,6 +22,11 @@ test("archive verification preserves both 30-second and five-minute originals", 
     audio[audio.length - 1] ^= 1;
     assert.throws(() => verifyDeviceArchive(audio, audio.length, hash), /integrity/);
   }
+});
+test("TUS archive acceptance checks server-side size without redownloading the file", () => {
+  assert.equal(verifyStoredArchiveMetadata({ size: 9_600_044, contentType: "audio/wav" }, 9_600_044), true);
+  assert.throws(() => verifyStoredArchiveMetadata({ size: 9_000_000, contentType: "audio/wav" }, 9_600_044), /complete recording/u);
+  assert.throws(() => verifyStoredArchiveMetadata({ size: 9_600_044, contentType: "text/plain" }, 9_600_044), /media type/u);
 });
 test("signed storage URLs cannot escape the Supabase upload origin", () => {
   const base = directStorageEndpoint("https://project.supabase.co");

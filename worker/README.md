@@ -1,6 +1,6 @@
-# Lantern WhatsApp worker
+# Quipus WhatsApp and queue worker
 
-This service owns Lantern's one long-lived Baileys socket. Deploy it as a
+This service owns Quipus's one long-lived Baileys socket. Deploy it as a
 **separate Railway service with exactly one replica**. Do not deploy this worker
 to Vercel: serverless instances cannot reliably retain a WhatsApp Web socket.
 
@@ -35,10 +35,14 @@ that origin's private `recordings` bucket are accepted; redirects are refused.
 Transcript text is delivered as a UTF-8 document, and the original WAV as a file.
 
 Set `LANTERN_APP_URL` to the HTTPS web deployment and `PROCESSING_WORKER_SECRET`
-to the same random 32+ character value used in Vercel. The worker wakes the durable
-recording and report queues every minute, including while no dashboard is open.
+to the same random 32+ character value used in Vercel. Set `UPSTASH_REDIS_URL`
+to the native TLS (`rediss://`) connection string for the same Upstash database
+whose REST credentials are configured in Vercel. Redis wakes the durable queue
+immediately; the worker also polls every minute as recovery, so PostgreSQL remains
+the source of truth if Redis is unavailable.
 Apply application migrations `009_audio_delivery.sql` and
-`010_reports_and_delivery.sql` before enabling this. See
+`010_reports_and_delivery.sql`, followed by `012_processing_intelligence.sql`,
+before enabling the latest processing code. See
 [`docs/recording-delivery-rollout.md`](../docs/recording-delivery-rollout.md).
 
 ## Pairing

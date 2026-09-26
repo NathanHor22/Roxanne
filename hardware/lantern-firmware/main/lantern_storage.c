@@ -42,7 +42,30 @@ esp_err_t lantern_storage_load(lantern_config_t *config) {
       (result = read_string(handle, "device_id", config->device_id, sizeof(config->device_id))) == ESP_OK) {
     result = read_string(handle, "dev_secret", config->device_secret, sizeof(config->device_secret));
   }
+  uint8_t count = 0;
+  if (result == ESP_OK) {
+    esp_err_t count_result = nvs_get_u8(handle, "wifi_count", &count);
+    if (count_result != ESP_OK && count_result != ESP_ERR_NVS_NOT_FOUND) result = count_result;
+  }
+  if (count > LANTERN_MAX_WIFI_PROFILES) count = LANTERN_MAX_WIFI_PROFILES;
+  for (uint8_t index = 0; result == ESP_OK && index < count; ++index) {
+    char ssid_key[12], pass_key[12];
+    snprintf(ssid_key, sizeof(ssid_key), "w%us", index);
+    snprintf(pass_key, sizeof(pass_key), "w%up", index);
+    result = read_string(handle, ssid_key, config->wifi_profiles[index].ssid,
+      sizeof(config->wifi_profiles[index].ssid));
+    if (result == ESP_OK) result = read_string(handle, pass_key,
+      config->wifi_profiles[index].password, sizeof(config->wifi_profiles[index].password));
+    if (result == ESP_OK && config->wifi_profiles[index].ssid[0]) ++config->wifi_profile_count;
+  }
   nvs_close(handle);
+  // Import the legacy active network once. Existing devices keep working and
+  // gain multi-network roaming without a factory reset.
+  if (result == ESP_OK && config->wifi_profile_count == 0 && config->wifi_ssid[0]) {
+    snprintf(config->wifi_profiles[0].ssid, sizeof(config->wifi_profiles[0].ssid), "%s", config->wifi_ssid);
+    snprintf(config->wifi_profiles[0].password, sizeof(config->wifi_profiles[0].password), "%s", config->wifi_password);
+    config->wifi_profile_count = 1;
+  }
   return result;
 }
 
@@ -53,6 +76,41 @@ esp_err_t lantern_storage_save_wifi(const char *ssid, const char *password, cons
   esp_err_t result = nvs_set_str(handle, "wifi_ssid", ssid);
   if (result == ESP_OK) result = nvs_set_str(handle, "wifi_pass", password);
   if (result == ESP_OK) result = nvs_set_str(handle, "pair_code", pairing_code ? pairing_code : "");
+  lantern_config_t current;
+  memset(&current, 0, sizeof(current));
+  size_t selected = LANTERN_MAX_WIFI_PROFILES;
+  uint8_t old_count = 0;
+  if (result == ESP_OK) {
+    esp_err_t count_result = nvs_get_u8(handle, "wifi_count", &old_count);
+    if (count_result != ESP_OK && count_result != ESP_ERR_NVS_NOT_FOUND) result = count_result;
+    if (old_count > LANTERN_MAX_WIFI_PROFILES) old_count = LANTERN_MAX_WIFI_PROFILES;
+  }
+  for (uint8_t index = 0; result == ESP_OK && index < old_count; ++index) {
+    char ssid_key[12], pass_key[12];
+    snprintf(ssid_key, sizeof(ssid_key), "w%us", index);
+    snprintf(pass_key, sizeof(pass_key), "w%up", index);
+    result = read_string(handle, ssid_key, current.wifi_profiles[index].ssid,
+      sizeof(current.wifi_profiles[index].ssid));
+    if (result == ESP_OK) result = read_string(handle, pass_key,
+      current.wifi_profiles[index].password, sizeof(current.wifi_profiles[index].password));
+    if (strcmp(current.wifi_profiles[index].ssid, ssid) == 0) selected = index;
+  }
+  lantern_wifi_profile_t ordered[LANTERN_MAX_WIFI_PROFILES] = {0};
+  snprintf(ordered[0].ssid, sizeof(ordered[0].ssid), "%s", ssid);
+  snprintf(ordered[0].password, sizeof(ordered[0].password), "%s", password);
+  size_t write_index = 1;
+  for (uint8_t index = 0; result == ESP_OK && index < old_count && write_index < LANTERN_MAX_WIFI_PROFILES; ++index) {
+    if (index == selected || !current.wifi_profiles[index].ssid[0]) continue;
+    ordered[write_index++] = current.wifi_profiles[index];
+  }
+  if (result == ESP_OK) result = nvs_set_u8(handle, "wifi_count", (uint8_t)write_index);
+  for (size_t index = 0; result == ESP_OK && index < write_index; ++index) {
+    char ssid_key[12], pass_key[12];
+    snprintf(ssid_key, sizeof(ssid_key), "w%us", (unsigned)index);
+    snprintf(pass_key, sizeof(pass_key), "w%up", (unsigned)index);
+    result = nvs_set_str(handle, ssid_key, ordered[index].ssid);
+    if (result == ESP_OK) result = nvs_set_str(handle, pass_key, ordered[index].password);
+  }
   if (result == ESP_OK) result = nvs_commit(handle);
   nvs_close(handle);
   return result;

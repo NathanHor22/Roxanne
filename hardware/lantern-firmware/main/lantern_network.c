@@ -50,6 +50,8 @@ static char s_playback_id[37];
 static unsigned s_playback_page;
 static volatile bool s_report_playing;
 static volatile bool s_report_interrupted;
+static volatile bool s_report_request_active;
+static volatile bool s_suspend_auto_reconnect;
 
 static esp_err_t start_setup_portal(void);
 
@@ -59,6 +61,8 @@ static void stop_setup_portal(void) {
     s_server = NULL;
   }
   s_status.setup_portal_active = false;
+  s_status.connectivity = s_status.wifi_connected
+    ? LANTERN_CONNECTIVITY_WIFI_ONLY : LANTERN_CONNECTIVITY_RECONNECTING;
   s_status.setup_ssid[0] = '\0';
   ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_mode(WIFI_MODE_STA));
 }
@@ -273,6 +277,13 @@ static esp_err_t perform_audio_request(esp_http_client_handle_t client,
   if (audio->playback_started) lantern_audio_pcm_end();
   free(chunk);
   if (s_report_interrupted) result = LANTERN_REPORT_INTERRUPTED;
+  // Advance only after the whole PCM page has drained. A disconnect or tap
+  // keeps the current page as the resume point; a completed page can never be
+  // read again unless the user explicitly asks to repeat it.
+  if (result == ESP_OK && s_report_playing && audio->playback_id[0]) {
+    snprintf(s_playback_id, sizeof(s_playback_id), "%s", audio->playback_id);
+    s_playback_page = audio->playback_page + 1;
+  }
   s_report_playing = false;
   if (result == LANTERN_REPORT_INTERRUPTED) {
     s_review_token[0] = '\0'; s_report_id[0] = '\0';
@@ -815,6 +826,7 @@ static esp_err_t start_setup_portal(void) {
   ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &audio));
   ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &firmware));
   s_status.setup_portal_active = true;
+  s_status.connectivity = LANTERN_CONNECTIVITY_SETUP;
   ESP_LOGI(TAG, "setup portal: SSID=%s URL=http://192.168.4.1", s_status.setup_ssid);
   notify();
   return ESP_OK;
@@ -826,13 +838,17 @@ static void wifi_event(void *argument, esp_event_base_t base, int32_t id, void *
     esp_wifi_connect();
   } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
     s_status.wifi_connected = false;
+    s_status.wifi_rssi = -127;
+    s_status.connectivity = s_status.setup_portal_active
+      ? LANTERN_CONNECTIVITY_SETUP : LANTERN_CONNECTIVITY_RECONNECTING;
     xEventGroupClearBits(s_wifi_events, WIFI_CONNECTED_BIT);
-    esp_wifi_connect();
+    if (!s_suspend_auto_reconnect) esp_wifi_connect();
     notify();
   } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
     const ip_event_got_ip_t *event = data;
     snprintf(s_status.ip_address, sizeof(s_status.ip_address), IPSTR, IP2STR(&event->ip_info.ip));
     s_status.wifi_connected = true;
+    s_status.connectivity = LANTERN_CONNECTIVITY_WIFI_ONLY;
     s_status.last_error[0] = '\0';
     xEventGroupSetBits(s_wifi_events, WIFI_CONNECTED_BIT);
     ESP_LOGI(TAG, "Wi-Fi connected at %s", s_status.ip_address);
@@ -849,10 +865,37 @@ static void connection_task(void *argument) {
   }
   EventBits_t bits = xEventGroupWaitBits(s_wifi_events, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(15000));
   if (!(bits & WIFI_CONNECTED_BIT)) {
-    set_error("Wi-Fi timed out; setup portal started");
-    start_setup_portal();
-    vTaskDelete(NULL);
-    return;
+    // A travelling user may be away from the most recently used network.
+    // Scan once and try the strongest remembered alternative before exposing
+    // the setup AP. The list is fixed and bounded to five profiles.
+    lantern_wifi_network_t visible[LANTERN_WIFI_SCAN_LIMIT] = {0};
+    size_t visible_count = 0;
+    s_suspend_auto_reconnect = true;
+    esp_wifi_disconnect();
+    if (lantern_network_scan_wifi(visible, LANTERN_WIFI_SCAN_LIMIT, &visible_count) == ESP_OK) {
+      for (size_t network = 0; network < visible_count && !(bits & WIFI_CONNECTED_BIT); ++network) {
+        for (size_t saved = 0; saved < s_config->wifi_profile_count; ++saved) {
+          if (strcmp(visible[network].ssid, s_config->wifi_profiles[saved].ssid) == 0 &&
+              strcmp(visible[network].ssid, s_config->wifi_ssid) != 0) {
+            ESP_LOGI(TAG, "trying remembered Wi-Fi %s at %d dBm",
+              visible[network].ssid, visible[network].rssi);
+            if (lantern_network_connect_wifi(visible[network].ssid,
+                s_config->wifi_profiles[saved].password) == ESP_OK) {
+              bits = WIFI_CONNECTED_BIT;
+            }
+            break;
+          }
+        }
+      }
+    }
+    s_suspend_auto_reconnect = false;
+    if (!(bits & WIFI_CONNECTED_BIT)) {
+      set_error("Known Wi-Fi unavailable; setup portal started");
+      esp_wifi_connect();
+      start_setup_portal();
+      vTaskDelete(NULL);
+      return;
+    }
   }
   if (!lantern_storage_is_paired(s_config) && s_config->pairing_code[0]) claim_device();
   if (!lantern_storage_is_paired(s_config)) start_setup_portal();
@@ -864,6 +907,7 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
   s_config = config;
   s_callback = callback;
   memset(&s_status, 0, sizeof(s_status));
+  s_status.connectivity = LANTERN_CONNECTIVITY_RECONNECTING;
   s_status.paired = lantern_storage_is_paired(config);
   s_wifi_events = xEventGroupCreate();
   if (!s_wifi_events) return ESP_ERR_NO_MEM;
@@ -884,7 +928,9 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
     size_t password_length = strnlen(config->wifi_password, sizeof(station.sta.password));
     memcpy(station.sta.ssid, config->wifi_ssid, ssid_length);
     memcpy(station.sta.password, config->wifi_password, password_length);
-    station.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    station.sta.threshold.authmode = WIFI_AUTH_OPEN;
+    station.sta.pmf_cfg.capable = true;
+    station.sta.pmf_cfg.required = false;
     ESP_ERROR_CHECK(esp_wifi_set_mode(needs_setup ? WIFI_MODE_APSTA : WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &station));
     if (needs_setup) {
@@ -903,7 +949,9 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
   if (s_status.setup_portal_active) configure_setup_radio();
   // Voice commands and streamed PCM are latency-sensitive. Modem power save
   // can defer hotspot packets until the next beacon and cause audible gaps.
-  esp_wifi_set_ps(WIFI_PS_NONE);
+  // Keep modem power save on while idle. Recording and streamed speech opt in
+  // to the low-latency radio mode explicitly.
+  esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
   if (portal_result != ESP_OK) return portal_result;
   if (has_wifi && xTaskCreate(connection_task, "lantern_connect", 8192, NULL, 5, NULL) != pdPASS) {
     return ESP_ERR_NO_MEM;
@@ -912,7 +960,152 @@ esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callba
 }
 
 void lantern_network_get_status(lantern_network_status_t *status) {
-  if (status) *status = s_status;
+  if (!status) return;
+  *status = s_status;
+  if (status->wifi_connected) {
+    wifi_ap_record_t access_point = {0};
+    if (esp_wifi_sta_get_ap_info(&access_point) == ESP_OK) {
+      status->wifi_rssi = access_point.rssi;
+      if (status->connectivity == LANTERN_CONNECTIVITY_ONLINE && access_point.rssi < -72) {
+        status->connectivity = LANTERN_CONNECTIVITY_WEAK;
+      } else if (status->connectivity == LANTERN_CONNECTIVITY_WEAK && access_point.rssi >= -72) {
+        status->connectivity = LANTERN_CONNECTIVITY_ONLINE;
+      }
+    }
+  }
+}
+
+void lantern_network_set_realtime(bool enabled) {
+  if (!s_wifi_started) return;
+  ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_ps(enabled ? WIFI_PS_NONE : WIFI_PS_MIN_MODEM));
+}
+
+esp_err_t lantern_network_open_setup_portal(void) {
+  esp_err_t result = start_setup_portal();
+  if (result == ESP_OK) {
+    s_status.connectivity = LANTERN_CONNECTIVITY_SETUP;
+    notify();
+  }
+  return result;
+}
+
+esp_err_t lantern_network_scan_wifi(lantern_wifi_network_t *networks, size_t capacity,
+                                    size_t *count) {
+  if (!networks || !capacity || !count || !s_wifi_started) return ESP_ERR_INVALID_ARG;
+  *count = 0;
+  wifi_scan_config_t scan = { .show_hidden = false };
+  esp_err_t result = esp_wifi_scan_start(&scan, true);
+  if (result != ESP_OK) return result;
+  uint16_t available = 20;
+  wifi_ap_record_t records[20] = {0};
+  result = esp_wifi_scan_get_ap_records(&available, records);
+  if (result != ESP_OK) return result;
+  for (uint16_t index = 0; index < available && *count < capacity; ++index) {
+    if (!records[index].ssid[0]) continue;
+    bool duplicate = false;
+    for (size_t prior = 0; prior < *count; ++prior) {
+      if (strcmp(networks[prior].ssid, (const char *)records[index].ssid) == 0) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (duplicate) continue;
+    lantern_wifi_network_t *output = &networks[(*count)++];
+    snprintf(output->ssid, sizeof(output->ssid), "%s", records[index].ssid);
+    output->rssi = records[index].rssi;
+    output->secured = records[index].authmode != WIFI_AUTH_OPEN;
+    output->remembered = false;
+    for (size_t saved = 0; s_config && saved < s_config->wifi_profile_count; ++saved) {
+      if (strcmp(output->ssid, s_config->wifi_profiles[saved].ssid) == 0) {
+        output->remembered = true;
+        break;
+      }
+    }
+  }
+  return ESP_OK;
+}
+
+esp_err_t lantern_network_connect_wifi(const char *ssid, const char *password) {
+  if (!ssid || !ssid[0] || strlen(ssid) > 32 || !password || strlen(password) > 64 ||
+      !s_wifi_started || !s_config) return ESP_ERR_INVALID_ARG;
+  wifi_config_t previous = {0};
+  ESP_RETURN_ON_ERROR(esp_wifi_get_config(WIFI_IF_STA, &previous), TAG, "read Wi-Fi config");
+  wifi_config_t station = {0};
+  snprintf((char *)station.sta.ssid, sizeof(station.sta.ssid), "%s", ssid);
+  snprintf((char *)station.sta.password, sizeof(station.sta.password), "%s", password);
+  station.sta.threshold.authmode = WIFI_AUTH_OPEN;
+  station.sta.pmf_cfg.capable = true;
+  station.sta.pmf_cfg.required = false;
+  xEventGroupClearBits(s_wifi_events, WIFI_CONNECTED_BIT);
+  s_status.connectivity = LANTERN_CONNECTIVITY_RECONNECTING;
+  notify();
+  s_suspend_auto_reconnect = true;
+  esp_wifi_disconnect();
+  esp_err_t configure_result = esp_wifi_set_config(WIFI_IF_STA, &station);
+  if (configure_result != ESP_OK) {
+    s_suspend_auto_reconnect = false;
+    return configure_result;
+  }
+  esp_err_t connect_result = esp_wifi_connect();
+  s_suspend_auto_reconnect = false;
+  if (connect_result != ESP_OK) return connect_result;
+  EventBits_t bits = xEventGroupWaitBits(s_wifi_events, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE,
+    pdMS_TO_TICKS(20000));
+  if (!(bits & WIFI_CONNECTED_BIT)) {
+    ESP_LOGW(TAG, "Wi-Fi candidate %s did not connect; restoring previous network", ssid);
+    s_suspend_auto_reconnect = true;
+    esp_wifi_disconnect();
+    esp_wifi_set_config(WIFI_IF_STA, &previous);
+    esp_wifi_connect();
+    s_suspend_auto_reconnect = false;
+    return ESP_ERR_TIMEOUT;
+  }
+  ESP_RETURN_ON_ERROR(lantern_storage_save_wifi(ssid, password, s_config->pairing_code),
+    TAG, "save Wi-Fi");
+  ESP_RETURN_ON_ERROR(lantern_storage_load(s_config), TAG, "reload Wi-Fi");
+  if (lantern_storage_is_paired(s_config) && s_status.setup_portal_active) stop_setup_portal();
+  s_status.connectivity = LANTERN_CONNECTIVITY_WIFI_ONLY;
+  notify();
+  return ESP_OK;
+}
+
+esp_err_t lantern_network_get_reports(lantern_report_item_t *items, size_t capacity,
+                                      size_t *count) {
+  if (!items || !capacity || !count || !s_config || !s_status.wifi_connected ||
+      !lantern_storage_is_paired(s_config)) return ESP_ERR_INVALID_STATE;
+  *count = 0;
+  char authorization[140];
+  device_authorization(authorization);
+  response_buffer_t *response = response_buffer_create();
+  if (!response) return ESP_ERR_NO_MEM;
+  int status = post_json("/api/device/v1/reports", "{\"limit\":5}", authorization, response);
+  if (status != 200) {
+    provider_error("Report list", status, response);
+    free(response);
+    return ESP_FAIL;
+  }
+  cJSON *root = cJSON_Parse(response->data);
+  cJSON *reports = root ? cJSON_GetObjectItemCaseSensitive(root, "reports") : NULL;
+  if (!cJSON_IsArray(reports)) {
+    cJSON_Delete(root);
+    free(response);
+    return ESP_FAIL;
+  }
+  cJSON *entry = NULL;
+  cJSON_ArrayForEach(entry, reports) {
+    if (*count >= capacity) break;
+    lantern_report_item_t *item = &items[(*count)++];
+    memset(item, 0, sizeof(*item));
+    copy_json_string(entry, "id", item->id, sizeof(item->id));
+    copy_json_string(entry, "title", item->title, sizeof(item->title));
+    copy_json_string(entry, "time", item->time, sizeof(item->time));
+    copy_json_string(entry, "status", item->status, sizeof(item->status));
+    copy_json_string(entry, "summary", item->summary, sizeof(item->summary));
+    copy_json_string(entry, "action", item->action, sizeof(item->action));
+  }
+  cJSON_Delete(root);
+  free(response);
+  return ESP_OK;
 }
 
 esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_version, int battery_level) {
@@ -937,10 +1130,17 @@ esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_versi
   if (status != 200) {
     ESP_LOGW(TAG, "heartbeat HTTP %d: %.192s", status, response->data);
     recover_rejected_credential(status);
+    s_status.connectivity = s_status.wifi_connected
+      ? LANTERN_CONNECTIVITY_WIFI_ONLY : LANTERN_CONNECTIVITY_RECONNECTING;
+    notify();
     free(response);
     return ESP_FAIL;
   }
   free(response);
+  s_status.connectivity = s_status.wifi_rssi < -72
+    ? LANTERN_CONNECTIVITY_WEAK : LANTERN_CONNECTIVITY_ONLINE;
+  s_status.last_error[0] = '\0';
+  notify();
   ESP_LOGI(TAG, "heartbeat acknowledged");
   return ESP_OK;
 }
@@ -1007,11 +1207,18 @@ bool lantern_network_review_pending(void) { return s_review_token[0] != '\0'; }
 void lantern_network_cancel_review(void) { s_review_token[0] = '\0'; s_report_id[0] = '\0'; }
 
 esp_err_t lantern_network_play_briefing(const char *kind, int battery_level) {
+  if (s_report_request_active) return ESP_ERR_INVALID_STATE;
+  s_report_request_active = true;
   lantern_network_cancel_review();
   do {
     esp_err_t result = play_briefing_page(kind, battery_level, strcmp(kind, "status") == 0);
-    if (result != ESP_OK) { lantern_network_cancel_review(); return result; }
+    if (result != ESP_OK) {
+      lantern_network_cancel_review();
+      s_report_request_active = false;
+      return result;
+    }
   } while (s_report_id[0]);
+  s_report_request_active = false;
   return ESP_OK;
 }
 

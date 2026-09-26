@@ -30,6 +30,10 @@ function extractionFixture(): MeetingExtraction {
       keyPoints: ["Start the pilot at the Bangsar branch."],
       commitments: [],
       detectedLanguage: "English and Bahasa Malaysia",
+      executiveSummary: "Mr Chung agreed to review a Bangsar pilot on Thursday at 1pm.",
+      dealStage: "evaluation",
+      risks: [],
+      openQuestions: ["Who owns the final pilot approval?"],
     },
     participants: [{
       name: "Mr Chung", company: null, role: null,
@@ -48,6 +52,16 @@ function extractionFixture(): MeetingExtraction {
         location: null,
         evidence: "Actually Thursday at one works. Confirmed, forty-five minutes.",
       },
+    }],
+    evidence: [{
+      category: "decision",
+      statement: "Mr Chung confirmed Thursday at 1pm.",
+      speaker: "Mr Chung",
+      startSeconds: 22,
+      endSeconds: 34,
+      quote: "Actually Thursday at one works.",
+      confidence: 0.98,
+      importance: 5,
     }],
   };
 }
@@ -86,6 +100,7 @@ test("OpenAI receives the conversation clock and a strict schedule schema", asyn
     assert.match(request.instructions, /untrusted data/u);
     assert.match(request.instructions, /later corrections/u);
     assert.match(request.instructions, /natural, concise English/u);
+    assert.match(request.instructions, /atomic evidence/u);
     assert.deepEqual(JSON.parse(request.input), { context, transcript });
     return modelResponse(extractionFixture());
   };
@@ -231,4 +246,30 @@ test("an ordinary follow-up may have no schedule", async () => {
   });
   assert.equal(result.followUps[0]?.type, "send_file");
   assert.equal(result.followUps[0]?.schedule, null);
+});
+
+test("unsupported evidence is removed and verified evidence inherits source coordinates", async () => {
+  const fixture = extractionFixture();
+  fixture.evidence.push({
+    category: "budget",
+    statement: "The budget is RM50,000.",
+    speaker: "Mr Chung",
+    startSeconds: 22,
+    endSeconds: 34,
+    quote: "The budget is RM50,000.",
+    confidence: 0.9,
+    importance: 4,
+  });
+  fixture.evidence[0]!.speaker = "Wrong speaker";
+  fixture.evidence[0]!.startSeconds = 0;
+  fixture.evidence[0]!.endSeconds = 1;
+  const result = await extractWithOpenAI(transcript, context, {
+    ...options,
+    fetchImpl: async () => modelResponse(fixture),
+  });
+  assert.equal(result.evidence.length, 1);
+  assert.equal(result.evidence[0]?.speaker, "Mr Chung");
+  assert.equal(result.evidence[0]?.startSeconds, 22);
+  assert.equal(result.evidence[0]?.endSeconds, 34);
+  assert.match(result.warning || "", /unsupported evidence item/u);
 });

@@ -39,6 +39,7 @@ export async function POST(request: Request) {
   if (readinessError) return readinessError;
 
   let sessionId = "";
+  let ownerId = "local-development";
   try {
     const input = headerSchema.parse({
       deviceId:
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
     if (!client) throw new Error("Supabase is unavailable.");
     const userId = await resolveWorkspaceUserId(client);
     if (!userId) throw new Error("The Quipus workspace is unavailable.");
+    ownerId = userId;
     const { data: device } = await client.from("devices").select("id,name").eq("id", input.deviceId).eq("user_id", userId).maybeSingle();
     if (!device) return NextResponse.json({ error: "Unknown hardware device." }, { status: 404 });
 
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
       : new Date(Date.now() - 5 * 60_000).toISOString();
     const endAt = new Date().toISOString();
     const clientReference = `hardware-${sessionId}`;
-    await setProcessingState(clientReference, { status: "processing", stage: "extracting" });
+    await setProcessingState(ownerId, clientReference, { status: "processing", stage: "extracting" });
     const transcription = transcriptionResultSchema.parse({
       text: segments.map((item) => `${item.speaker}: ${item.text}`).join("\n"),
       segments,
@@ -123,12 +125,12 @@ export async function POST(request: Request) {
     meeting.recordingId = persistence.recordingId;
     await rememberSession(clientReference, { title: meeting.title, intent: extraction.insight.intent, followUps: extraction.followUps });
     if (contacts[0]) await rememberPerson(contacts[0].id, { name: contacts[0].name, company: contacts[0].company, lastMeeting: startedAt });
-    await setProcessingState(clientReference, { status: "ready", meetingId: clientReference, persisted: persistence.persisted });
+    await setProcessingState(ownerId, clientReference, { status: "ready", meetingId: clientReference, persisted: persistence.persisted });
     if (redis) await redis.del(`hardware-session:${sessionId}`);
 
     return NextResponse.json({ meeting, persisted: persistence.persisted, transcriptSegments: segments.length });
   } catch (error) {
-    if (sessionId) await setProcessingState(`hardware-${sessionId}`, { status: "failed", error: error instanceof Error ? error.message : "Hardware processing failed." });
+    if (sessionId) await setProcessingState(ownerId, `hardware-${sessionId}`, { status: "failed", error: error instanceof Error ? error.message : "Hardware processing failed." });
     console.error("[hardware-session-complete]", error);
     return NextResponse.json(
       { error: error instanceof z.ZodError ? "Hardware completion data is invalid." : error instanceof Error ? error.message : "Hardware processing failed." },

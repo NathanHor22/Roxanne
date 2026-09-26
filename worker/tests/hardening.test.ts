@@ -26,6 +26,14 @@ test("worker requires a distinct 32-byte auth encryption key", () => {
     /must be separate/u,
   );
   assert.equal(loadConfig(baseEnv).workspaceKey, "lantern");
+  assert.throws(
+    () => loadConfig({ ...baseEnv, UPSTASH_REDIS_URL: "redis://public.example.test:6379" }),
+    /rediss/u,
+  );
+  assert.equal(
+    loadConfig({ ...baseEnv, UPSTASH_REDIS_URL: "rediss://default:secret@redis.example.test:6379" }).redisUrl,
+    "rediss://default:secret@redis.example.test:6379",
+  );
 });
 
 test("auth values are encrypted and bound to their workspace and data key", () => {

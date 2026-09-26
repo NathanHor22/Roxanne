@@ -19,8 +19,8 @@ test("infers only explicitly supported audio extensions", () => {
   assert.equal(normalizeAudioContentType("call.txt", "text/plain"), null);
 });
 
-test("uses a safe storage extension and keeps the 25 MB contract", () => {
+test("uses a safe storage extension and keeps the long-recording archive contract", () => {
   assert.equal(safeAudioExtension("client call", "audio/mpeg"), "mp3");
   assert.equal(safeAudioExtension("client.call.ogg", "audio/ogg"), "ogg");
-  assert.equal(MAX_AUDIO_BYTES, 26_214_400);
+  assert.equal(MAX_AUDIO_BYTES, 268_435_456);
 });

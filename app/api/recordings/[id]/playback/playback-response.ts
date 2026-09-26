@@ -22,15 +22,18 @@ function ownedAudioPath(
 ): path is string {
   if (typeof path !== "string" || path.length > 512) return false;
   const parts = path.split("/");
-  return (
-    parts.length === 4 &&
-    parts[0].toLowerCase() === ownerId.toLowerCase() &&
-    /^\d{4}$/u.test(parts[1]) &&
-    /^(0[1-9]|1[0-2])$/u.test(parts[2]) &&
-    parts[3].toLowerCase().startsWith(`${recordingId.toLowerCase()}.`) &&
-    /\.(mp3|m4a|mp4|wav|webm|ogg)$/iu.test(parts[3]) &&
-    parts[3].split(".").length === 2
-  );
+  if (parts.length !== 4 || parts[0].toLowerCase() !== ownerId.toLowerCase()) {
+    return false;
+  }
+  const fileName = parts[3];
+  const validFile =
+    fileName.toLowerCase().startsWith(`${recordingId.toLowerCase()}.`) &&
+    /\.(mp3|m4a|mp4|wav|webm|ogg)$/iu.test(fileName) &&
+    fileName.split(".").length === 2;
+  if (!validFile) return false;
+  const datedBrowserUpload = /^\d{4}$/u.test(parts[1]) && /^(0[1-9]|1[0-2])$/u.test(parts[2]);
+  const archivedDeviceUpload = parts[1] === "device" && z.string().uuid().safeParse(parts[2]).success;
+  return datedBrowserUpload || archivedDeviceUpload;
 }
 
 function missingStorageObject(error: unknown): boolean {

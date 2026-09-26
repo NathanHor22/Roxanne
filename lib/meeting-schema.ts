@@ -2,6 +2,8 @@ import { z } from "zod";
 import { scheduleDetailsSchema } from "./workspace/model";
 
 import type {
+  DealStage,
+  MeetingEvidence,
   InterestLevel,
   MeetingInsight,
   TranscriptSegment,
@@ -97,11 +99,48 @@ export const meetingInsightSchema = z
     concern: compactText("concern", 240),
     promised: compactText("promised", 240),
     next: compactText("next", 240),
-    keyPoints: z.array(compactText("key point", 240)).max(8),
+    keyPoints: z.array(compactText("key point", 240)).max(5),
     commitments: z.array(extractedCommitmentSchema).max(20),
     detectedLanguage: compactText("detected language", 80),
+    executiveSummary: compactText("executive summary", 500),
+    dealStage: z.enum([
+      "discovery", "evaluation", "proposal", "negotiation",
+      "closed_won", "closed_lost", "unknown",
+    ]),
+    risks: z.array(compactText("risk", 240)).max(8),
+    openQuestions: z.array(compactText("open question", 240)).max(8),
   })
   .strict();
+
+export const meetingEvidenceSchema = z
+  .object({
+    category: z.enum([
+      "need", "decision", "commitment", "objection", "budget", "timeline",
+      "stakeholder", "competitor", "follow_up", "product", "company",
+      "open_question", "context",
+    ]),
+    statement: compactText("evidence statement", 500),
+    speaker: compactText("evidence speaker", 80).nullable(),
+    startSeconds: z.number().finite().nonnegative().nullable(),
+    endSeconds: z.number().finite().nonnegative().nullable(),
+    quote: compactText("evidence quote", 500),
+    confidence: z.number().finite().min(0).max(1),
+    importance: z.number().int().min(1).max(5),
+  })
+  .strict()
+  .superRefine((evidence, context) => {
+    if (
+      evidence.startSeconds !== null &&
+      evidence.endSeconds !== null &&
+      evidence.endSeconds < evidence.startSeconds
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endSeconds"],
+        message: "endSeconds cannot be before startSeconds",
+      });
+    }
+  });
 
 export const extractedFollowUpSchema = z
   .object({
@@ -119,6 +158,7 @@ export const meetingExtractionSchema = z
     insight: meetingInsightSchema,
     participants: z.array(extractedParticipantSchema).max(20),
     followUps: z.array(extractedFollowUpSchema).max(20),
+    evidence: z.array(meetingEvidenceSchema).max(80),
   })
   .strict();
 
@@ -172,6 +212,14 @@ type _InterestCompatibility = AssertAssignable<
   InterestLevel,
   z.infer<typeof meetingInsightSchema>["interestLevel"]
 >;
+type _DealStageCompatibility = AssertAssignable<
+  DealStage,
+  z.infer<typeof meetingInsightSchema>["dealStage"]
+>;
+type _EvidenceCompatibility = AssertAssignable<
+  MeetingEvidence,
+  z.infer<typeof meetingEvidenceSchema>
+>;
 
 /**
  * JSON Schema sent to Qwen's OpenAI-compatible strict structured-output mode.
@@ -181,7 +229,7 @@ type _InterestCompatibility = AssertAssignable<
 export const meetingExtractionJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["insight", "participants", "followUps"],
+  required: ["insight", "participants", "followUps", "evidence"],
   properties: {
     insight: {
       type: "object",
@@ -197,6 +245,10 @@ export const meetingExtractionJsonSchema = {
         "keyPoints",
         "commitments",
         "detectedLanguage",
+        "executiveSummary",
+        "dealStage",
+        "risks",
+        "openQuestions",
       ],
       properties: {
         meetingType: { type: "string", minLength: 1, maxLength: 80 },
@@ -211,7 +263,7 @@ export const meetingExtractionJsonSchema = {
         next: { type: "string", minLength: 1, maxLength: 240 },
         keyPoints: {
           type: "array",
-          maxItems: 8,
+          maxItems: 5,
           items: { type: "string", minLength: 1, maxLength: 240 },
         },
         commitments: {
@@ -238,6 +290,19 @@ export const meetingExtractionJsonSchema = {
           },
         },
         detectedLanguage: { type: "string", minLength: 1, maxLength: 80 },
+        executiveSummary: { type: "string", minLength: 1, maxLength: 500 },
+        dealStage: {
+          type: "string",
+          enum: ["discovery", "evaluation", "proposal", "negotiation", "closed_won", "closed_lost", "unknown"],
+        },
+        risks: {
+          type: "array", maxItems: 8,
+          items: { type: "string", minLength: 1, maxLength: 240 },
+        },
+        openQuestions: {
+          type: "array", maxItems: 8,
+          items: { type: "string", minLength: 1, maxLength: 240 },
+        },
       },
     },
     participants: {
@@ -326,6 +391,35 @@ export const meetingExtractionJsonSchema = {
               },
             },
           },
+        },
+      },
+    },
+    evidence: {
+      type: "array",
+      maxItems: 80,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "category", "statement", "speaker", "startSeconds", "endSeconds",
+          "quote", "confidence", "importance",
+        ],
+        properties: {
+          category: {
+            type: "string",
+            enum: [
+              "need", "decision", "commitment", "objection", "budget", "timeline",
+              "stakeholder", "competitor", "follow_up", "product", "company",
+              "open_question", "context",
+            ],
+          },
+          statement: { type: "string", minLength: 1, maxLength: 500 },
+          speaker: { type: ["string", "null"], maxLength: 80 },
+          startSeconds: { type: ["number", "null"], minimum: 0 },
+          endSeconds: { type: ["number", "null"], minimum: 0 },
+          quote: { type: "string", minLength: 1, maxLength: 500 },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
+          importance: { type: "integer", minimum: 1, maximum: 5 },
         },
       },
     },

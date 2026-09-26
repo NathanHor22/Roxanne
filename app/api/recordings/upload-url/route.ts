@@ -77,7 +77,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Choose a supported audio file up to 25 MB.", issues: error.flatten() },
+        { error: "Choose a supported audio file up to 256 MB.", issues: error.flatten() },
         { status: 400 },
       );
     }

@@ -49,7 +49,13 @@ export function meetingReportDetails(meeting: DeviceMeetingBrief): string[] {
     for (const detail of details) {
       if (!detail) continue;
       const text = cleanSpeech(detail);
-      if (text && !seen.has(text)) { parts.push(text); seen.add(text); }
+      const fingerprint = text.toLocaleLowerCase("en")
+        .replace(/^(?:they need|concerns?|promises?|commitments?|next steps?)\s*:\s*/u, "")
+        .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+      if (text && fingerprint && !seen.has(fingerprint)) {
+        parts.push(text);
+        seen.add(fingerprint);
+      }
     }
     return parts;
 }

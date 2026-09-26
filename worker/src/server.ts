@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import pino from "pino";
+import { Redis } from "ioredis";
 import { loadConfig } from "./config.js";
 import {
   createDatabasePool,
@@ -19,6 +20,7 @@ const logger = pino({
   redact: ["req.headers.authorization", "authorization", "token"],
 });
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const PROCESSING_WAKEUP_CHANNEL = "quipus:processing:wakeup";
 
 function json(
   response: ServerResponse,
@@ -83,7 +85,7 @@ async function main(): Promise<void> {
       if (method === "GET" && pathname === "/health") {
         json(response, 200, {
           ok: true,
-          service: "lantern-whatsapp-worker",
+          service: "quipus-whatsapp-worker",
           uptimeSeconds: Math.floor(process.uptime()),
           whatsapp: worker.snapshot().status,
         });
@@ -167,6 +169,7 @@ async function main(): Promise<void> {
 
   let shuttingDown = false;
   let processingTimer: NodeJS.Timeout | undefined;
+  let processingSubscriber: Redis | undefined;
   let kicking = false;
   if (process.env.LANTERN_APP_URL && process.env.PROCESSING_WORKER_SECRET) {
     const endpoint = new URL("/api/internal/process-recordings", process.env.LANTERN_APP_URL);
@@ -178,17 +181,38 @@ async function main(): Promise<void> {
         const response = await fetch(endpoint, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15000), headers: { authorization: `Bearer ${process.env.PROCESSING_WORKER_SECRET}` } });
         if (!response.ok) logger.warn({ status: response.status }, "Recording queue wakeup failed");
         await response.body?.cancel();
-      } catch { logger.warn("Recording queue wakeup could not reach Lantern"); }
+      } catch { logger.warn("Recording queue wakeup could not reach Quipus"); }
       finally { kicking = false; }
     };
     processingTimer = setInterval(() => void kick(), 60000);
     processingTimer.unref();
     void kick();
+    if (config.redisUrl) {
+      processingSubscriber = new Redis(config.redisUrl, {
+        lazyConnect: true,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: true,
+      });
+      processingSubscriber.on("message", (channel: string) => {
+        if (channel === PROCESSING_WAKEUP_CHANNEL) void kick();
+      });
+      processingSubscriber.on("error", (error: Error) => {
+        logger.warn({ err: error }, "Redis processing wakeup listener is unavailable");
+      });
+      void processingSubscriber.connect()
+        .then(() => processingSubscriber?.subscribe(PROCESSING_WAKEUP_CHANNEL))
+        .then(() => logger.info("Redis processing wakeup listener connected"))
+        .catch((error: unknown) => logger.warn({ err: error }, "Redis processing wakeup listener could not connect"));
+    }
   }
   const shutdown = (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
     if (processingTimer) clearInterval(processingTimer);
+    if (processingSubscriber) {
+      processingSubscriber.removeAllListeners();
+      processingSubscriber.disconnect(false);
+    }
     logger.info({ signal }, "Shutting down WhatsApp worker");
     worker.shutdown();
     server.close(() => {

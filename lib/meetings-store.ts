@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import type { Commitment, Contact, FollowUp, Meeting, MeetingInsight, TranscriptSegment } from "@/lib/types";
+import type { Commitment, Contact, FollowUp, Meeting, MeetingEvidence, MeetingInsight, PublicResearchSource, TranscriptSegment } from "@/lib/types";
 import { demoMeetings } from "@/lib/demo-data";
 import {
   archivedLanternSessionMeeting,
@@ -55,15 +55,17 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
   const linksResult = meetingIds.length
     ? await client.from("meeting_contacts").select("meeting_id,is_primary,contacts(*)").in("meeting_id", meetingIds)
     : { data: [], error: null };
-  const [recordingsResult, transcriptsResult, insightsResult, commitmentsResult, followUpsResult, actionsResult] = await Promise.all([
+  const [recordingsResult, transcriptsResult, insightsResult, commitmentsResult, evidenceResult, researchResult, followUpsResult, actionsResult] = await Promise.all([
     client.from("recordings").select("id,storage_path").eq("user_id", userId),
     client.from("transcripts").select("recording_id,segments").eq("user_id", userId),
     client.from("meeting_insights").select("*").eq("user_id", userId),
     client.from("commitments").select("*").eq("user_id", userId),
+    client.from("meeting_evidence").select("*").eq("user_id", userId).order("importance", { ascending: false }),
+    client.from("meeting_research_sources").select("*").eq("user_id", userId),
     client.from("follow_ups").select("*").eq("user_id", userId),
     client.from("actions").select("meeting_id,follow_up_id,external_id,payload").eq("user_id", userId).eq("type", "calendar_event"),
   ]);
-  const failure = [linksResult, recordingsResult, transcriptsResult, insightsResult, commitmentsResult, followUpsResult, actionsResult].find((result) => result.error);
+  const failure = [linksResult, recordingsResult, transcriptsResult, insightsResult, commitmentsResult, evidenceResult, researchResult, followUpsResult, actionsResult].find((result) => result.error);
   if (failure?.error) throw new Error(`Could not load meetings: ${failure.error.message}`);
   const publicIdByDatabaseId = new Map(meetingRows.map((row) => [row.id, row.client_reference || row.id]));
   // An event can exist even when a later local completion write failed.
@@ -88,6 +90,40 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
     commitmentsByMeeting.set(row.meeting_id, [
       ...(commitmentsByMeeting.get(row.meeting_id) || []),
       commitment,
+    ]);
+  }
+  const evidenceByMeeting = new Map<string, MeetingEvidence[]>();
+  for (const row of evidenceResult.data || []) {
+    const evidence: MeetingEvidence = {
+      id: row.id,
+      category: row.category,
+      statement: row.statement,
+      speaker: row.speaker,
+      startSeconds: row.start_seconds === null ? null : Number(row.start_seconds),
+      endSeconds: row.end_seconds === null ? null : Number(row.end_seconds),
+      quote: row.quote,
+      confidence: Number(row.confidence),
+      importance: Number(row.importance),
+      sourceKind: row.source_kind,
+    };
+    evidenceByMeeting.set(row.meeting_id, [
+      ...(evidenceByMeeting.get(row.meeting_id) || []),
+      evidence,
+    ]);
+  }
+  const researchByMeeting = new Map<string, PublicResearchSource[]>();
+  for (const row of researchResult.data || []) {
+    const source: PublicResearchSource = {
+      id: row.id,
+      company: row.company,
+      title: row.title,
+      url: row.url,
+      snippet: row.snippet,
+      publishedDate: row.published_date,
+    };
+    researchByMeeting.set(row.meeting_id, [
+      ...(researchByMeeting.get(row.meeting_id) || []),
+      source,
     ]);
   }
   const followUpsByMeeting = new Map<string, FollowUp[]>();
@@ -128,6 +164,8 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
       meetingType: String(insightRow.meeting_type || "meeting"), intent: String(insightRow.intent || ""), interestLevel: (insightRow.interest_level || "unknown") as MeetingInsight["interestLevel"],
       wants: String(insightRow.wants || ""), concern: String(insightRow.concern || ""), promised: String(insightRow.promised || ""), next: String(insightRow.next_action || ""),
       keyPoints: Array.isArray(insightRow.key_points) ? insightRow.key_points.map(String) : [], commitments: commitmentsByMeeting.get(row.id) || [],
+      executiveSummary: String(insightRow.executive_summary || ""), dealStage: (insightRow.deal_stage || "unknown") as MeetingInsight["dealStage"],
+      risks: Array.isArray(insightRow.risks) ? insightRow.risks.map(String) : [], openQuestions: Array.isArray(insightRow.open_questions) ? insightRow.open_questions.map(String) : [],
     } : null;
     const recording = row.recording_id ? recordingById.get(row.recording_id) : undefined;
     const path = recording?.storage_path;
@@ -146,6 +184,8 @@ export async function loadMeetings(): Promise<{ meetings: Meeting[]; source: "su
       recordingUrl: typeof path === "string" ? signedByPath.get(path) || null : null,
       transcript: (row.recording_id ? transcriptByRecording.get(row.recording_id) : []) as TranscriptSegment[],
       insight,
+      evidence: evidenceByMeeting.get(row.id) || [],
+      research: researchByMeeting.get(row.id) || [],
       followUps: (followUpsByMeeting.get(row.id) || []).map((followUp) => ({
         ...followUp,
         meetingId: row.client_reference || row.id,

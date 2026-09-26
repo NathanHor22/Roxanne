@@ -37,9 +37,11 @@ interrupt a newer recording on the device.
 
 ## Release order
 
-1. Back up the database. Apply `supabase/migrations/009_audio_delivery.sql` then
+1. Back up the database. Apply `supabase/migrations/009_audio_delivery.sql`,
    `010_reports_and_delivery.sql`, after migrations 001–008. These are one-time
    migrations; do not repeatedly paste them into an already-migrated database.
+   Apply `012_processing_intelligence.sql` after those migrations before deploying
+   the long-recording and evidence pipeline.
    Keep the `recordings` Storage bucket private. Its existing device-upload limits
    still apply. Realtime requires the owner-scoped SELECT policy on
    `lantern_sessions` from migration 007; migration 009 adds the table
@@ -58,7 +60,10 @@ interrupt a newer recording on the device.
    - `PROCESSING_WORKER_SECRET`: the identical web secret.
    - `MEDIA_STORAGE_ORIGIN=https://your-project.supabase.co` (the project origin,
      not the direct upload hostname and not a signed recording URL).
-   The worker calls `/api/internal/process-recordings` every minute. This recovers
+   - `UPSTASH_REDIS_URL`: the native TLS (`rediss://`) URL for the same Upstash
+     database used by the web app's REST credentials.
+   Redis requests an immediate processing pass. The worker also calls
+   `/api/internal/process-recordings` every minute. This recovers
    jobs interrupted by a serverless timeout. Without it, the initial request can
    process successfully, but delayed retries and automatic deliveries are not
    guaranteed. Allow this authenticated endpoint through any deployment protection.

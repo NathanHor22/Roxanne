@@ -20,7 +20,7 @@ export type DevicePromptKind = (typeof devicePromptKinds)[number];
 
 const prompts: Record<DevicePromptKind, string> = {
   consent_request:
-    "Recording requires consent. Do you consent to being recorded? Say yes or no.",
+    "Confirm the room has agreed. Say yes, we consent, or say no.",
   consent_success:
     "Consent confirmed. Starting your recording.",
   consent_failure:

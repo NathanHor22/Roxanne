@@ -137,7 +137,8 @@ function buildMessages(
         "Use 'Not identified' (translated to the requested output language) when a required compact label has no evidence.",
         "A user commitment is something the Quipus user owes; a contact commitment is something the client/partner owes.",
         "Resolve relative dates from the supplied reference date and timezone. If timing is ambiguous, use null and preserve the timeframe in the description.",
-        "Keep key points distinct and actionable. Create followUps only when an action is actually supported by the conversation.",
+        "Build evidence first: every material need, decision, commitment, objection, budget, timeline, stakeholder, competitor, follow-up, product, company, and open question must carry an exact quote from the transcript plus its speaker and timestamps when available.",
+        "Use at most five decisive key points. Keep them distinct and actionable. Create followUps only when an action is actually supported by the conversation.",
         "For a promised quotation/pricing/deck/file, use follow-up type send_file. For a requested future meeting, use schedule.",
       ].join(" "),
     },
@@ -149,7 +150,7 @@ function buildMessages(
         `Known contact hint: ${knownContact}`,
         `Reference date/time: ${referenceDate}`,
         `Timezone: ${context.timezone ?? "Asia/Kuala_Lumpur"}`,
-        "The JSON must contain insight, participants, and followUps. Every schema field must be present; use null or [] where allowed.",
+        "The JSON must contain insight, participants, followUps, and evidence. Every schema field must be present; use null or [] where allowed.",
         `TRANSCRIPT_JSON:\n${JSON.stringify(transcript)}`,
       ].join("\n"),
     },
@@ -164,7 +165,7 @@ function responseFormat(mode: ResponseMode) {
   return {
     type: "json_schema",
     json_schema: {
-      name: "lantern_meeting_memory",
+      name: "quipus_meeting_memory",
       strict: true,
       schema: meetingExtractionJsonSchema,
     },

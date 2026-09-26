@@ -58,9 +58,10 @@ test("wake word and following command are verified as separate states", () => {
   assert.equal(commandReply("wake_detected"), "I'm listening. Say your command.");
 });
 
-test("wake command mode accepts only the two idle commands", () => {
+test("wake command mode accepts only safe idle commands", () => {
   assert.equal(interpretDeviceCommand("start recording", "wake_command"), "start_recording");
   assert.equal(interpretDeviceCommand("status report", "wake_command"), "status_report");
+  assert.equal(interpretDeviceCommand("Wi-Fi setup", "wake_command"), "wifi_setup");
   assert.equal(interpretDeviceCommand("stop recording", "wake_command"), "unknown");
   assert.equal(commandReply("start_recording", "wake_command"), "Start recording selected.");
 });

@@ -90,6 +90,17 @@ test("playback signs only the owned original object for two hours without proxyi
   });
 });
 
+test("playback accepts the owner-scoped device archive layout", async () => {
+  const sessionId = "12e8da59-6303-49ca-9564-83f8c98f2097";
+  const devicePath = `${ownerId}/device/${sessionId}/${recordingId}.wav`;
+  const mock = mockPlayback({
+    row: { id: recordingId, user_id: ownerId, storage_path: devicePath },
+  });
+  const response = await recordingPlaybackResponse(mock.client, recordingId, ownerId);
+  assert.equal(response.status, 200);
+  assert.deepEqual(mock.signed, [[devicePath, PLAYBACK_URL_SECONDS]]);
+});
+
 test("missing, transcript-only, foreign and malformed recording paths never reach signing", async () => {
   const paths = [
     null,
@@ -99,6 +110,7 @@ test("missing, transcript-only, foreign and malformed recording paths never reac
     `${ownerId}/2026/09/another-recording.webm`,
     `https://example.test/${recordingId}.webm`,
     `${ownerId}/2026/09/${recordingId}.txt`,
+    `${ownerId}/device/not-a-session/${recordingId}.wav`,
   ];
   for (const path of paths) {
     const mock = mockPlayback({

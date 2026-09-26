@@ -156,7 +156,7 @@ export function createFallbackMeetingExtraction(
   rawContext: ExtractionContext = {},
 ): MeetingExtractionResult {
   const context = extractionContextSchema.parse(rawContext);
-  const { text } = transcriptText(transcript);
+  const { text, segments } = transcriptText(transcript);
   const sentences = splitSentences(text);
 
   const wants = firstMatching(
@@ -214,7 +214,25 @@ export function createFallbackMeetingExtraction(
 
   const keyPoints = [...new Set([wants, concern, ...promisedSentences, nextStep])]
     .filter((value): value is string => Boolean(value))
-    .slice(0, 8);
+    .slice(0, 5);
+  const evidence = keyPoints.map((statement, index) => {
+    const source = segments?.find((segment) => segment.text.includes(statement));
+    const category =
+      statement === concern ? "objection" as const
+        : statement === nextStep ? "follow_up" as const
+          : promisedSentences.includes(statement) ? "commitment" as const
+            : "need" as const;
+    return {
+      category,
+      statement,
+      speaker: source?.speaker ?? null,
+      startSeconds: source?.startSeconds ?? null,
+      endSeconds: source?.endSeconds ?? null,
+      quote: compact(statement, 500),
+      confidence: 0.65,
+      importance: Math.max(1, 5 - index),
+    };
+  });
 
   return meetingExtractionResultSchema.parse({
     insight: {
@@ -235,9 +253,25 @@ export function createFallbackMeetingExtraction(
       keyPoints,
       commitments,
       detectedLanguage: detectLanguage(text),
+      executiveSummary: compact(
+        [wants, concern, nextStep].filter(Boolean).join(" ") ||
+          sentences[0] ||
+          "Review the conversation.",
+        500,
+      ),
+      dealStage: /\b(?:proposal|quotation|quote|pricing)\b/iu.test(text)
+        ? "proposal"
+        : /\b(?:pilot|evaluate|evaluation|demo)\b/iu.test(text)
+          ? "evaluation"
+          : /\b(?:agreed|signed|proceed)\b/iu.test(text)
+            ? "negotiation"
+            : "discovery",
+      risks: concern ? [concern] : [],
+      openQuestions: [],
     },
     participants: inferParticipants(text, context),
     followUps,
+    evidence,
     provider: "fallback",
     warning: FALLBACK_EXTRACTION_WARNING,
   });

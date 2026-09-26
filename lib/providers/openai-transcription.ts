@@ -5,6 +5,11 @@ import {
   transcriptionResultSchema,
   type TranscriptionResult,
 } from "../meeting-schema";
+import {
+  OPENAI_WAV_CHUNK_BYTES,
+  splitCanonicalWav,
+  type WavChunk,
+} from "../wav";
 
 const OPENAI_TRANSCRIPTION_URL = "https://api.openai.com/v1/audio/transcriptions";
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -16,6 +21,17 @@ const TRANSCRIPTION_FALLBACK_MODELS = [
   "whisper-1",
 ] as const;
 const SAME_SPEAKER_MERGE_GAP_SECONDS = 1.25;
+
+type TranscriptionOptions = {
+  fileName?: string;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  fetchImpl?: typeof fetch;
+  apiKey?: string | null;
+  modelId?: string;
+  prompt?: string;
+  onChunkProgress?: (completed: number, total: number) => void | Promise<void>;
+};
 
 const openAIResponseSchema = z
   .object({
@@ -128,17 +144,9 @@ function numberAndGroupSpeakers(
   return grouped;
 }
 
-export async function transcribeWithOpenAI(
+async function transcribeSingleWithOpenAI(
   audio: Blob,
-  options: {
-    fileName?: string;
-    timeoutMs?: number;
-    signal?: AbortSignal;
-    fetchImpl?: typeof fetch;
-    apiKey?: string | null;
-    modelId?: string;
-    prompt?: string;
-  } = {},
+  options: TranscriptionOptions = {},
 ): Promise<TranscriptionResult> {
   const runtime = env();
   const apiKey =
@@ -267,4 +275,220 @@ export async function transcribeWithOpenAI(
   throw new OpenAITranscriptionProviderError(
     "OpenAI did not detect speech in this recording.",
   );
+}
+
+type TimedSegment = TranscriptionResult["segments"][number] & {
+  startSeconds: number;
+  endSeconds: number;
+};
+
+function speakerNumber(label: string) {
+  const match = /^Speaker (\d+)$/u.exec(label);
+  return match ? Number(match[1]) : null;
+}
+
+function normalizedWords(text: string) {
+  return new Set(
+    text
+      .normalize("NFKC")
+      .toLocaleLowerCase("en")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim()
+      .split(/\s+/u)
+      .filter(Boolean),
+  );
+}
+
+function wordSimilarity(left: string, right: string) {
+  const a = normalizedWords(left);
+  const b = normalizedWords(right);
+  if (!a.size || !b.size) return 0;
+  let intersection = 0;
+  for (const word of a) if (b.has(word)) intersection += 1;
+  return intersection / Math.max(a.size, b.size);
+}
+
+/** Keeps provider-local speaker labels stable across overlapping API chunks. */
+export function combineChunkedTranscriptions(
+  chunks: readonly WavChunk[],
+  results: readonly TranscriptionResult[],
+): TranscriptionResult {
+  if (chunks.length !== results.length || chunks.length === 0) {
+    throw new Error("Each WAV chunk requires one transcription result.");
+  }
+  const combined: TranscriptionResult["segments"] = [];
+  let nextSpeaker = 1;
+  let previousCoverageEnd = 0;
+
+  for (let index = 0; index < results.length; index += 1) {
+    const chunk = chunks[index]!;
+    const result = results[index]!;
+    const shifted = result.segments.map((segment) => ({
+      ...segment,
+      ...(segment.startSeconds !== undefined
+        ? { startSeconds: segment.startSeconds + chunk.offsetSeconds }
+        : {}),
+      ...(segment.endSeconds !== undefined
+        ? { endSeconds: segment.endSeconds + chunk.offsetSeconds }
+        : {}),
+    }));
+    const localSpeakers = [...new Set(shifted.map((segment) => segment.speaker))];
+    const mapping = new Map<string, string>();
+
+    if (index === 0) {
+      for (const label of localSpeakers) {
+        if (label === "Conversation") mapping.set(label, label);
+        else {
+          mapping.set(label, `Speaker ${nextSpeaker}`);
+          nextSpeaker += 1;
+        }
+      }
+    } else {
+      const previousOverlap = combined.filter(
+        (segment): segment is TimedSegment =>
+          segment.startSeconds !== undefined &&
+          segment.endSeconds !== undefined &&
+          segment.endSeconds > chunk.offsetSeconds,
+      );
+      const candidates: Array<{ local: string; global: string; score: number }> = [];
+      for (const local of localSpeakers) {
+        const current = shifted.filter(
+          (segment): segment is TimedSegment =>
+            segment.speaker === local &&
+            segment.startSeconds !== undefined &&
+            segment.endSeconds !== undefined &&
+            segment.startSeconds < previousCoverageEnd,
+        );
+        for (const global of new Set(previousOverlap.map((segment) => segment.speaker))) {
+          let score = 0;
+          for (const currentSegment of current) {
+            for (const previousSegment of previousOverlap) {
+              if (previousSegment.speaker !== global) continue;
+              const overlap = Math.max(
+                0,
+                Math.min(currentSegment.endSeconds, previousSegment.endSeconds) -
+                  Math.max(currentSegment.startSeconds, previousSegment.startSeconds),
+              );
+              if (overlap > 0) {
+                score += overlap * (1 + wordSimilarity(currentSegment.text, previousSegment.text));
+              }
+            }
+          }
+          if (score > 0) candidates.push({ local, global, score });
+        }
+      }
+      const usedLocal = new Set<string>();
+      const usedGlobal = new Set<string>();
+      for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
+        if (usedLocal.has(candidate.local) || usedGlobal.has(candidate.global)) continue;
+        mapping.set(candidate.local, candidate.global);
+        usedLocal.add(candidate.local);
+        usedGlobal.add(candidate.global);
+      }
+      for (const local of localSpeakers) {
+        if (mapping.has(local)) continue;
+        if (local === "Conversation") mapping.set(local, local);
+        else {
+          mapping.set(local, `Speaker ${nextSpeaker}`);
+          nextSpeaker += 1;
+        }
+      }
+    }
+
+    for (const segment of shifted) {
+      const mapped = { ...segment, speaker: mapping.get(segment.speaker) ?? segment.speaker };
+      // The earlier chunk owns the overlap. Preserve a crossing segment because
+      // it may contain the first complete rendering of speech after the cut.
+      if (
+        index > 0 &&
+        mapped.endSeconds !== undefined &&
+        mapped.endSeconds <= previousCoverageEnd
+      ) {
+        continue;
+      }
+      const previous = combined.at(-1);
+      const gap =
+        previous?.endSeconds !== undefined && mapped.startSeconds !== undefined
+          ? mapped.startSeconds - previous.endSeconds
+          : Number.POSITIVE_INFINITY;
+      if (
+        previous &&
+        previous.speaker === mapped.speaker &&
+        gap >= 0 &&
+        gap <= SAME_SPEAKER_MERGE_GAP_SECONDS
+      ) {
+        previous.text = `${previous.text} ${mapped.text}`.trim();
+        if (mapped.endSeconds !== undefined) previous.endSeconds = mapped.endSeconds;
+      } else {
+        combined.push(mapped);
+      }
+    }
+    previousCoverageEnd = Math.max(
+      previousCoverageEnd,
+      chunk.offsetSeconds + chunk.durationSeconds,
+    );
+  }
+
+  const text = combined.map((segment) => segment.text).join(" ").trim();
+  return transcriptionResultSchema.parse({
+    text,
+    segments: combined,
+    language: results[0]!.language,
+    provider: "openai",
+    warning: `Long recording processed in ${chunks.length} overlapping audio sections.`,
+  });
+}
+
+async function mapWithConcurrency<T, U>(
+  values: readonly T[],
+  concurrency: number,
+  task: (value: T, index: number) => Promise<U>,
+) {
+  const output = new Array<U>(values.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (cursor < values.length) {
+      const index = cursor;
+      cursor += 1;
+      output[index] = await task(values[index]!, index);
+    }
+  });
+  await Promise.all(runners);
+  return output;
+}
+
+/**
+ * Transcribes short files directly and long Quipus WAV archives as two
+ * concurrent, overlapping requests while rebuilding absolute timestamps.
+ */
+export async function transcribeWithOpenAI(
+  audio: Blob,
+  options: TranscriptionOptions = {},
+): Promise<TranscriptionResult> {
+  if (audio.size <= OPENAI_WAV_CHUNK_BYTES) {
+    const result = await transcribeSingleWithOpenAI(audio, options);
+    await options.onChunkProgress?.(1, 1);
+    return result;
+  }
+  let chunks: WavChunk[];
+  try {
+    chunks = splitCanonicalWav(new Uint8Array(await audio.arrayBuffer()));
+  } catch (cause) {
+    throw new OpenAITranscriptionProviderError(
+      "Recordings over 20 MB must be canonical 16 kHz mono PCM WAV files.",
+      { cause },
+    );
+  }
+  const baseName = (options.fileName || "quipus.wav").replace(/\.wav$/iu, "");
+  let completed = 0;
+  const results = await mapWithConcurrency(chunks, 3, async (chunk, index) => {
+    const result = await transcribeSingleWithOpenAI(new Blob([Uint8Array.from(chunk.bytes).buffer], { type: "audio/wav" }), {
+      ...options,
+      fileName: `${baseName}.part-${String(index + 1).padStart(3, "0")}.wav`,
+    });
+    completed += 1;
+    await options.onChunkProgress?.(completed, chunks.length);
+    return result;
+  });
+  return combineChunkedTranscriptions(chunks, results);
 }
