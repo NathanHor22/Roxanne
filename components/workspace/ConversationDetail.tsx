@@ -12,9 +12,12 @@ import {
   CheckCircle2,
   Clock3,
   FileText,
+  ExternalLink,
+  Globe2,
   Headphones,
   Mail,
   Pencil,
+  Quote,
   Save,
   ShieldCheck,
   Sparkles,
@@ -30,6 +33,7 @@ import {
   type WorkspaceMode,
 } from "@/lib/workspace/model";
 import { ConversationReplay, type PlaybackProgress } from "./ConversationReplay";
+import { formatAudioTime } from "@/lib/workspace/playback";
 import { initials } from "./ConversationPanel";
 import { useWorkspaceTime } from "./WorkspaceTime";
 import styles from "./conversation-detail.module.css";
@@ -201,6 +205,8 @@ export function ConversationDetail({
             </header>
             {insight ? (
               <div className={styles.brief}>
+                {insight.executiveSummary && <p className={styles.executiveSummary}>{insight.executiveSummary}</p>}
+                {insight.dealStage && insight.dealStage !== "unknown" && <span className={styles.dealStage}>{insight.dealStage.replace("_", " ")}</span>}
                 <ul>{(insight.keyPoints.length ? insight.keyPoints : [insight.wants]).map((point, index) => <li key={index}>{point}</li>)}</ul>
                 {insight.concern && <div className={styles.concern}><strong>Keep in mind</strong><p>{insight.concern}</p></div>}
                 {insight.promised && <div><strong>You promised</strong><p>{insight.promised}</p></div>}
@@ -210,6 +216,44 @@ export function ConversationDetail({
               <div className={styles.emptyCard}><FileText /><strong>{conversation.status === "processing" ? "Preparing the brief" : "No brief available"}</strong><p>{conversation.transcript?.length ? "The original transcript is still available." : conversation.recordingId ? "The original recording is still available." : "No recording or transcript is available."}</p></div>
             )}
           </section>
+
+          {Boolean(conversation.evidence?.length) && (
+            <section className={styles.contextCard}>
+              <header className={styles.cardHeader}>
+                <div><span className={styles.kicker}>VERIFIED EVIDENCE</span><h3>Why Quipus remembered it</h3></div>
+                <Quote />
+              </header>
+              <div className={styles.evidenceList}>
+                {conversation.evidence!.slice(0, 8).map((item, index) => (
+                  <article className={styles.evidenceItem} key={item.id || `${item.category}-${index}`}>
+                    <span>{item.category.replace("_", " ")} · {Math.round(item.confidence * 100)}%</span>
+                    <strong>{item.statement}</strong>
+                    <blockquote>“{item.quote}”</blockquote>
+                    <small>{item.speaker || "Unidentified speaker"}{item.startSeconds !== null ? ` · ${formatAudioTime(item.startSeconds)}` : ""}</small>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {Boolean(conversation.research?.length) && (
+            <section className={styles.contextCard}>
+              <header className={styles.cardHeader}>
+                <div><span className={styles.kicker}>PUBLIC CONTEXT</span><h3>Company research</h3></div>
+                <Globe2 />
+              </header>
+              <div className={styles.researchList}>
+                {conversation.research!.slice(0, 6).map((source) => (
+                  <a href={source.url} target="_blank" rel="noreferrer nofollow" key={source.id || source.url}>
+                    <span>{source.company}</span>
+                    <strong>{source.title}</strong>
+                    <p>{source.snippet}</p>
+                    <small>Open source <ExternalLink /></small>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
 
           {(approvals.length > 0 || tasks.length > 0 || commitments.length > 0) && (
             <section className={styles.contextCard}>

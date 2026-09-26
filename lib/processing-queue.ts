@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { prepareWavForRecognition } from "./audio-processing";
 import { conversationClock } from "./conversation-clock";
+import { researchCompaniesForMeeting } from "./company-research";
 import { env } from "./env";
 import { transcriptionResultSchema, type TranscriptionResult } from "./meeting-schema";
 import { persistFailedHardwareMeeting, persistProcessedMeeting } from "./persistence";
 import { transcribeWithOpenAI } from "./providers/openai-transcription";
+import { verifyDeviceArchive } from "./device-upload";
 import { extractConversationInsights } from "./providers/meeting-extraction";
+import { setProcessingState } from "./redis";
 import type { Meeting } from "./types";
 
 /** A job owns one archived session, never the current state of its device. */
@@ -34,7 +38,25 @@ export async function processNextRecording(client: SupabaseClient, userId?: stri
     const { error } = await client.from("lantern_sessions").update({ processing_stage, ...values })
       .eq("id", session.id).eq("user_id", job.user_id);
     if (error) throw new Error(error.message);
+    if (recording?.id) {
+      const progress: Record<string, number> = {
+        queued: 5, audio_processing: 18, transcribing: 45,
+        consolidating: 72, researching: 82, saving: 90, ready: 100, failed: 100,
+      };
+      await setProcessingState(job.user_id, recording.id, {
+        stage: processing_stage,
+        progress: progress[processing_stage] ?? 0,
+        sessionId: session.id,
+        ...(typeof values.meeting_id === "string" ? { meetingId: values.meeting_id } : {}),
+        ...(typeof values.processing_error === "string" ? { error: values.processing_error } : {}),
+      });
+    }
   };
+  const heartbeat = setInterval(() => {
+    void updateJob({ lease_until: new Date(Date.now() + 6 * 60_000).toISOString() })
+      .catch((error) => console.error("[recording-lease-heartbeat]", error));
+  }, 2 * 60_000);
+  heartbeat.unref?.();
   let readyMeetingId: string | null = null;
   try {
     if (!recording?.storage_path) throw new Error("Original WAV is unavailable.");
@@ -53,11 +75,41 @@ export async function processNextRecording(client: SupabaseClient, userId?: stri
     if (session.final_transcription) {
       transcription = transcriptionResultSchema.parse(session.final_transcription);
     } else {
-      await stage("transcribing");
+      await stage("audio_processing");
       const { data: audio, error: audioError } = await client.storage.from("recordings").download(recording.storage_path);
       if (audioError || !audio) throw new Error("Could not read the original WAV.");
+      const archiveBytes = new Uint8Array(await audio.arrayBuffer());
+      const { data: manifest, error: manifestError } = await client.from("lantern_audio_uploads")
+        .select("total_bytes,sha256").eq("session_id", session.id).maybeSingle();
+      if (manifestError) throw new Error("Could not read the recording integrity manifest.");
+      if (manifest) {
+        verifyDeviceArchive(archiveBytes, Number(manifest.total_bytes), String(manifest.sha256));
+        const { error: verifiedError } = await client.from("lantern_audio_uploads")
+          .update({ verified_at: new Date().toISOString() }).eq("session_id", session.id);
+        if (verifiedError) throw new Error("Could not mark the recording integrity check complete.");
+      }
+      const prepared = prepareWavForRecognition(archiveBytes);
+      const { error: qualityError } = await client.from("recordings").update({ audio_quality: prepared.quality })
+        .eq("id", recording.id).eq("user_id", job.user_id);
+      if (qualityError) throw new Error(`Could not save audio quality metadata: ${qualityError.message}`);
+      await stage("transcribing");
       try {
-        transcription = await transcribeWithOpenAI(audio, { fileName: `${session.id}.wav`, timeoutMs: 120000 });
+        transcription = await transcribeWithOpenAI(
+          new Blob([Uint8Array.from(prepared.audio).buffer], { type: "audio/wav" }),
+          {
+            fileName: `${session.id}.wav`,
+            timeoutMs: 180000,
+            onChunkProgress: async (completed, total) => {
+              await setProcessingState(job.user_id, recording.id, {
+                stage: "transcribing",
+                progress: Math.round(20 + (completed / total) * 45),
+                completedAudioSections: completed,
+                totalAudioSections: total,
+                sessionId: session.id,
+              });
+            },
+          },
+        );
       } catch (cause) {
         if (job.attempts < 3 || !session.transcript_segments?.length) throw cause;
         transcription = transcriptionResultSchema.parse({
@@ -66,22 +118,30 @@ export async function processNextRecording(client: SupabaseClient, userId?: stri
           warning: "Final speaker separation was unavailable; this report uses the live transcript.",
         });
       }
-      await stage("summarising", { final_transcription: transcription, transcript_segments: transcription.segments,
+      await stage("consolidating", { final_transcription: transcription, transcript_segments: transcription.segments,
         transcript_language: transcription.language, transcript_received_at: new Date().toISOString() });
     }
+    if (session.final_transcription) await stage("consolidating");
     const extraction = await extractConversationInsights(transcription.segments, {
       title: "Recorded conversation", outputLanguage: "English", referenceDate: clock.startedAt,
       timezone: clock.timeZone, referenceLocalDateTime: clock.localDateTime,
     });
+    await stage("researching");
+    const research = await researchCompaniesForMeeting(
+      extraction.participants.map((participant) => participant.company),
+    );
     await stage("saving");
     const contacts = extraction.participants.map(p => ({ id: randomUUID(), ...p }));
     const meeting: Meeting = {
       id: reference, title: contacts[0] ? `${contacts[0].name}${contacts[0].company ? ` · ${contacts[0].company}` : ""}` : `Conversation · ${clock.localDate} ${clock.localTime.slice(0, 5)}`,
       startAt: clock.startedAt, endAt, status: "ready", source: "hardware", contacts,
-      recordingId: recording.id, transcript: transcription.segments, insight: extraction.insight, followUps: [],
+      recordingId: recording.id, transcript: transcription.segments, insight: extraction.insight,
+      evidence: extraction.evidence.map((item) => ({ ...item, sourceKind: "conversation" })),
+      research, followUps: [],
     };
     const saved = await persistProcessedMeeting({ ownerUserId: job.user_id, clientReference: reference,
-      meeting, transcription, extraction, preUploadedRecording: { recordingId: recording.id, storagePath: recording.storage_path } });
+      meeting, transcription, extraction, research,
+      preUploadedRecording: { recordingId: recording.id, storagePath: recording.storage_path } });
     if (!saved.meetingId) throw new Error("Could not save the meeting.");
     readyMeetingId = saved.meetingId;
     await stage("ready", { meeting_id: saved.meetingId, processing_error: null });
@@ -115,6 +175,8 @@ export async function processNextRecording(client: SupabaseClient, userId?: stri
     }
     await updateJob({ state: failed ? "failed" : "queued", lease_until: null, last_error: message,
       available_at: new Date(Date.now() + job.attempts * 60000).toISOString() });
+  } finally {
+    clearInterval(heartbeat);
   }
   return true;
 }

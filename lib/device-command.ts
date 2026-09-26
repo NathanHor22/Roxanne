@@ -10,6 +10,7 @@ export type DeviceCommandContext =
 export type DeviceCommandIntent =
   | "wake_detected"
   | "status_report"
+  | "wifi_setup"
   | "start_recording"
   | "stop_recording"
   | "consent_yes"
@@ -71,6 +72,9 @@ export function interpretDeviceCommand(
   ) {
     return "status_report";
   }
+  if (/\b(?:wi fi setup|wifi setup|set up wi fi|set up wifi|change wi fi|change wifi|network setup|internet setup|setup network)\b/iu.test(command)) {
+    return "wifi_setup";
+  }
   if (
     /\b(?:start recording|start the recording|start meeting|record now|we're talking now|we are talking now|mula rakam|mulakan rakaman|mula meeting|mula mesyuarat|ring start)\b/iu.test(
       command,
@@ -113,9 +117,11 @@ export function commandReply(
         return "I did not hear a clear yes or no. Please confirm. Do you consent to being recorded?";
       }
       return context === "wake_command"
-        ? "I did not catch that. Say start recording or status report."
-        : "I did not catch that. Say Computer, then start recording or status report.";
+        ? "I did not catch that. Say start recording, status report, or Wi-Fi setup."
+        : "I did not catch that. Say Computer, then start recording, status report, or Wi-Fi setup.";
     case "status_report":
       return "Preparing your status report.";
+    case "wifi_setup":
+      return "Opening Wi-Fi setup.";
   }
 }

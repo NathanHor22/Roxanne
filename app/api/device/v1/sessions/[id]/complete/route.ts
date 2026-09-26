@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticateLantern } from "@/lib/lantern-device-auth";
 import { advanceLantern, lanternMachineSchema } from "@/lib/lantern-state";
 import { processNextRecording } from "@/lib/processing-queue";
+import { publishProcessingWakeup } from "@/lib/redis";
 import { getServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -34,7 +35,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (queueError) throw queueError;
       machine = lanternMachineSchema.parse(data);
     }
-    after(async () => { await processNextRecording(client, device.userId, id).catch(error => console.error("[recording-job]", error)); });
+    after(async () => {
+      const results = await Promise.allSettled([
+        publishProcessingWakeup({ sessionId: id, userId: device.userId }),
+        processNextRecording(client, device.userId, id),
+      ]);
+      for (const result of results) {
+        if (result.status === "rejected") console.error("[recording-job]", result.reason);
+      }
+    });
     return reply({ accepted: true, archiveAccepted: true, processingQueued: stored.processing_stage !== "ready",
       duplicate: Boolean(stored.ended_at), conversationId: `hardware:${id}`, meetingId: stored.meeting_id,
       meeting: stored.processing_stage === "ready" ? { status: "ready" } : null, session: machine });

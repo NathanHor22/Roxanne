@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Meeting } from "@/lib/types";
 import type { MeetingExtractionResult, TranscriptionResult } from "@/lib/meeting-schema";
+import type { RelayResearchSource } from "@/lib/relay";
 import { getServerSupabase, resolveWorkspaceUserId } from "@/lib/supabase/server";
 
 export interface PersistMeetingInput {
@@ -16,6 +17,7 @@ export interface PersistMeetingInput {
   fileName?: string;
   transcription: TranscriptionResult;
   extraction: MeetingExtractionResult;
+  research?: RelayResearchSource[];
   /** Private object and metadata row created by /api/recordings/upload-url. */
   preUploadedRecording?: {
     recordingId: string;
@@ -283,6 +285,8 @@ export async function persistProcessedMeeting(
     user_id: userId, meeting_id: meetingId, meeting_type: insight.meetingType, intent: insight.intent,
     interest_level: insight.interestLevel, wants: insight.wants, concern: insight.concern,
     promised: insight.promised, next_action: insight.next, key_points: insight.keyPoints,
+    executive_summary: insight.executiveSummary, deal_stage: insight.dealStage,
+    risks: insight.risks, open_questions: insight.openQuestions,
   }, { onConflict: "meeting_id" });
   if (insightError) throw new Error(`Could not save meeting insights: ${insightError.message}`);
 
@@ -291,6 +295,40 @@ export async function persistProcessedMeeting(
   if (insight.commitments.length) {
     const { error } = await client.from("commitments").insert(insight.commitments.map((item) => ({ user_id: userId, meeting_id: meetingId, owner_type: item.ownerType, description: item.description, due_at: dueTimestamp(item.dueAt), status: item.status })));
     if (error) throw new Error(`Could not save commitments: ${error.message}`);
+  }
+
+  const { error: evidenceDeleteError } = await client.from("meeting_evidence").delete().eq("meeting_id", meetingId);
+  if (evidenceDeleteError) throw new Error(`Could not refresh meeting evidence: ${evidenceDeleteError.message}`);
+  if (input.extraction.evidence.length) {
+    const { error } = await client.from("meeting_evidence").insert(input.extraction.evidence.map((item) => ({
+      user_id: userId,
+      meeting_id: meetingId,
+      category: item.category,
+      statement: item.statement,
+      speaker: item.speaker,
+      start_seconds: item.startSeconds,
+      end_seconds: item.endSeconds,
+      quote: item.quote,
+      confidence: item.confidence,
+      importance: item.importance,
+      source_kind: "conversation",
+    })));
+    if (error) throw new Error(`Could not save meeting evidence: ${error.message}`);
+  }
+
+  const { error: researchDeleteError } = await client.from("meeting_research_sources").delete().eq("meeting_id", meetingId);
+  if (researchDeleteError) throw new Error(`Could not refresh public company research: ${researchDeleteError.message}`);
+  if (input.research?.length) {
+    const { error } = await client.from("meeting_research_sources").insert(input.research.map((source) => ({
+      user_id: userId,
+      meeting_id: meetingId,
+      company: source.company,
+      title: source.title,
+      url: source.url,
+      snippet: source.snippet,
+      published_date: source.publishedDate,
+    })));
+    if (error) throw new Error(`Could not save public company research: ${error.message}`);
   }
 
   const { error: followUpsDeleteError } = await client.from("follow_ups").delete().eq("meeting_id", meetingId);
@@ -320,6 +358,11 @@ export async function persistProcessedMeeting(
     schedule: item.schedule,
     status: "pending",
   }));
+  input.meeting.evidence = input.extraction.evidence.map((item) => ({
+    ...item,
+    sourceKind: "conversation",
+  }));
+  input.meeting.research = input.research || [];
 
   const signed = path
     ? (await client.storage.from("recordings").createSignedUrl(path, 3600)).data

@@ -5,12 +5,34 @@
 #include <stdint.h>
 
 #include "esp_err.h"
+#include "lantern_display.h"
 #include "lantern_storage.h"
+
+#define LANTERN_WIFI_SCAN_LIMIT 5
+#define LANTERN_REPORT_LIST_LIMIT 5
+
+typedef struct {
+  char ssid[33];
+  int rssi;
+  bool secured;
+  bool remembered;
+} lantern_wifi_network_t;
+
+typedef struct {
+  char id[37];
+  char title[49];
+  char time[17];
+  char status[17];
+  char summary[145];
+  char action[97];
+} lantern_report_item_t;
 
 typedef struct {
   bool wifi_connected;
+  int wifi_rssi;
   bool setup_portal_active;
   bool paired;
+  lantern_connectivity_t connectivity;
   char setup_ssid[33];
   char ip_address[16];
   char last_error[96];
@@ -47,6 +69,13 @@ typedef struct {
 esp_err_t lantern_network_start(lantern_config_t *config, lantern_network_callback_t callback);
 void lantern_network_get_status(lantern_network_status_t *status);
 esp_err_t lantern_network_send_heartbeat(const char *state, unsigned state_version, int battery_level);
+void lantern_network_set_realtime(bool enabled);
+esp_err_t lantern_network_open_setup_portal(void);
+esp_err_t lantern_network_scan_wifi(lantern_wifi_network_t *networks, size_t capacity,
+                                    size_t *count);
+esp_err_t lantern_network_connect_wifi(const char *ssid, const char *password);
+esp_err_t lantern_network_get_reports(lantern_report_item_t *items, size_t capacity,
+                                      size_t *count);
 esp_err_t lantern_network_play_briefing(const char *kind, int battery_level);
 bool lantern_network_review_pending(void);
 void lantern_network_cancel_review(void);

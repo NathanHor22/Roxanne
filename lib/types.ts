@@ -3,6 +3,28 @@ export type Locale = "en" | "ms" | "zh-CN" | "yue" | "ta";
 export type MeetingStatus = "upcoming" | "processing" | "ready" | "failed";
 export type FollowUpStatus = "pending" | "approved" | "completed" | "failed" | "dismissed";
 export type InterestLevel = "low" | "medium" | "high" | "unknown";
+export type DealStage =
+  | "discovery"
+  | "evaluation"
+  | "proposal"
+  | "negotiation"
+  | "closed_won"
+  | "closed_lost"
+  | "unknown";
+export type EvidenceCategory =
+  | "need"
+  | "decision"
+  | "commitment"
+  | "objection"
+  | "budget"
+  | "timeline"
+  | "stakeholder"
+  | "competitor"
+  | "follow_up"
+  | "product"
+  | "company"
+  | "open_question"
+  | "context";
 
 export interface Contact {
   id: string;
@@ -40,6 +62,32 @@ export interface MeetingInsight {
   keyPoints: string[];
   commitments: Commitment[];
   detectedLanguage?: string;
+  executiveSummary?: string;
+  dealStage?: DealStage;
+  risks?: string[];
+  openQuestions?: string[];
+}
+
+export interface MeetingEvidence {
+  id?: string;
+  category: EvidenceCategory;
+  statement: string;
+  speaker: string | null;
+  startSeconds: number | null;
+  endSeconds: number | null;
+  quote: string;
+  confidence: number;
+  importance: number;
+  sourceKind?: "conversation" | "research";
+}
+
+export interface PublicResearchSource {
+  id?: string;
+  company: string;
+  title: string;
+  url: string;
+  snippet: string;
+  publishedDate: string | null;
 }
 
 export interface FollowUp {
@@ -76,6 +124,8 @@ export interface Meeting {
   recordingUrl?: string | null;
   transcript?: TranscriptSegment[];
   insight?: MeetingInsight | null;
+  evidence?: MeetingEvidence[];
+  research?: PublicResearchSource[];
   followUps?: FollowUp[];
   calendarEventId?: string | null;
   sourceConversationId?: string | null;

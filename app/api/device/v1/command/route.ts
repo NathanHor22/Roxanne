@@ -80,7 +80,7 @@ export async function POST(request: Request) {
             ? "Computer. Quipus."
             : context === "consent" || context === "consent_retry" || context === "action"
               ? "Yes. No. Yeah. Ya. Tidak. Boleh. Tak."
-              : "Start recording. Status report. Full breakdown. Third meeting. Yesterday. At two pm. Continue my report. Stop.",
+              : "Start recording. Status report. Wi-Fi setup. Full breakdown. Third meeting. Yesterday. At two pm. Continue my report. Stop.",
         timeoutMs: 45_000,
       },
     );

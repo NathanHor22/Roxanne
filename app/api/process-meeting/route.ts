@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuthenticatedSession, requireProductionPersistence } from "@/lib/api-security";
+import { researchCompaniesForMeeting } from "@/lib/company-research";
 import { MAX_AUDIO_BYTES, normalizeAudioContentType } from "@/lib/audio-upload";
+import { prepareWavForRecognition } from "@/lib/audio-processing";
 import { parseLocale } from "@/lib/i18n";
 import { persistProcessedMeeting } from "@/lib/persistence";
 import { transcribeMeetingAudio } from "@/lib/providers/transcription";
@@ -154,7 +156,7 @@ async function parseDirectRequest(request: Request): Promise<ProcessInput> {
     return failClaimedRecording(new ProcessRequestError("The uploaded recording is empty.", 400));
   }
   if (storedAudio.size > MAX_AUDIO_BYTES) {
-    return failClaimedRecording(new ProcessRequestError("The recording exceeds the 25 MB limit.", 413));
+    return failClaimedRecording(new ProcessRequestError("The recording exceeds the 256 MB archive limit.", 413));
   }
   if (storedAudio.size !== input.size) {
     return failClaimedRecording(new ProcessRequestError("The private upload did not finish correctly. Upload the recording again.", 409));
@@ -193,7 +195,7 @@ async function parseDirectRequest(request: Request): Promise<ProcessInput> {
 
 async function parseLocalMultipartRequest(request: Request): Promise<ProcessInput> {
   // Vercel buffers Route Handler request bodies and has a much smaller request
-  // limit than Quipus's 25 MB file limit. Multipart is intentionally confined
+  // limit than Quipus's 256 MB archive limit. Multipart is intentionally confined
   // to credential-free local development and tiny deterministic smoke tests.
   if (process.env.NODE_ENV === "production" || getServerSupabase()) {
     throw new ProcessRequestError("Upload audio directly to private storage before processing.", 415);
@@ -202,7 +204,7 @@ async function parseLocalMultipartRequest(request: Request): Promise<ProcessInpu
   const audio = form.get("audio");
   if (!(audio instanceof File)) throw new ProcessRequestError("Choose an audio recording.", 400);
   if (audio.size === 0) throw new ProcessRequestError("The recording is empty.", 400);
-  if (audio.size > MAX_AUDIO_BYTES) throw new ProcessRequestError("The recording exceeds the 25 MB limit.", 413);
+  if (audio.size > MAX_AUDIO_BYTES) throw new ProcessRequestError("The recording exceeds the 256 MB archive limit.", 413);
   const normalizedType = normalizeAudioContentType(audio.name, audio.type);
   if (!normalizedType) throw new ProcessRequestError(`Unsupported audio type: ${audio.type || "unknown"}`, 415);
 
@@ -225,7 +227,7 @@ async function parseLocalMultipartRequest(request: Request): Promise<ProcessInpu
 
 async function markFailed(input: ProcessInput | undefined, message: string) {
   if (input?.processingId) {
-    await setProcessingState(input.processingId, { status: "failed", error: message });
+    await setProcessingState(input.ownerId || "local-development", input.processingId, { status: "failed", error: message });
   }
   if (!input?.preUploadedRecording || !input.ownerId) return;
   const client = getServerSupabase();
@@ -260,10 +262,23 @@ export async function POST(request: Request) {
       ? await parseDirectRequest(request)
       : await parseLocalMultipartRequest(request);
     const clientReference = input.clientReference;
+    const processingOwner = input.ownerId || "local-development";
 
-    await setProcessingState(input.processingId, { status: "processing", stage: "transcribing", fileName: input.fileName });
-    const transcription = await transcribeMeetingAudio(input.audio, { fileName: input.fileName });
-    await setProcessingState(input.processingId, { status: "processing", stage: "extracting", language: transcription.language });
+    let recognitionAudio = input.audio;
+    await setProcessingState(processingOwner, input.processingId, { status: "processing", stage: "audio_processing", fileName: input.fileName });
+    if (input.audio.type === "audio/wav") {
+      const prepared = prepareWavForRecognition(new Uint8Array(await input.audio.arrayBuffer()));
+      recognitionAudio = new Blob([Uint8Array.from(prepared.audio).buffer], { type: "audio/wav" });
+      if (input.preUploadedRecording && input.ownerId) {
+        const client = getServerSupabase();
+        const { error: qualityError } = await client?.from("recordings").update({ audio_quality: prepared.quality })
+          .eq("id", input.preUploadedRecording.recordingId).eq("user_id", input.ownerId) ?? { error: null };
+        if (qualityError) throw new Error(`Could not save audio quality metadata: ${qualityError.message}`);
+      }
+    }
+    await setProcessingState(processingOwner, input.processingId, { status: "processing", stage: "transcribing", fileName: input.fileName });
+    const transcription = await transcribeMeetingAudio(recognitionAudio, { fileName: input.fileName });
+    await setProcessingState(processingOwner, input.processingId, { status: "processing", stage: "consolidating", language: transcription.language });
     const extraction = await extractConversationInsights(transcription.segments, {
       title: input.title,
       contactHint: input.contactHint ? { name: input.contactHint.name, company: input.contactHint.company, role: input.contactHint.role, email: input.contactHint.email, phone: input.contactHint.phone } : undefined,
@@ -271,6 +286,10 @@ export async function POST(request: Request) {
       referenceDate: input.startAt,
       timezone: "Asia/Kuala_Lumpur",
     });
+    await setProcessingState(processingOwner, input.processingId, { status: "processing", stage: "researching" });
+    const research = await researchCompaniesForMeeting(
+      extraction.participants.map((participant) => participant.company),
+    );
 
     const contacts: Contact[] = extraction.participants.length
       ? extraction.participants.map((item) => ({ id: randomUUID(), ...item }))
@@ -286,6 +305,8 @@ export async function POST(request: Request) {
       contacts,
       transcript: transcription.segments,
       insight: extraction.insight,
+      evidence: extraction.evidence.map((item) => ({ ...item, sourceKind: "conversation" })),
+      research,
       followUps,
     };
 
@@ -296,13 +317,14 @@ export async function POST(request: Request) {
       fileName: input.fileName,
       transcription,
       extraction,
+      research,
       preUploadedRecording: input.preUploadedRecording,
     });
     if (persistence.recordingId) meeting.recordingId = persistence.recordingId;
     if (persistence.signedRecordingUrl) meeting.recordingUrl = persistence.signedRecordingUrl;
     await rememberSession(input.clientReference, { title: meeting.title, intent: extraction.insight.intent, commitments: extraction.insight.commitments, followUps: extraction.followUps });
     if (contacts[0]) await rememberPerson(contacts[0].id, { name: contacts[0].name, company: contacts[0].company, lastMeeting: meeting.startAt, wants: extraction.insight.wants, openCommitments: extraction.insight.commitments.filter((item) => item.ownerType === "user" && item.status === "open").map((item) => item.description) });
-    await setProcessingState(input.processingId, { status: "ready", meetingId: input.clientReference, persisted: persistence.persisted });
+    await setProcessingState(processingOwner, input.processingId, { status: "ready", meetingId: input.clientReference, persisted: persistence.persisted });
 
     return NextResponse.json({
       meeting,

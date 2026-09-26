@@ -3,6 +3,7 @@ export interface WorkerConfig {
   relayToken: string;
   authEncryptionKey: string;
   workspaceKey: string;
+  redisUrl?: string;
   host: string;
   port: number;
 }
@@ -26,6 +27,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
     if (storage.protocol !== "https:" || storage.username || storage.password || storage.pathname !== "/" || storage.search || storage.hash) {
       throw new Error("MEDIA_STORAGE_ORIGIN must be the HTTPS Supabase project origin, without a path.");
     }
+  }
+  let redisUrl: string | undefined;
+  if (env.UPSTASH_REDIS_URL?.trim()) {
+    const redis = new URL(env.UPSTASH_REDIS_URL.trim());
+    const localRedis = redis.protocol === "redis:" && ["localhost", "127.0.0.1"].includes(redis.hostname);
+    if (redis.protocol !== "rediss:" && !localRedis) {
+      throw new Error("UPSTASH_REDIS_URL must use encrypted rediss:// (redis:// is allowed only for localhost)." );
+    }
+    redisUrl = redis.toString();
   }
   const databaseUrl = required(env, "DATABASE_URL");
   const relayToken = required(env, "WHATSAPP_RELAY_TOKEN");
@@ -60,6 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
     relayToken,
     authEncryptionKey,
     workspaceKey,
+    redisUrl,
     host: env.HOST?.trim() || "0.0.0.0",
     port,
   };

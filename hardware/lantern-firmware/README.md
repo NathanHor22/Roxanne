@@ -16,15 +16,17 @@ native USB, 16 MB flash, and an SDIO microSD slot. A battery and microSD card
 are not required to flash the USB-powered prototype. Touching the screen
 provides the same primary control as the centre button on Quipus Original.
 
-The current V2 image reports battery level as unknown until measurement is
-implemented; it does not fabricate a percentage. It automatically
+The V2 image reads the board's built-in 1:1 battery divider on GPIO 9 and shows
+a smoothed percentage in the top status bar. Validate its endpoints against the
+final battery before treating it as laboratory-grade state of charge. The top bar
+shows `CHG` while a detectable charging source is connected and `BAT` while the
+device runs from its battery. It automatically
 mounts a FAT16/FAT32 microSD card without formatting it, streams the complete
 16 kHz mono PCM meeting into a temporary file, finalizes a WAV on Stop, and
 uploads the full file directly to private Storage using resumable 6 MiB requests
 with a 16 KiB RAM buffer. A server without the new upload endpoint uses the
 legacy chunked upload. An SD-backed session never substitutes the 30-second
-PSRAM buffer when its full recording cannot be uploaded. Battery telemetry remains a
-separate hardware step.
+PSRAM buffer when its full recording cannot be uploaded.
 
 Hardware-specific pins and capabilities live under `main/boards`. Session,
 voice, networking, and dashboard behavior remain in the shared firmware. Each
@@ -96,7 +98,7 @@ replace it later; changing the displayed name cannot retrain a wake model.
 
 Quipus V2 records the complete meeting to microSD while keeping the rolling
 30-second PSRAM retry archive. The current raw-WAV server contract accepts up
-to 25 MB, which is about 13 minutes 39 seconds at 16 kHz mono 16-bit PCM. The
+to 256 MB, which is about 2 hours 19 minutes at 16 kHz mono 16-bit PCM. The
 five-minute prototype target uses about 9.6 MB. Hour-long replay will require
 an encoded on-device format plus resumable upload state across power cycles.
 

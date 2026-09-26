@@ -42,3 +42,17 @@ export function verifyDeviceArchive(bytes: Uint8Array, expectedBytes: number, sh
   }
   return wav;
 }
+
+/** Fast acceptance check for an object that Supabase TUS has finalized. */
+export function verifyStoredArchiveMetadata(
+  object: { size?: number; contentType?: string | null },
+  expectedBytes: number,
+) {
+  if (object.size !== expectedBytes) {
+    throw new Error("The complete recording has not reached storage.");
+  }
+  if (object.contentType && object.contentType !== "audio/wav") {
+    throw new Error("The stored recording has an unexpected media type.");
+  }
+  return true;
+}

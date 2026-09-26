@@ -45,6 +45,10 @@ function validExtraction() {
         },
       ],
       detectedLanguage: "English + Bahasa Malaysia",
+      executiveSummary: "Acme is evaluating a procurement automation pilot and needs ERP compatibility.",
+      dealStage: "evaluation" as const,
+      risks: ["ERP integration must be confirmed"],
+      openQuestions: [],
     },
     participants: [
       {
@@ -61,6 +65,18 @@ function validExtraction() {
         description: "Send revised pricing",
         dueAt: "2026-08-28",
         draft: null,
+      },
+    ],
+    evidence: [
+      {
+        category: "need" as const,
+        statement: "Acme wants a procurement automation pilot.",
+        speaker: "James Tan",
+        startSeconds: 0,
+        endSeconds: 8,
+        quote: "A procurement automation pilot",
+        confidence: 0.9,
+        importance: 5,
       },
     ],
   };

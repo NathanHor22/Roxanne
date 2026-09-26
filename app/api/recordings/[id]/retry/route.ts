@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAuthenticatedLanternUser } from "@/lib/supabase/session";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { processNextRecording } from "@/lib/processing-queue";
+import { publishProcessingWakeup } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -14,6 +15,11 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   if (!id.success) return NextResponse.json({ error: "Invalid recording." }, { status: 400 });
   const { data: sessionId, error } = await client.rpc("retry_lantern_processing", { p_recording_id: id.data, p_user_id: user.id });
   if (error || !sessionId) return NextResponse.json({ error: "This recording is already processing, complete, or unavailable. Refresh its status." }, { status: 409 });
-  after(async () => { await processNextRecording(client, user.id, sessionId).catch(() => console.error("Recording retry will resume after its lease expires.")); });
+  after(async () => {
+    await Promise.allSettled([
+      publishProcessingWakeup({ sessionId, userId: user.id }),
+      processNextRecording(client, user.id, sessionId),
+    ]);
+  });
   return NextResponse.json({ accepted: true }, { headers: { "cache-control": "no-store" } });
 }

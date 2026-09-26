@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { deviceUploadRequest, directStorageEndpoint, TUS_CHUNK_BYTES, validateTusLocation, verifyDeviceArchive } from "@/lib/device-upload";
+import { deviceUploadRequest, directStorageEndpoint, TUS_CHUNK_BYTES, validateTusLocation, verifyStoredArchiveMetadata } from "@/lib/device-upload";
 import { authenticateLantern } from "@/lib/lantern-device-auth";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
@@ -47,14 +47,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return reply({ accepted: true });
     }
     if (input.action === "commit") {
-      const { data: audio, error: readError } = await client.storage.from("recordings").download(path);
-      if (readError || !audio) return reply({ error: "Upload is incomplete. Keep the SD original and retry." }, 409);
-      verifyDeviceArchive(new Uint8Array(await audio.arrayBuffer()), input.bytes, input.sha256);
+      // TUS has already finalized the object atomically. Confirm its server-side
+      // size here instead of downloading an hour-long WAV through Vercel merely
+      // to hash it a second time. The processing worker verifies the declared
+      // SHA-256 while reading these same bytes for transcription.
+      const { data: object, error: infoError } = await client.storage.from("recordings").info(path);
+      if (infoError || !object) return reply({ error: "Upload is incomplete. Keep the SD original and retry." }, 409);
+      verifyStoredArchiveMetadata(object, input.bytes);
       const { data: recordingId, error: attachError } = await client.rpc("attach_lantern_direct_audio", {
         p_session_id: id, p_user_id: device.userId, p_device_id: device.id,
       });
       if (attachError) throw attachError;
-      return reply({ accepted: true, archived: true, recordingId, uploadedBytes: input.bytes });
+      return reply({ accepted: true, archived: true, integrityVerification: "processing", recordingId, uploadedBytes: input.bytes });
     }
     const endpoint = directStorageEndpoint(env().NEXT_PUBLIC_SUPABASE_URL!);
     const { data: signed, error: signingError } = await client.storage.from("recordings").createSignedUploadUrl(path);

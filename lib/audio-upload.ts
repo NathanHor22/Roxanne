@@ -1,4 +1,5 @@
-export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+/** About 2 hours 20 minutes of the firmware's 16 kHz mono PCM format. */
+export const MAX_AUDIO_BYTES = 256 * 1024 * 1024;
 
 export const STORAGE_AUDIO_TYPES = [
   "audio/mpeg",
